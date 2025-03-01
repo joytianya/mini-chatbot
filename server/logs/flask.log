@@ -1,0 +1,111 @@
+2025-03-01 22:16:10 [INFO] ARK_API_KEY 已配置
+
+=== 服务器启动 ===
+本地访问: http://127.0.0.1:5001
+局域网访问: http://192.168.1.11:5001
+=================
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.1.11:5001
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+2025-03-01 22:16:11 [INFO] ARK_API_KEY 已配置
+ * Debugger is active!
+ * Debugger PIN: 665-802-798
+2025-03-01 22:16:12 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:12 [INFO] X-Forwarded-For: None
+127.0.0.1 - - [01/Mar/2025 22:16:12] "GET /api/test HTTP/1.1" 200 -
+2025-03-01 22:16:16 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:16 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:16 [INFO] 收到请求: OPTIONS /api/chat
+127.0.0.1 - - [01/Mar/2025 22:16:16] "[35m[1mOPTIONS /api/chat HTTP/1.1[0m" 204 -
+2025-03-01 22:16:25 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:25 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:25 [INFO] 收到请求: POST /upload
+`embedding_function` is expected to be an Embeddings object, support for passing in a function will soon be removed.
+127.0.0.1 - - [01/Mar/2025 22:16:25] "POST /upload HTTP/1.1" 200 -
+2025-03-01 22:16:29 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:29 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:29 [INFO] 收到请求: OPTIONS /api/chat_with_doc
+127.0.0.1 - - [01/Mar/2025 22:16:29] "[35m[1mOPTIONS /api/chat_with_doc HTTP/1.1[0m" 204 -
+2025-03-01 22:16:39 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:39 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:39 [INFO] 收到请求: POST /api/chat
+2025-03-01 22:16:39 [INFO] 收到的请求数据: {"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "It seems like your message might be incomplete. Could you clarify or provide more details about what you're asking or referring to? I'm here to help!"}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "Got it! If you're referring to the number \"1,\" here are a few interpretations or fun facts about it:\n\n1. **Numerical Value**: It's the first and smallest positive integer.\n2. **Symbolism**: Often represents unity, beginnings, or singularity.\n3. **In Math**: It’s the multiplicative identity (any number multiplied by 1 remains unchanged).\n4. **In Sports**: Teams or players ranked #1 are considered the best.\n5. **In Computing**: It’s a binary digit (bit), representing \"on\" or \"true.\"\n\nLet me know if you'd like me to expand on any of these! 😊"}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "Ah, I see! If you're simply sharing the number **1**, here’s a fun thought: \n\n**1** is the foundation of all numbers. It’s where counting begins, and it’s often associated with leadership, independence, and new beginnings. In many cultures, it symbolizes unity and wholeness. \n\nIs there a specific context or meaning you’d like to explore about the number **1**? Let me know! 😊"}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "Got it! Here’s a creative take on the number **1**:\n\n🌟 **\"1\"** is the loneliest number... but also the strongest! It stands tall, independent, and unshaken. It’s the starting point of every journey, the spark of every idea, and the foundation of every great achievement. \n\nHere’s to **1**—the beginning of everything! 🚀\n\nLet me know if you’d like me to dive deeper into any specific meaning or context! 😊"}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "Ah, **1** again! Let’s keep it fun and meaningful:\n\n💡 **\"1\"** is the ultimate symbol of individuality and focus. It’s the first step, the first thought, and the first move. In math, it’s the building block of all numbers. In life, it’s a reminder to stay true to yourself and take that first leap toward your goals.\n\nHere’s to **1**—the power of starting something new! 🌱\n\nLet me know if you’d like me to explore a specific angle or symbolism! 😊"}, {"role": "user", "content": "2"}, {"role": "assistant", "content": "Ah, **2**! The number of balance, partnership, and duality. Let’s dive into it:\n\n✨ **\"2\"** is all about harmony and connection. It’s the yin and yang, the give and take, the dynamic duo. It represents teamwork, relationships, and the idea that two heads are better than one. In math, it’s the first even number, symbolizing stability and balance.\n\nHere’s to **2**—the beauty of connection and collaboration! 🤝\n\nWould you like me to explore a specific aspect of the number **2**? Let me know! 😊"}, {"role": "user", "content": "讲了什么"}, {"role": "assistant", "content": "好的,我来总结一下我刚才讲的内容:\n\n1. 首先我回应了数字 **1**,将其描述为孤独但强大的数字,是每个旅程的起点、每个想法的火花和每个伟大成就的基础。\n\n2. 然后我又一次回应了数字 **1**,强调它是个性和专注的终极象征,是第一步、第一个想法和第一个行动,提醒人们忠于自己,朝着目标迈出第一步。\n\n3. 接着我转向数字 **2**,将其描述为平衡、伙伴关系和二元性的数字,代表和谐、联系、阴阳、给予和接受、动态二人组,象征着团队合作、关系和两个头脑比一个更好的想法。\n\n总的来说,我试图以积极和富有洞察力的方式诠释这些数字的象征意义。希望这个总结对你有帮助。如果还有任何问题,欢迎继续询问。"}, {"role": "user", "content": "deepseek是啥"}, {"role": "assistant", "content": "DeepSeek 是一家中国的人工智能公司，专注于开发和提供先进的自然语言处理（NLP）技术和大模型解决方案。该公司致力于通过人工智能技术提升各行各业的效率，特别是在智能客服、内容生成、数据分析等领域有广泛的应用。\n\nDeepSeek 的核心产品包括大语言模型（LLM）和智能对话系统，这些技术可以用于自动化客服、智能助手、内容创作等场景。公司也提供定制化的AI解决方案，帮助企业和机构利用人工智能技术优化业务流程。\n\n如果你对 DeepSeek 的具体技术、产品或应用场景感兴趣，可以进一步探讨！ 😊"}, {"role": "user", "content": "1"}, {"role": "user", "content": "1"}], "model": "deepseek-v3-241226", "stream": true}
+127.0.0.1 - - [01/Mar/2025 22:16:40] "POST /api/chat HTTP/1.1" 200 -
+2025-03-01 22:16:42 [INFO] 生成响应完成
+响应详情:
+用户问题: 1
+完整响应:
+Got it! Here’s a quick take on **1**:
+
+**1** is the beginning, the foundation, and the symbol of individuality. It’s the first step, the spark of creation, and the building block of all numbers. In life, it reminds us to take that first leap toward our goals.
+
+Let me know if you’d like me to expand on this! 😊
+--------------------------------------------------------------------------------
+2025-03-01 22:16:45 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:45 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:45 [INFO] 收到请求: POST /upload
+`embedding_function` is expected to be an Embeddings object, support for passing in a function will soon be removed.
+127.0.0.1 - - [01/Mar/2025 22:16:45] "POST /upload HTTP/1.1" 200 -
+2025-03-01 22:16:48 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:16:48 [INFO] X-Forwarded-For: None
+2025-03-01 22:16:48 [INFO] 收到请求: POST /api/chat_with_doc
+2025-03-01 22:16:48 [INFO] 收到请求
+请求详情:
+方法: POST
+路径: /api/chat_with_doc
+数据: {
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "1"
+    },
+    {
+      "role": "user",
+      "content": "1"
+    },
+    {
+      "role": "assistant",
+      "content": "请求失败：Failed to fetch"
+    },
+    {
+      "role": "assistant",
+      "content": "Got it! Here’s a quick take on **1**:\n\n**1** is the beginning, the foundation, and the symbol of individuality. It’s the first step, the spark of creation, and the building block of all numbers. In life, it reminds us to take that first leap toward our goals.\n\nLet me know if you’d like me to expand on this! 😊"
+    },
+    {
+      "role": "user",
+      "content": "1"
+    }
+  ],
+  "model": "deepseek-v3-241226",
+  "document_id": true
+}
+--------------------------------------------------------------------------------
+2025-03-01 22:16:48 [ERROR] [__init__.py:999] 处理请求时出错: Error code: 404 - {'error': {'code': 'InvalidEndpointOrModel.NotFound', 'message': 'The model or endpoint ep-20250227223958-wb4sk1 does not exist or you do not have access to it. Request id: 021740838607131b8278729ff36ef4d4e2cc093528a72946a0ca3', 'param': '', 'type': 'NotFound'}}
+127.0.0.1 - - [01/Mar/2025 22:16:48] "[35m[1mPOST /api/chat_with_doc HTTP/1.1[0m" 500 -
+2025-03-01 22:17:16 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:17:16 [INFO] X-Forwarded-For: None
+2025-03-01 22:17:16 [INFO] 收到请求: POST /upload
+127.0.0.1 - - [01/Mar/2025 22:17:17] "[35m[1mPOST /upload HTTP/1.1[0m" 500 -
+2025-03-01 22:17:24 [INFO] 请求来自: 127.0.0.1
+2025-03-01 22:17:24 [INFO] X-Forwarded-For: None
+2025-03-01 22:17:24 [INFO] 收到请求: POST /api/chat
+2025-03-01 22:17:24 [INFO] 收到的请求数据: {"messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": "1"}, {"role": "assistant", "content": "请求失败：Failed to fetch"}, {"role": "assistant", "content": "Got it! Here’s a quick take on **1**:\n\n**1** is the beginning, the foundation, and the symbol of individuality. It’s the first step, the spark of creation, and the building block of all numbers. In life, it reminds us to take that first leap toward our goals.\n\nLet me know if you’d like me to expand on this! 😊"}, {"role": "assistant", "content": "请求失败：Error code: 404 - {'error': {'code': 'InvalidEndpointOrModel.NotFound', 'message': 'The model or endpoint ep-20250227223958-wb4sk1 does not exist or you do not have access to it. Request id: 021740838607131b8278729ff36ef4d4e2cc093528a72946a0ca3', 'param': '', 'type': 'NotFound'}}"}, {"role": "user", "content": "2"}], "model": "deepseek-v3-241226"}
+127.0.0.1 - - [01/Mar/2025 22:17:24] "POST /api/chat HTTP/1.1" 200 -
+2025-03-01 22:17:26 [INFO] 生成响应完成
+响应详情:
+用户问题: 2
+完整响应:
+**2** is the number of duality, balance, and partnership. It represents harmony, cooperation, and the coming together of opposites. In life, it reminds us to seek unity, embrace teamwork, and find balance in our relationships and endeavors.
+
+Let me know if you'd like me to expand on this! 😊
+--------------------------------------------------------------------------------

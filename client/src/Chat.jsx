@@ -59,8 +59,8 @@ function Chat() {
       height: '100vh',
       maxHeight: '100vh',
       overflow: 'hidden',
-      position: 'relative'
-    }}>
+        position: 'relative'
+      }}>
       {/* 侧边栏组件 */}
       <Sidebar 
         isSidebarExpanded={isSidebarExpanded}
@@ -93,7 +93,7 @@ function Chat() {
         handleRetry={handleRetry}
         handleCopy={handleCopy}
         handleEdit={handleEdit}
-        highlightedMessageId={highlightedMessageId}
+                      highlightedMessageId={highlightedMessageId}
         chatContainerRef={chatContainerRef}
         handleScroll={handleScroll}
         loadingHistory={loadingHistory}
