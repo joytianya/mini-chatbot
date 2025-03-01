@@ -132,7 +132,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 doc_store = DocumentStore()
 client = OpenAI(
     api_key=os.getenv("ARK_API_KEY"),  # 从环境变量读取 ARK_API_KEY
-    base_url="https://ark.cn-beijing.volces.com/api/v3",
+    base_url=os.getenv("ARK_BASE_URL"),  # 从环境变量读取 ARK_BASE_URL
 )
 
 def allowed_file(filename):
