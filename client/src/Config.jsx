@@ -2,8 +2,8 @@
 export const modelOptions = [
   'deepseek-v3-241226',
   'deepseek-r1-250120',
-  'deepseek-chat',
-  'deepseek-reasoner'
+  //'deepseek-chat',
+  //'deepseek-reasoner'
 ];
 export const maxHistoryLength = 10;  // 添加最大对话长度配置
 

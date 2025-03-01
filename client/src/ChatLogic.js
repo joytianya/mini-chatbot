@@ -788,6 +788,7 @@ export const useChatLogic = () => {
     sendChatRequest,
     sendDocumentChatRequest,
     activeDocument,
-    setActiveDocument
+    setActiveDocument,
+    handleToggleSidebar: () => setIsSidebarExpanded(prev => !prev)
   };
 }; 

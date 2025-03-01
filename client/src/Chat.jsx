@@ -45,7 +45,8 @@ function Chat() {
     sendChatRequest,     // 发送普通聊天请求
     sendDocumentChatRequest,  // 发送文档聊天请求
     activeDocument,      // 当前活动文档
-    setActiveDocument    // 设置当前活动文档
+    setActiveDocument,    // 设置当前活动文档
+    handleToggleSidebar  // 添加这一行
   } = useChatLogic();
 
   // 文件上传相关状态
@@ -57,7 +58,8 @@ function Chat() {
       display: 'flex',
       height: '100vh',
       maxHeight: '100vh',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
       {/* 侧边栏组件 */}
       <Sidebar 
@@ -70,6 +72,7 @@ function Chat() {
         handleClearAll={handleClearAll}
         formatTime={formatTime}
         darkMode={darkMode}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       {/* 聊天区域组件 */}
@@ -90,7 +93,7 @@ function Chat() {
         handleRetry={handleRetry}
         handleCopy={handleCopy}
         handleEdit={handleEdit}
-                      highlightedMessageId={highlightedMessageId}
+        highlightedMessageId={highlightedMessageId}
         chatContainerRef={chatContainerRef}
         handleScroll={handleScroll}
         loadingHistory={loadingHistory}

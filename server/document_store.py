@@ -44,7 +44,7 @@ class ArkEmbeddings:
             
             try:
                 response = self.client.embeddings.create(
-                    model="ep-20250227223958-wb4sk",
+                    model=os.getenv('ARK_EMBEDDING_MODEL'),
                     input=batch_texts,
                     encoding_format="float"
                 )
@@ -60,7 +60,7 @@ class ArkEmbeddings:
     def embed_query(self, text):
         """将查询转换为向量"""
         response = self.client.embeddings.create(
-            model="ep-20250227223958-wb4sk",
+            model=os.getenv('ARK_EMBEDDING_MODEL'),
             input=[text],
             encoding_format="float"
         )
@@ -70,7 +70,7 @@ class DocumentStore:
     def __init__(self):
         self.embeddings = ArkEmbeddings(
             api_key=os.getenv('ARK_API_KEY'),
-            base_url="https://ark.cn-beijing.volces.com/api/v3"
+            base_url=os.getenv('ARK_BASE_URL')
         )
         self.vector_store = None
         self.index_dir = Path("faiss_index")  # 索引存储目录
