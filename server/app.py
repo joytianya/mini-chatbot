@@ -364,17 +364,17 @@ def chat_with_doc():
                 # 可以选择性地显示找到的文档片段
                 if relevant_docs:
                     # 发送相关文档内容的标题
-                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': '相关文档内容：\n'}}]})}\n\n".encode('utf-8')
+                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'相关文档内容：{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
                     
                     # 遍历并发送每个文档片段
                     for i, doc in enumerate(relevant_docs):
                         # 处理可能的None值
                         content = doc.page_content if doc and hasattr(doc, 'page_content') else ''
                         if content:
-                            yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'片段 {i+1}：{content}\n'}}]})}\n\n".encode('utf-8')
+                            yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'片段 {i+1}：{content}{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
                     
                     # 发送过渡提示
-                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': '\n基于以上文档回答：\n'}}]})}\n\n".encode('utf-8')
+                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'{os.linesep}基于以上文档回答：{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
 
                 # 调用 OpenAI API 进行流式响应
                 logger.debug("调用 OpenAI API")
