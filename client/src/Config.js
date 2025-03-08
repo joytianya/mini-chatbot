@@ -3,8 +3,8 @@ export const serverURL = process.env.NODE_ENV === 'production'
   : 'http://localhost:5001';
 
 export const modelOptions = [
-  'gpt-3.5-turbo',
-  'gpt-4'
+  //'gpt-3.5-turbo',
+  //'gpt-4'
 ];
 
 export const maxHistoryLength = 50; 

@@ -14,6 +14,7 @@ function Chat() {
   // 使用自定义钩子获取所有聊天相关的状态和方法
   const {
     displayMessages,      // 显示的消息列表
+    setDisplayMessages,   // 设置显示的消息列表
     input,               // 输入框的值
     setInput,            // 设置输入框的值
     selectedModel,       // 当前选择的模型
@@ -115,6 +116,7 @@ function Chat() {
         setDarkMode={setDarkMode}
         handleExport={handleExport}
         displayMessages={displayMessages}
+        setDisplayMessages={setDisplayMessages}
         streaming={streaming}
         reasoningText={reasoningText}
         currentResponse={currentResponse}
@@ -122,7 +124,7 @@ function Chat() {
         handleRetry={handleRetry}
         handleCopy={handleCopy}
         handleEdit={handleEdit}
-                      highlightedMessageId={highlightedMessageId}
+        highlightedMessageId={highlightedMessageId}
         chatContainerRef={chatContainerRef}
         handleScroll={handleScroll}
         loadingHistory={loadingHistory}

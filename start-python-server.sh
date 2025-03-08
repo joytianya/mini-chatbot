@@ -2,12 +2,9 @@
 
 cd server
 
-# 检查端口是否被占用
-if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
-    echo "端口 5001 已被占用,正在关闭..."
-    lsof -ti :5001 | xargs kill -9
-    echo "已关闭占用端口 5001 的进程"
-fi
+# 设置端口为5001
+export PORT=5001
+
 # 检查 app.py 进程是否在运行
 if pgrep -f "python app.py" > /dev/null; then
     echo "检测到 app.py 进程正在运行,正在关闭..."

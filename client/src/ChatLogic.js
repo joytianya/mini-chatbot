@@ -911,6 +911,7 @@ export const useChatLogic = () => {
 
   return {
     displayMessages,
+    setDisplayMessages,
     input,
     setInput,
     selectedModel,
@@ -936,20 +937,16 @@ export const useChatLogic = () => {
     handleEdit,
     handleScroll,
     formatTime,
-    loadingHistory,
     currentTurns,
-    setCurrentTurns,
     highlightedMessageId,
-    handleFileUpload,
+    loadingHistory,
     sendChatRequest,
     sendDocumentChatRequest,
     activeDocument,
     setActiveDocument,
     handleToggleSidebar: () => setIsSidebarExpanded(prev => !prev),
-    modelConfigs,
     availableModels,
     setAvailableModels,
-    handleSettingsSave,
     setModelConfigs,
     getConfigForModel
   };
