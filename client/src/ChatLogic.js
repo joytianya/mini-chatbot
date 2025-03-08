@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { modelOptions, maxHistoryLength, serverURL } from './Config';
+import { maxHistoryLength, serverURL } from './Config';
 
 // 辅助函数
 export const hashCode = (str) => {
@@ -66,7 +66,18 @@ export const useChatLogic = () => {
   });
 
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
+  const [selectedModel, setSelectedModel] = useState(() => {
+    // 从 localStorage 获取用户配置的模型
+    const savedConfigs = localStorage.getItem('modelConfigs');
+    if (savedConfigs) {
+      const configs = JSON.parse(savedConfigs);
+      if (configs.length > 0 && configs[0].model_name) {
+        return configs[0].model_name;
+      }
+    }
+    // 如果没有配置,返回空字符串
+    return '';
+  });
   const [streaming, setStreaming] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
   const [reasoningText, setReasoningText] = useState('');
@@ -110,15 +121,11 @@ export const useChatLogic = () => {
     return saved ? JSON.parse(saved) : [];
   });
   const [availableModels, setAvailableModels] = useState(() => {
-    // 合并默认模型和配置中的模型
     const saved = localStorage.getItem('modelConfigs');
     const configs = saved ? JSON.parse(saved) : [];
-    const configModels = configs
+    return configs
       .map(config => config.model_name)
       .filter(name => name && name.trim() !== '');
-    
-    // 去重合并
-    return [...new Set([...modelOptions, ...configModels])];
   });
 
   // Refs
@@ -189,9 +196,11 @@ export const useChatLogic = () => {
   const getConfigForModel = (modelName) => {
     console.log('获取模型配置, 当前选择的模型:', modelName);
     console.log('当前所有模型配置:', modelConfigs);
+    console.log('可用的模型列表:', availableModels);
     
     // 如果modelName为undefined，尝试从localStorage获取最后使用的模型
     if (!modelName) {
+      console.log('模型名称为空，尝试从localStorage获取');
       const savedConfigs = localStorage.getItem('modelConfigs');
       if (savedConfigs) {
         const configs = JSON.parse(savedConfigs);
@@ -204,6 +213,8 @@ export const useChatLogic = () => {
 
     // 从 modelConfigs 中查找匹配的配置
     const config = modelConfigs.find(config => config.model_name === modelName);
+    console.log('找到的模型配置:', config);
+    
     const result = {
       base_url: config?.base_url || '',
       api_key: config?.api_key || '',
@@ -900,7 +911,7 @@ export const useChatLogic = () => {
     setModelConfigs(configs);
     
     // 更新可用模型列表
-    const updatedModels = [...new Set([...modelOptions, ...modelNames])];
+    const updatedModels = [...new Set([...modelNames])];
     setAvailableModels(updatedModels);
     
     // 如果当前选中的模型不在更新后的列表中，选择第一个可用模型

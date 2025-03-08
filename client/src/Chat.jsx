@@ -1,7 +1,7 @@
 // 导入必要的React组件和钩子
 import React, { useState, useEffect, useRef } from 'react';
-// 导入配置文件中的模型选项和历史记录长度限制
-import { modelOptions, maxHistoryLength, serverURL } from './Config';
+// 导入配置文件中的历史记录长度限制
+import { maxHistoryLength, serverURL } from './Config';
 // 导入侧边栏和聊天区域组件
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -68,7 +68,7 @@ function Chat() {
     setModelConfigs(configs);
     
     // 更新可用模型列表
-    const updatedModels = [...new Set([...modelOptions, ...modelNames])];
+    const updatedModels = [...new Set([...modelNames])];
     console.log('更新后的可用模型列表:', updatedModels);
     
     // 如果当前选中的模型不在更新后的列表中，选择第一个可用模型
