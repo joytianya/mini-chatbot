@@ -1,0 +1,13 @@
+flask[async]
+flask-cors
+langchain-community
+langchain
+openai
+faiss-cpu
+python-dotenv
+httpx[socks]
+tiktoken
+pypdf
+unstructured
+python-docx
+markdown
