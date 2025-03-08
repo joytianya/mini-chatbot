@@ -53,6 +53,27 @@ npm install
 npm run dev
 ```
 
+> 🔄 **开发与部署命令的区别：**
+> 1. `npm run dev`（开发环境）：
+>    - 启动本地开发服务器
+>    - 支持热更新（修改代码后自动刷新）
+>    - 不会进行代码压缩和优化
+>    - 包含开发工具和调试信息
+>    - 运行在内存中，不生成实际文件
+>    - 适用于本地开发和调试
+>
+> 2. `npm run deploy`（生产环境）：
+>    - 先执行 `npm run build` 生成静态文件
+>    - 对代码进行压缩和优化
+>    - 移除调试信息和开发工具
+>    - 生成实际的静态文件（在 dist 目录）
+>    - 将文件部署到 GitHub Pages
+>    - 适用于生产环境发布
+>
+> 💡 **使用场景：**
+> - 开发时使用 `npm run dev`
+> - 正式发布时使用 `npm run deploy`
+
 #### 前端部署（以 GitHub Pages 为例）
 
 0. 安装 gh-pages 包：
@@ -88,6 +109,20 @@ npm run build  # 这会在 dist 目录下生成生产环境的静态文件
 npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
 ```
 
+> 💡 **环境说明：**
+> - `npm run build` 会自动设置 `NODE_ENV=production`
+> - `npm run deploy` 本身不会设置 NODE_ENV，它主要做两件事：
+>   1. 执行 `predeploy`（即 `npm run build`）
+>   2. 将 `dist` 目录推送到 gh-pages 分支
+> - 如果需要确保生产环境配置，可以显式设置：
+>   ```bash
+>   # Windows
+>   set NODE_ENV=production && npm run deploy
+>   
+>   # Linux/Mac
+>   NODE_ENV=production npm run deploy
+>   ```
+
 > 💡 **说明：**
 > - `npm run build`：仅构建项目，生成静态文件
 > - `npm run deploy`：包含构建步骤，并自动部署到 GitHub Pages
@@ -119,7 +154,7 @@ npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
    - `PORT`: `10000`  # Render 会自动分配端口，这个值会被覆盖
    - 其他必要的环境变量（如有）
 
-> �� **生产环境说明：**
+> 🔒 **生产环境说明：**
 > - 生产环境下 `FLASK_ENV=production` 会：
 >   - 强制禁用调试模式（即使 `app.run(debug=True)`）
 >   - 强制禁用热重载（即使 `use_reloader=True`）
@@ -148,6 +183,21 @@ npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
 
 - `PORT`：服务器端口（默认5001）
 - `FLASK_ENV`：运行环境（development/production）
+
+> 💡 **Node.js 环境变量说明：**
+> - `process.env` 是 Node.js 中访问环境变量的对象
+> - 常见的环境变量：
+>   - `process.env.NODE_ENV`：运行环境（development/production）
+>   - `process.env.PORT`：服务器端口
+>   - `process.env.BASE_URL`：基础URL
+> - 设置方式：
+>   1. 命令行直接设置：`NODE_ENV=production npm start`
+>   2. .env 文件：`NODE_ENV=production`
+>   3. package.json 脚本：`"build": "NODE_ENV=production vite build"`
+> - 注意：
+>   - 开发环境可以通过 `.env.development` 设置
+>   - 生产环境可以通过 `.env.production` 设置
+>   - 环境变量在构建时会被固定，不能在运行时修改
 
 ### 模型配置
 
@@ -220,3 +270,27 @@ npm run dev
    - 确保文档格式正确
    - 确保文档内容清晰可读
    - 如果问题仍然存在，可以尝试手动处理文档
+
+## 📜 许可证
+
+MIT License
+
+Copyright (c) 2024 Mini-Chatbot
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
