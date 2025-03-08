@@ -12,3 +12,4 @@ unstructured
 python-docx
 markdown
 werkzeug==2.0.1
+openai==1.63.2

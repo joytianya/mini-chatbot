@@ -249,7 +249,10 @@ def chat():
         model_name = data.get('model_name', '默认的model_name')
 
         # 使用 base_url, api_key, model_name 调用不同的模型
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
