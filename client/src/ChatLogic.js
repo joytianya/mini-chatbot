@@ -304,10 +304,11 @@ export const useChatLogic = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
-        credentials: 'same-origin',
+        credentials: 'include',
         mode: 'cors'
       });
 
@@ -501,9 +502,12 @@ export const useChatLogic = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
         },
         body: JSON.stringify(requestBody),
-        signal: controller.signal
+        signal: controller.signal,
+        credentials: 'include',
+        mode: 'cors'
       });
 
       if (!response.ok) {
@@ -700,8 +704,11 @@ export const useChatLogic = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
         },
         body: JSON.stringify(requestBody),
+        credentials: 'include',
+        mode: 'cors'
       });
 
       await handleStreamResponse(response, updatedMessages);
@@ -832,8 +839,13 @@ export const useChatLogic = () => {
 
     const response = await fetch(`${serverURL}/api/chat`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
       body: JSON.stringify(requestBody),
+      credentials: 'include',
+      mode: 'cors'
     });
 
     return response;
@@ -870,8 +882,13 @@ export const useChatLogic = () => {
 
     const response = await fetch(`${serverURL}/api/chat_with_doc`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
       body: JSON.stringify(requestBody),
+      credentials: 'include',
+      mode: 'cors'
     });
 
     return response;

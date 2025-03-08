@@ -106,6 +106,8 @@ CORS(app,
             "origins": ["http://localhost:5173", "https://joytianya.github.io"],
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Accept"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type", "X-CSRFToken"],
             "max_age": 3600
         }
     }
@@ -447,8 +449,19 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
+    return response
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
+    #print(os.environ.get('PORT'))
+    
+    #port = int(os.environ.get('PORT', 5001))
+    port = 5001
     app.run(
         host='0.0.0.0',
         port=port

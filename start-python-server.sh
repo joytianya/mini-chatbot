@@ -8,6 +8,13 @@ if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
     lsof -ti :5001 | xargs kill -9
     echo "已关闭占用端口 5001 的进程"
 fi
+# 检查 app.py 进程是否在运行
+if pgrep -f "python app.py" > /dev/null; then
+    echo "检测到 app.py 进程正在运行,正在关闭..."
+    pkill -f "python app.py"
+    echo "已关闭 app.py 进程"
+fi
+
 
 # 检查 Python 虚拟环境是否存在
 if [ ! -d "venv" ]; then
