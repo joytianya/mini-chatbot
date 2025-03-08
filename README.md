@@ -108,15 +108,25 @@ npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
 
 ### 后端部署
 
-1. 进入server目录：
-```bash
-cd server
-```
+#### 后端部署（以 Render 为例）
 
-2. 运行启动脚本：
-```bash
-./start-python-server.sh
-```
+1. 在 Render 上创建新的 Web Service
+2. 配置以下内容：
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `python app.py`
+3. 设置环境变量：
+   - `FLASK_ENV`: `production`  # 生产环境必须设置为 production
+   - `PORT`: `10000`  # Render 会自动分配端口，这个值会被覆盖
+   - 其他必要的环境变量（如有）
+
+> �� **生产环境说明：**
+> - 生产环境下 `FLASK_ENV=production` 会：
+>   - 强制禁用调试模式（即使 `app.run(debug=True)`）
+>   - 强制禁用热重载（即使 `use_reloader=True`）
+>   - 简化错误信息，不暴露敏感信息
+>   - 优化性能，禁用开发特性
+> - 这是 Flask 的安全特性，不可覆盖
+> - 如果需要调试，建议在本地开发环境进行
 
 ## 📖 使用指南
 
@@ -141,10 +151,20 @@ cd server
 
 ### 模型配置
 
-- Base URL
-- API Key
-- 模型名称
-- Embedding配置
+#### 对话模型配置
+- `base_url`：模型API的基础URL
+- `api_key`：访问模型API的密钥
+- `model_name`：使用的模型名称（如 'gpt-3.5-turbo'）
+
+#### Embedding配置
+- `embedding_base_url`：Embedding服务的基础URL
+- `embedding_api_key`：访问Embedding服务的密钥
+- `embedding_model_name`：使用的Embedding模型名称
+
+> 💡 **配置说明：**
+> - 对话模型用于处理用户的问题和生成回答
+> - Embedding模型用于处理文档并建立向量索引
+> - 两组配置可以使用相同或不同的服务提供商
 
 ## 🌐 部署指南
 
@@ -152,7 +172,7 @@ cd server
 
 1. 克隆仓库：
 ```bash
-git clone [仓库地址]
+git clone https://github.com/joytianya/mini-chatbot.git
 ```
 
 2. 前端开发：
@@ -162,75 +182,41 @@ npm install
 npm run dev
 ```
 
-3. 后端开发：
-```bash
-cd server
-./start-python-server.sh
-```
-
 ### 生产环境部署
-
-#### 前端部署（以 GitHub Pages 为例）
-
-1. 修改 `vite.config.js` 中的 base 配置
-2. 构建和部署：
-
-```bash
-# 构建项目 - 将源代码编译打包成静态文件
-npm run build  # 这会在 dist 目录下生成生产环境的静态文件
-
-# 部署项目 - 将构建好的静态文件部署到 GitHub Pages
-npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
-```
-
-> 💡 **说明：**
-> - `npm run build`：仅构建项目，生成静态文件
-> - `npm run deploy`：包含构建步骤，并自动部署到 GitHub Pages
-> - 如果只想本地查看构建结果，使用 `build`
-> - 如果要发布到线上环境，使用 `deploy`
-
-3. 访问 GitHub 仓库设置，确认 Pages 服务已开启
-
-#### 后端部署（以 Render 为例）
 
 1. 在 Render 上创建新的 Web Service
 2. 配置以下内容：
    - Build Command: `pip install -r requirements.txt`
    - Start Command: `python app.py`
-3. 设置环境变量
+3. 设置环境变量：
+   - `FLASK_ENV`: `production`  # 生产环境必须设置为 production
+   - `PORT`: `10000`  # Render 会自动分配端口，这个值会被覆盖
+   - 其他必要的环境变量（如有）
 
-## ❓ 常见问题
+> 💡 **注意：**
+> - 生产环境必须使用 `FLASK_ENV=production`，这会禁用调试模式
+> - 生产环境下不会启用热重载
+> - 错误信息会被简化，不会暴露敏感信息
+> - 性能会得到优化
 
-1. **Q: 如何更改服务器端口？**  
-   A: 修改 `start-python-server.sh` 中的 `PORT` 环境变量
+## 🤔 常见问题
 
-2. **Q: 支持哪些文档格式？**  
-   A: 目前支持 PDF、Word (.docx)、TXT 格式
+1. 如何解决部署后页面404的问题？
+   - 检查 `base` 配置是否正确
+   - 确保仓库是公开的（public）
+   - 首次部署可能需要等待几分钟
 
-3. **Q: 如何配置不同的模型？**  
-   A: 在设置界面配置相应的 API 地址和密钥
+2. 如何解决后端部署的问题？
+   - 确保 Render 环境配置正确
+   - 检查环境变量设置是否正确
+   - 如果问题仍然存在，可以尝试手动部署
 
-4. **Q: 文档处理失败怎么办？**  
-   A: 检查文档格式是否支持，确保文档未加密且格式正确
+3. 如何解决前端部署的问题？
+   - 检查 npm 命令是否正确
+   - 确保所有依赖安装正确
+   - 如果问题仍然存在，可以尝试手动部署
 
-5. **Q: `package.json` 和 `package-lock.json` 有什么区别？**  
-   A: 两者都是 npm 包管理的重要文件，但用途不同：
-   - `package.json`：
-     - 项目的配置文件，记录项目的基本信息
-     - 声明项目依赖的包的版本范围（如 `^1.2.3` 表示兼容 1.x.x）
-     - 包含项目的脚本命令（如 `npm run dev`）
-     - 可以手动修改
-   - `package-lock.json`：
-     - 记录确切的依赖版本和依赖树
-     - 确保团队成员使用相同的依赖版本
-     - 加快安装速度（精确的版本记录）
-     - 自动生成，不应手动修改
-   
-   > 💡 **最佳实践：**
-   > - 两个文件都要提交到版本控制系统
-   > - 执行 `npm install` 时会根据 `package-lock.json` 安装精确版本
-   > - 更新依赖时使用 `npm update` 而不是手动修改
-
-## 📄 许可证
-
-MIT License 
+4. 如何解决文档对话的问题？
+   - 确保文档格式正确
+   - 确保文档内容清晰可读
+   - 如果问题仍然存在，可以尝试手动处理文档
