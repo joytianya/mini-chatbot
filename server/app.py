@@ -338,6 +338,8 @@ def chat_with_doc():
         embedding_base_url = data['embedding_base_url']
         embedding_api_key = data['embedding_api_key']
         embedding_model_name = data['embedding_model_name']
+        document_id = data.get('document_id')  # 获取document_id参数
+        
         # 打印调试信息
         logger.info("收到的参数:")
         logger.info(f"base_url: {base_url}")
@@ -346,7 +348,9 @@ def chat_with_doc():
         logger.info(f"embedding_base_url: {embedding_base_url}")
         logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
         logger.info(f"embedding_model_name: {embedding_model_name}")
+        logger.info(f"document_id: {document_id}")
         logger.info(f"消息数量: {len(messages)}")
+        
         # 检查doc_store是否为None，如果是则重新初始化
         global doc_store
         if doc_store is None:
@@ -362,10 +366,10 @@ def chat_with_doc():
         # 使用 base_url, api_key, model_name 调用不同的模型
         client = OpenAI(api_key=api_key, base_url=base_url)
         
-        # 使用全局doc_store检索相关文档
-        relevant_docs = doc_store.search(messages[-1]['content'], k=30)
+        # 使用全局doc_store检索相关文档，传入document_id参数
+        relevant_docs = doc_store.search(messages[-1]['content'], k=30, document_id=document_id)
         if not relevant_docs:
-            logger.warning("No relevant documents found")
+            logger.warning(f"在文档 {document_id or '所有文档'} 中未找到相关内容")
         
         # 构建并记录上下文
         context = "\n\n".join([f"文档片段 {i+1}:\n{doc.page_content}" for i, doc in enumerate(relevant_docs)])
@@ -504,5 +508,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     app.run(
         host='0.0.0.0',
-        port=port
+        port=port,
+        debug=True,  # 启用调试模式，支持热更新
+        use_reloader=True  # 启用重载器
     )

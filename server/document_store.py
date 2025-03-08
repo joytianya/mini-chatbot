@@ -92,7 +92,7 @@ class DocumentStore:
                 base_url=base_url,
                 model_name=model_name
             )
-            self.vector_store = None
+            self.vector_stores = {}  # 使用字典存储多个向量存储，键为文件哈希
             self.index_dir = Path("faiss_index")  # 索引存储目录
             self.file_hashes = {}  # 文件路径到哈希的映射
             
@@ -102,13 +102,13 @@ class DocumentStore:
             
             # 尝试加载已有的向量存储
             try:
-                self._load_vector_store()
+                self._load_all_vector_stores()
                 logger.info("成功加载已有的向量存储")
             except Exception as e:
                 logger.error(f"加载向量存储失败: {str(e)}")
             
             self._initialized = True
-            
+    
     def _file_hash(self, file_path):
         """计算文件的 SHA256 哈希"""
         hash_sha256 = hashlib.sha256()
@@ -129,6 +129,46 @@ class DocumentStore:
         hash_file = self.index_dir / "file_hashes.json"
         with open(hash_file, "w") as f:
             json.dump(self.file_hashes, f)
+
+    def _load_all_vector_stores(self):
+        """加载所有已存在的向量存储"""
+        if not self.file_hashes:
+            return
+        
+        for file_path, file_hash in self.file_hashes.items():
+            try:
+                index_path = self.index_dir / file_hash
+                if index_path.exists():
+                    self.vector_stores[file_hash] = FAISS.load_local(
+                        str(index_path),
+                        self.embeddings,
+                        allow_dangerous_deserialization=True
+                    )
+                    logger.info(f"已加载索引: {file_hash} (文件: {file_path})")
+            except Exception as e:
+                logger.error(f"加载索引失败 {file_hash}: {str(e)}")
+    
+    def _save_vector_store(self, file_hash):
+        """保存指定哈希的向量存储到磁盘"""
+        if file_hash in self.vector_stores:
+            index_path = self.index_dir / file_hash
+            self.vector_stores[file_hash].save_local(str(index_path))
+            logger.info(f"向量索引已保存到: {index_path}")
+
+    def _load_vector_store(self, file_hash):
+        """从磁盘加载指定哈希的向量存储"""
+        index_path = self.index_dir / file_hash
+        if index_path.exists():
+            self.vector_stores[file_hash] = FAISS.load_local(
+                str(index_path),
+                self.embeddings,
+                allow_dangerous_deserialization=True
+            )
+            logger.info(f"已加载缓存的向量索引: {file_hash}")
+            return True
+        else:
+            logger.warning(f"没有找到缓存的向量索引: {file_hash}")
+            return False
 
     def process_single_file(self, file_path):
         """处理单个文件"""
@@ -154,9 +194,8 @@ class DocumentStore:
             current_hash = self._file_hash(file_path)
             
             # 检查文件是否已经处理过且未修改
-            if self.file_hashes.get(file_path) == current_hash:
-                logger.info(f"文件未修改，使用缓存的向量索引")
-                self._load_vector_store()
+            if self.file_hashes.get(file_path) == current_hash and current_hash in self.vector_stores:
+                logger.info(f"文件未修改，使用缓存的向量索引: {current_hash}")
                 return {
                     "success": True,
                     "document_id": current_hash
@@ -173,8 +212,8 @@ class DocumentStore:
                 logger.error("文档加载失败")
                 raise ValueError("文档加载失败")
             
-            # 更新哈希
-            self.file_hashes = {file_path: current_hash}  # 只保存当前文件
+            # 更新哈希映射
+            self.file_hashes[file_path] = current_hash
             
             # 切分文档
             text_splitter = RecursiveCharacterTextSplitter(
@@ -190,10 +229,10 @@ class DocumentStore:
             logger.info(f"处理 {len(texts)} 个文本块...")
             
             # 创建新的向量存储
-            self.vector_store = FAISS.from_documents(texts, self.embeddings)
+            self.vector_stores[current_hash] = FAISS.from_documents(texts, self.embeddings)
             
             # 保存向量存储和哈希
-            self._save_vector_store()
+            self._save_vector_store(current_hash)
             self._save_hashes()
             
             logger.info("向量存储更新完成")
@@ -209,40 +248,46 @@ class DocumentStore:
                 "document_id": None
             }
 
-    def load_documents(self, directory_path):
-        """已弃用，请使用 process_single_file"""
-        raise NotImplementedError("请使用 process_single_file 处理单个文件")
-
-    def _save_vector_store(self):
-        """保存向量存储到磁盘"""
-        if self.vector_store:
-            index_path = self.index_dir / "current_index"
-            self.vector_store.save_local(index_path)
-            logger.info(f"向量索引已保存到: {index_path}")
-
-    def _load_vector_store(self):
-        """从磁盘加载向量存储"""
-        index_path = self.index_dir / "current_index"
-        if index_path.exists():
-            self.vector_store = FAISS.load_local(
-                index_path, 
-                self.embeddings,
-                allow_dangerous_deserialization=True
-            )
-            logger.info(f"已加载缓存的向量索引: {index_path}")
-        else:
-            logger.error("没有找到缓存的向量索引")
-            raise ValueError("没有找到缓存的向量索引")
-
-    def search(self, query, k=3):
-        if not self.vector_store:
+    def search(self, query, k=3, document_id=None):
+        """在向量存储中搜索
+        
+        Args:
+            query: 搜索查询
+            k: 返回结果数量
+            document_id: 文件哈希值，如果指定则只在该文件的索引中搜索，否则搜索所有索引
+        """
+        if not self.vector_stores:
+            logger.warning("没有可用的向量存储")
             return []
-        return self.vector_store.similarity_search(query, k=k)
+        
+        all_results = []
+        if document_id:
+            # 只在指定文档中搜索
+            if document_id not in self.vector_stores:
+                logger.warning(f"未找到指定文档的向量存储: {document_id}")
+                return []
+            try:
+                results = self.vector_stores[document_id].similarity_search(query, k=k)
+                all_results.extend(results)
+                logger.info(f"在文档 {document_id} 中找到 {len(results)} 个相关片段")
+            except Exception as e:
+                logger.error(f"搜索向量存储 {document_id} 时出错: {str(e)}")
+        else:
+            # 在所有文档中搜索
+            for file_hash, vector_store in self.vector_stores.items():
+                try:
+                    results = vector_store.similarity_search(query, k=k)
+                    all_results.extend(results)
+                    logger.info(f"在文档 {file_hash} 中找到 {len(results)} 个相关片段")
+                except Exception as e:
+                    logger.error(f"搜索向量存储 {file_hash} 时出错: {str(e)}")
+        
+        # 按相关性排序并返回前k个结果
+        return sorted(all_results, key=lambda x: x.metadata.get('score', 0), reverse=True)[:k]
 
     def clear(self):
         """清空向量存储"""
-        self.vector_store = None
-        # 清空缓存
+        self.vector_stores = {}
         self.file_hashes = {}
         if self.index_dir.exists():
             for f in self.index_dir.glob("*"):

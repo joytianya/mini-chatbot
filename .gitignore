@@ -39,3 +39,6 @@ instruct.md
 test.ipynb
 
 documents/
+
+faiss_index/
+
