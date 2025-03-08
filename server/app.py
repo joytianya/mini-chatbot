@@ -103,7 +103,7 @@ app = Flask(__name__)
 CORS(app, 
     resources={
         r"/*": {
-            "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+            "origins": ["http://localhost:5173", "https://joytianya.github.io"],
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Accept"],
             "max_age": 3600
@@ -445,17 +445,8 @@ def get_local_ip():
         return "127.0.0.1"
 
 if __name__ == '__main__':
-    host = get_local_ip()
-    port = 5001
-    print(f"\n=== 服务器启动 ===")
-    print(f"本地访问: http://127.0.0.1:{port}")
-    print(f"局域网访问: http://{host}:{port}")
-    print(f"=================\n")
-    
+    port = int(os.environ.get('PORT', 5001))
     app.run(
-        debug=True, 
-        port=port,
-        host='0.0.0.0',  # 允许外部访问
-        threaded=True,   # 启用多线程
-        ssl_context=None  # 禁用 SSL
+        host='0.0.0.0',
+        port=port
     )
