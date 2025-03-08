@@ -358,8 +358,8 @@ def chat_with_doc():
             full_response = []
             try:
                 # 发送初始推理内容
-                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': '正在分析相关文档...\n'}}]})}\n\n".encode('utf-8')
-                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'找到 {len(relevant_docs)} 个相关文档片段。\n'}}]})}\n\n".encode('utf-8')
+                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': '正在分析相关文档...{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
+                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'找到 {len(relevant_docs)} 个相关文档片段。{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
                 
                 # 可以选择性地显示找到的文档片段
                 if relevant_docs:
