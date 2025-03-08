@@ -307,7 +307,8 @@ export const useChatLogic = () => {
         },
         body: JSON.stringify(requestBody),
         signal: controller.signal,
-        credentials: 'include'
+        credentials: 'same-origin',
+        mode: 'cors'
       });
 
       if (!response.ok) {
