@@ -314,26 +314,41 @@ def chat_with_doc():
     try:
         data = request.json
         CustomLogger.request(request.method, request.path, data)
+        
+        # 检查必要参数
+        required_params = ['messages', 'base_url', 'api_key', 'model_name', 
+                         'embedding_base_url', 'embedding_api_key', 'embedding_model_name']
+        for param in required_params:
+            if not data.get(param):
+                raise ValueError(f'Missing required parameter: {param}')
+        
         messages = data['messages']
-        base_url = data.get('base_url', '默认的base_url')
-        api_key = data.get('api_key', '默认的api_key')
-        model_name = data.get('model_name', '默认的model_name')
+        base_url = data['base_url']
+        api_key = data['api_key']
+        model_name = data['model_name']
+        embedding_base_url = data['embedding_base_url']
+        embedding_api_key = data['embedding_api_key']
+        embedding_model_name = data['embedding_model_name']
         
         # 检查doc_store是否为None，如果是则重新初始化
         global doc_store
         if doc_store is None:
             logger.info("doc_store为空，重新初始化...")
             update_doc_store(
-                api_key=api_key,
-                base_url=base_url,
-                model_name=model_name
+                api_key=embedding_api_key,
+                base_url=embedding_base_url,
+                model_name=embedding_model_name
             )
+            if doc_store is None:
+                raise ValueError('Failed to initialize doc_store')
 
         # 使用 base_url, api_key, model_name 调用不同的模型
         client = OpenAI(api_key=api_key, base_url=base_url)
         
         # 使用全局doc_store检索相关文档
         relevant_docs = doc_store.search(messages[-1]['content'], k=30)
+        if not relevant_docs:
+            logger.warning("No relevant documents found")
         
         # 构建并记录上下文
         context = "\n\n".join([f"文档片段 {i+1}:\n{doc.page_content}" for i, doc in enumerate(relevant_docs)])

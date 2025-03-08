@@ -278,6 +278,20 @@ export const useChatLogic = () => {
     setAbortController(controller);
 
     try {
+      // 检查是否有必要的配置
+      if (!currentConfig.base_url || !currentConfig.api_key) {
+        throw new Error('请先在设置中配置模型参数');
+      }
+
+      // 如果是文档聊天，检查 embedding 配置
+      if (activeDocument) {
+        const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+        const embeddingConfig = embeddingConfigs[0];
+        if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
+          throw new Error('请先在设置中配置 Embedding 参数');
+        }
+      }
+
       console.log('准备发送请求:', {
         selectedModel,
         activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档'
@@ -303,12 +317,17 @@ export const useChatLogic = () => {
         embedding_base_url: embeddingConfig.embedding_base_url,
         embedding_api_key: embeddingConfig.embedding_api_key,
         embedding_model_name: embeddingConfig.embedding_model_name,
-        ...(activeDocument && { document_id: activeDocument.id })
+        document_id: activeDocument?.id || '',
+        stream: true
       };
 
       console.log('完整的请求数据:', {
         url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
-        body: requestBody
+        body: {
+          ...requestBody,
+          api_key: '***',
+          embedding_api_key: '***'
+        }
       });
 
       const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
@@ -325,7 +344,11 @@ export const useChatLogic = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || '请求失败');
+        if (errorData.error?.code === 'MissingParameter') {
+          throw new Error('缺少必要参数，请检查模型配置是否完整');
+        } else {
+          throw new Error(errorData.error?.message || '请求失败');
+        }
       }
       await handleStreamResponse(response, updatedDisplayMessages);
       
@@ -865,9 +888,10 @@ export const useChatLogic = () => {
   // 带文档的聊天请求
   const sendDocumentChatRequest = async (message, documentId) => {
     const currentConfig = getConfigForModel(selectedModel);
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    
+    // 获取当前选中模型对应的embedding配置
+    const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+    const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
 
     const requestBody = {
       messages: [
@@ -879,17 +903,17 @@ export const useChatLogic = () => {
         { role: 'user', content: message }
       ],
       model: selectedModel,
-      base_url: currentConfig.base_url,
-      api_key: currentConfig.api_key,
-      model_name: currentConfig.model_name || selectedModel,  // 确保有 model_name
-      embedding_base_url: currentConfig.embedding_base_url,
-      embedding_api_key: currentConfig.embedding_api_key,
-      embedding_model_name: currentConfig.embedding_model_name,
+      base_url: currentConfig.base_url || '',
+      api_key: currentConfig.api_key || '',
+      model_name: currentConfig.model_name || selectedModel,
+      embedding_base_url: embeddingConfig.embedding_base_url || '',
+      embedding_api_key: embeddingConfig.embedding_api_key || '',
+      embedding_model_name: embeddingConfig.embedding_model_name || '',
       document_id: documentId,
       stream: true
     };
 
-    console.log('发送文档请求数据:', requestBody);  // 添加日志
+    console.log('发送文档请求数据:', requestBody);
 
     const response = await fetch(`${serverURL}/api/chat_with_doc`, {
       method: 'POST',
