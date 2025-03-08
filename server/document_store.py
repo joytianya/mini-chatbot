@@ -70,7 +70,7 @@ class ArkEmbeddings:
     def embed_query(self, text):
         """将查询转换为向量"""
         response = self.client.embeddings.create(
-            model=os.getenv('ARK_EMBEDDING_MODEL'),
+            model=self.model_name,
             input=[text],
             encoding_format="float"
         )
