@@ -11,9 +11,18 @@ import numpy as np
 import hashlib
 from pathlib import Path
 import json
+import logging
 
 # 加载环境变量
 load_dotenv()
+
+# 配置日志记录
+logger = logging.getLogger('document_store')
+logger.setLevel(logging.INFO)
+
+# 移除可能存在的重复处理器
+for h in logger.handlers[:]:
+    logger.removeHandler(h)
 
 class ArkEmbeddings:
     def __init__(self, api_key, base_url, model_name):
@@ -34,14 +43,14 @@ class ArkEmbeddings:
     
     def embed_documents(self, texts):
         """将文档转换为向量"""
-        print(f"\n正在生成 {len(texts)} 个文档的向量...")
+        logger.info(f"正在生成 {len(texts)} 个文档的向量...")
         # 分批处理，每批最多 10 个文档
         batch_size = 10
         all_embeddings = []
         
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i:i + batch_size]
-            print(f"处理第 {i//batch_size + 1} 批，共 {len(batch_texts)} 个文档")
+            logger.info(f"处理第 {i//batch_size + 1} 批，共 {len(batch_texts)} 个文档")
             
             try:
                 response = self.client.embeddings.create(
@@ -52,10 +61,10 @@ class ArkEmbeddings:
                 batch_embeddings = [embedding.embedding for embedding in response.data]
                 all_embeddings.extend(batch_embeddings)
             except Exception as e:
-                print(f"处理批次 {i//batch_size + 1} 时出错: {str(e)}")
+                logger.error(f"处理批次 {i//batch_size + 1} 时出错: {str(e)}")
                 raise
         
-        print(f"向量生成完成，共 {len(all_embeddings)} 个向量")
+        logger.info(f"向量生成完成，共 {len(all_embeddings)} 个向量")
         return all_embeddings
     
     def embed_query(self, text):
@@ -94,9 +103,9 @@ class DocumentStore:
             # 尝试加载已有的向量存储
             try:
                 self._load_vector_store()
-                print("成功加载已有的向量存储")
+                logger.info("成功加载已有的向量存储")
             except Exception as e:
-                print(f"加载向量存储失败: {str(e)}")
+                logger.error(f"加载向量存储失败: {str(e)}")
             
             self._initialized = True
             
@@ -123,7 +132,7 @@ class DocumentStore:
 
     def process_single_file(self, file_path):
         """处理单个文件"""
-        print(f"\n处理文件: {file_path}")
+        logger.info(f"处理文件: {file_path}")
         
         # 获取文件类型和对应的加载器
         ext = Path(file_path).suffix.lower()
@@ -137,6 +146,7 @@ class DocumentStore:
         
         loader_cls = loaders.get(ext)
         if not loader_cls:
+            logger.error(f"不支持的文件类型: {ext}")
             raise ValueError(f"不支持的文件类型: {ext}")
         
         try:
@@ -145,7 +155,7 @@ class DocumentStore:
             
             # 检查文件是否已经处理过且未修改
             if self.file_hashes.get(file_path) == current_hash:
-                print(f"文件未修改，使用缓存的向量索引")
+                logger.info(f"文件未修改，使用缓存的向量索引")
                 self._load_vector_store()
                 return {
                     "success": True,
@@ -160,6 +170,7 @@ class DocumentStore:
             documents = loader.load()
             
             if not documents:
+                logger.error("文档加载失败")
                 raise ValueError("文档加载失败")
             
             # 更新哈希
@@ -173,9 +184,10 @@ class DocumentStore:
             texts = text_splitter.split_documents(documents)
             
             if not texts:
+                logger.error("文档切分失败")
                 raise ValueError("文档切分失败")
             
-            print(f"处理 {len(texts)} 个文本块...")
+            logger.info(f"处理 {len(texts)} 个文本块...")
             
             # 创建新的向量存储
             self.vector_store = FAISS.from_documents(texts, self.embeddings)
@@ -184,14 +196,14 @@ class DocumentStore:
             self._save_vector_store()
             self._save_hashes()
             
-            print("向量存储更新完成")
+            logger.info("向量存储更新完成")
             return {
                 "success": True,
                 "document_id": current_hash
             }
             
         except Exception as e:
-            print(f"处理文件时出错: {str(e)}")
+            logger.error(f"处理文件时出错: {str(e)}")
             return {
                 "success": False,
                 "document_id": None
@@ -206,7 +218,7 @@ class DocumentStore:
         if self.vector_store:
             index_path = self.index_dir / "current_index"
             self.vector_store.save_local(index_path)
-            print(f"向量索引已保存到: {index_path}")
+            logger.info(f"向量索引已保存到: {index_path}")
 
     def _load_vector_store(self):
         """从磁盘加载向量存储"""
@@ -217,8 +229,9 @@ class DocumentStore:
                 self.embeddings,
                 allow_dangerous_deserialization=True
             )
-            print(f"已加载缓存的向量索引: {index_path}")
+            logger.info(f"已加载缓存的向量索引: {index_path}")
         else:
+            logger.error("没有找到缓存的向量索引")
             raise ValueError("没有找到缓存的向量索引")
 
     def search(self, query, k=3):
@@ -234,4 +247,4 @@ class DocumentStore:
         if self.index_dir.exists():
             for f in self.index_dir.glob("*"):
                 f.unlink()
-        print("向量存储已清空")
+        logger.info("向量存储已清空")

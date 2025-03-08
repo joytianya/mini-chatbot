@@ -5,10 +5,13 @@ cd server
 # 设置端口为5001
 export PORT=5001
 
-# 检查 app.py 进程是否在运行
-if pgrep -f "python app.py" > /dev/null; then
+# 检查 app.py 进程是否在运行（更精确的匹配）
+if ps aux | grep "[P]ython.*app\.py" > /dev/null; then
     echo "检测到 app.py 进程正在运行,正在关闭..."
-    pkill -f "python app.py"
+    # 使用更精确的模式来终止进程
+    pkill -f "[P]ython.*app\.py"
+    # 等待进程完全终止
+    sleep 2
     echo "已关闭 app.py 进程"
 fi
 

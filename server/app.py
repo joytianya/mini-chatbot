@@ -14,7 +14,6 @@ import traceback
 
 # 配置日志
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 # 创建自定义格式化器
 class CustomFormatter(Formatter):
@@ -41,10 +40,20 @@ class CustomFormatter(Formatter):
 # 创建处理器并设置格式化器
 handler = StreamHandler()
 handler.setFormatter(CustomFormatter(
-    fmt='%(asctime)s [%(levelname)s] %(message)s',
+    fmt='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 ))
-logger.addHandler(handler)
+
+# 配置根日志记录器
+root_logger = logging.getLogger()
+# 移除所有现有的处理器
+for h in root_logger.handlers[:]:
+    root_logger.removeHandler(h)
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
+
+# 配置应用日志记录器
+logger.setLevel(logging.INFO)
 
 # 自定义日志格式
 def log_separator(length=80):
@@ -329,7 +338,15 @@ def chat_with_doc():
         embedding_base_url = data['embedding_base_url']
         embedding_api_key = data['embedding_api_key']
         embedding_model_name = data['embedding_model_name']
-        
+        # 打印调试信息
+        logger.info("收到的参数:")
+        logger.info(f"base_url: {base_url}")
+        logger.info(f"api_key: {api_key[:5]}***") # 只显示前5位
+        logger.info(f"model_name: {model_name}")
+        logger.info(f"embedding_base_url: {embedding_base_url}")
+        logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
+        logger.info(f"embedding_model_name: {embedding_model_name}")
+        logger.info(f"消息数量: {len(messages)}")
         # 检查doc_store是否为None，如果是则重新初始化
         global doc_store
         if doc_store is None:
