@@ -11,7 +11,7 @@ export const maxHistoryLength = 10;  // 添加最大对话长度配置
 //export const serverURL = 'https://mini-chatbot-backend.onrender.com';
 //export const serverURL = 'http://localhost:5001';
 //export const serverURL = window.location.//export const server//export const serverURL = 'URL_ADDRESS-chatbot-backend.onrender.com';
-export const serverURL = process.env.NODE_ENV === 'production' 
+export const serverURL = process.env.NODE_ENV === 'development' 
   ? 'https://mini-chatbot-backend.onrender.com'
   : window.location.hostname === 'localhost' 
     ? 'http://localhost:5001'
