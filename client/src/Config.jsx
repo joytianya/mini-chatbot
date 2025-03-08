@@ -1,7 +1,7 @@
 // 测试用配置
 export const modelOptions = [
-  'deepseek-v3-241226',
-  'deepseek-r1-250120',
+  //'deepseek-v3-241226',
+  //'deepseek-r1-250120',
   //'deepseek-chat',
   //'deepseek-reasoner'
 ];

@@ -16,11 +16,12 @@ import json
 load_dotenv()
 
 class ArkEmbeddings:
-    def __init__(self, api_key, base_url):
+    def __init__(self, api_key, base_url, model_name):
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url
         )
+        self.model_name = model_name
     
     def __call__(self, text):
         """使类实例可调用，用于兼容 FAISS 的接口"""
@@ -44,7 +45,7 @@ class ArkEmbeddings:
             
             try:
                 response = self.client.embeddings.create(
-                    model=os.getenv('ARK_EMBEDDING_MODEL'),
+                    model=self.model_name,
                     input=batch_texts,
                     encoding_format="float"
                 )
@@ -67,19 +68,38 @@ class ArkEmbeddings:
         return response.data[0].embedding
 
 class DocumentStore:
-    def __init__(self):
-        self.embeddings = ArkEmbeddings(
-            api_key=os.getenv('ARK_API_KEY'),
-            base_url=os.getenv('ARK_BASE_URL')
-        )
-        self.vector_store = None
-        self.index_dir = Path("faiss_index")  # 索引存储目录
-        self.file_hashes = {}  # 文件路径到哈希的映射
-        
-        # 创建必要的目录
-        self.index_dir.mkdir(exist_ok=True)
-        self._load_existing_hashes()
-        
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DocumentStore, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, api_key, base_url, model_name):
+        if not self._initialized:
+            self.embeddings = ArkEmbeddings(
+                api_key=api_key,
+                base_url=base_url,
+                model_name=model_name
+            )
+            self.vector_store = None
+            self.index_dir = Path("faiss_index")  # 索引存储目录
+            self.file_hashes = {}  # 文件路径到哈希的映射
+            
+            # 创建必要的目录
+            self.index_dir.mkdir(exist_ok=True)
+            self._load_existing_hashes()
+            
+            # 尝试加载已有的向量存储
+            try:
+                self._load_vector_store()
+                print("成功加载已有的向量存储")
+            except Exception as e:
+                print(f"加载向量存储失败: {str(e)}")
+            
+            self._initialized = True
+            
     def _file_hash(self, file_path):
         """计算文件的 SHA256 哈希"""
         hash_sha256 = hashlib.sha256()
@@ -127,10 +147,16 @@ class DocumentStore:
             if self.file_hashes.get(file_path) == current_hash:
                 print(f"文件未修改，使用缓存的向量索引")
                 self._load_vector_store()
-                return True
+                return {
+                    "success": True,
+                    "document_id": current_hash
+                }
             
             # 加载文档
-            loader = loader_cls(file_path)
+            if loader_cls == TextLoader:
+                loader = loader_cls(file_path, encoding='utf-8')
+            else:
+                loader = loader_cls(file_path)
             documents = loader.load()
             
             if not documents:
@@ -159,11 +185,17 @@ class DocumentStore:
             self._save_hashes()
             
             print("向量存储更新完成")
-            return True
+            return {
+                "success": True,
+                "document_id": current_hash
+            }
             
         except Exception as e:
             print(f"处理文件时出错: {str(e)}")
-            return False
+            return {
+                "success": False,
+                "document_id": None
+            }
 
     def load_documents(self, directory_path):
         """已弃用，请使用 process_single_file"""

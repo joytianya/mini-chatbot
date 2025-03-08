@@ -68,6 +68,7 @@ const ChatArea = ({
             outline: 'none'
           }}
         >
+          {/* 默认模型选项 */}
           {modelOptions.map(model => (
             <option 
               key={model} 
@@ -80,6 +81,19 @@ const ChatArea = ({
               {model}
             </option>
           ))}
+          {/* 从设置中获取的自定义模型 */}
+          {window.chatSettings?.model_name && !modelOptions.includes(window.chatSettings.model_name) && (
+            <option 
+              key={window.chatSettings.model_name} 
+              value={window.chatSettings.model_name}
+              style={{
+                backgroundColor: darkMode ? '#2d2d2d' : '#fff',
+                color: darkMode ? '#e0e0e0' : '#2c3e50'
+              }}
+            >
+              {window.chatSettings.model_name}
+            </option>
+          )}
         </select>
 
         {/* 右侧：对话轮次和导出按钮 */}

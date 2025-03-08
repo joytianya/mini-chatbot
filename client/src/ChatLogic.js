@@ -105,6 +105,21 @@ export const useChatLogic = () => {
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const [activeDocument, setActiveDocument] = useState(null);
   const [currentTurns, setCurrentTurns] = useState(2);
+  const [modelConfigs, setModelConfigs] = useState(() => {
+    const saved = localStorage.getItem('modelConfigs');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [availableModels, setAvailableModels] = useState(() => {
+    // 合并默认模型和配置中的模型
+    const saved = localStorage.getItem('modelConfigs');
+    const configs = saved ? JSON.parse(saved) : [];
+    const configModels = configs
+      .map(config => config.model_name)
+      .filter(name => name && name.trim() !== '');
+    
+    // 去重合并
+    return [...new Set([...modelOptions, ...configModels])];
+  });
 
   // Refs
   const chatContainerRef = useRef(null);
@@ -171,10 +186,41 @@ export const useChatLogic = () => {
   };
 
   // 消息处理函数
+  const getConfigForModel = (modelName) => {
+    console.log('获取模型配置, 当前选择的模型:', modelName);
+    console.log('当前所有模型配置:', modelConfigs);
+    
+    // 如果modelName为undefined，尝试从localStorage获取最后使用的模型
+    if (!modelName) {
+      const savedConfigs = localStorage.getItem('modelConfigs');
+      if (savedConfigs) {
+        const configs = JSON.parse(savedConfigs);
+        if (configs.length > 0) {
+          modelName = configs[0].model_name;
+          console.log('从localStorage获取默认模型:', modelName);
+        }
+      }
+    }
+
+    // 从 modelConfigs 中查找匹配的配置
+    const config = modelConfigs.find(config => config.model_name === modelName);
+    const result = {
+      base_url: config?.base_url || '',
+      api_key: config?.api_key || '',
+      model_name: modelName || ''  // 确保即使modelName为undefined也返回空字符串
+    };
+    
+    console.log('返回的模型配置:', result);
+    return result;
+  };
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!input.trim() || streaming) return;
 
+    // 获取当前选中模型的配置
+    const currentConfig = getConfigForModel(selectedModel);
+    
     const messageId = Date.now().toString();
     const newMessage = { 
       id: messageId,
@@ -221,26 +267,47 @@ export const useChatLogic = () => {
     setAbortController(controller);
 
     try {
-      console.log('当前文档状态:', activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档');
+      console.log('准备发送请求:', {
+        selectedModel,
+        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档'
+      });
       
+      // 获取当前选中模型对应的embedding配置
+      const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+      const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
+      
+      const requestBody = {
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          { role: 'user', content: input }
+        ],
+        model: selectedModel,
+        base_url: currentConfig.base_url,
+        api_key: currentConfig.api_key,
+        model_name: currentConfig.model_name || selectedModel,
+        embedding_base_url: embeddingConfig.embedding_base_url,
+        embedding_api_key: embeddingConfig.embedding_api_key,
+        embedding_model_name: embeddingConfig.embedding_model_name,
+        ...(activeDocument && { document_id: activeDocument.id })
+      };
+
+      console.log('完整的请求数据:', {
+        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
+        body: requestBody
+      });
+
       const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: 'You are a helpful assistant.' },
-            ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            { role: 'user', content: input }
-          ],
-          model: selectedModel,
-          ...(activeDocument && { document_id: activeDocument.id })
-        }),
-        signal: controller.signal
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -414,17 +481,27 @@ export const useChatLogic = () => {
     try {
       const controller = new AbortController();
       setAbortController(controller);
+      
+      const currentConfig = getConfigForModel(selectedModel);
+      console.log('重试请求的模型配置:', currentConfig);
+
+      const requestBody = {
+        messages: requestMsgs,
+        model: selectedModel,
+        base_url: currentConfig.base_url,
+        api_key: currentConfig.api_key,
+        model_name: currentConfig.model_name,
+        stream: true
+      };
+      
+      console.log('重试请求的完整数据:', requestBody);
 
       const response = await fetch(`${serverURL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: requestMsgs,
-          model: selectedModel,
-          stream: true
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       });
 
@@ -601,19 +678,29 @@ export const useChatLogic = () => {
     setIsReasoning(true);
 
     try {
+      const currentConfig = getConfigForModel(selectedModel);
+      console.log('编辑消息使用的模型配置:', currentConfig);
+      
+      const requestBody = {
+        messages: [...previousMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })), editedMessage],
+        model: selectedModel,
+        base_url: currentConfig.base_url,
+        api_key: currentConfig.api_key,
+        model_name: currentConfig.model_name,
+        stream: true
+      };
+      
+      console.log('编辑请求的完整数据:', requestBody);
+
       const response = await fetch(`${serverURL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: [...previousMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })), editedMessage],
-          model: selectedModel,
-          stream: true
-        })
+        body: JSON.stringify(requestBody),
       });
 
       await handleStreamResponse(response, updatedMessages);
@@ -677,9 +764,17 @@ export const useChatLogic = () => {
     const files = e.target.files;
     const formData = new FormData();
     
+    // 获取当前选中模型对应的embedding配置
+    const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+    const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
+    
+    // 添加文件和embedding配置参数
     for (let file of files) {
       formData.append('documents', file);
     }
+    formData.append('embedding_base_url', embeddingConfig.embedding_base_url || '默认的embedding_base_url');
+    formData.append('embedding_api_key', embeddingConfig.embedding_api_key || '默认的embedding_api_key');
+    formData.append('embedding_model_name', embeddingConfig.embedding_model_name || '默认的embedding_model_name');
     
     try {
       const response = await fetch(`${serverURL}/upload`, {
@@ -708,48 +803,91 @@ export const useChatLogic = () => {
 
   // 普通聊天请求
   const sendChatRequest = async (message) => {
-    try {
-      const response = await fetch(`${serverURL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          model: selectedModel,
-          history: displayMessages.slice(-currentTurns * 2)
-        })
-      });
-      
-      if (!response.ok) throw new Error('请求失败');
-      return response;
-    } catch (error) {
-      console.error('发送消息错误:', error);
-      throw error;
-    }
+    const currentConfig = getConfigForModel(selectedModel);
+    console.log('当前模型配置:', currentConfig);
+    console.log('当前对话轮数:', currentTurns);
+    console.log('当前请求消息:', requestMessages);
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const requestBody = {
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        { role: 'user', content: message }
+      ],
+      model: selectedModel,
+      base_url: currentConfig.base_url,
+      api_key: currentConfig.api_key,
+      model_name: currentConfig.model_name || selectedModel,  // 确保有 model_name
+      stream: true
+    };
+
+    console.log('发送请求数据:', requestBody);  // 添加日志
+
+    const response = await fetch(`${serverURL}/api/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    return response;
   };
 
   // 带文档的聊天请求
   const sendDocumentChatRequest = async (message, documentId) => {
-    try {
-      const response = await fetch(`${serverURL}/api/chat_with_doc`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          document_id: documentId,
-          model: selectedModel,
-          history: displayMessages.slice(-currentTurns * 2)
-        })
-      });
-      
-      if (!response.ok) throw new Error('请求失败');
-      return response;
-    } catch (error) {
-      console.error('发送消息错误:', error);
-      throw error;
+    const currentConfig = getConfigForModel(selectedModel);
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const requestBody = {
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        { role: 'user', content: message }
+      ],
+      model: selectedModel,
+      base_url: currentConfig.base_url,
+      api_key: currentConfig.api_key,
+      model_name: currentConfig.model_name || selectedModel,  // 确保有 model_name
+      embedding_base_url: currentConfig.embedding_base_url,
+      embedding_api_key: currentConfig.embedding_api_key,
+      embedding_model_name: currentConfig.embedding_model_name,
+      document_id: documentId,
+      stream: true
+    };
+
+    console.log('发送文档请求数据:', requestBody);  // 添加日志
+
+    const response = await fetch(`${serverURL}/api/chat_with_doc`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    return response;
+  };
+
+  // 处理设置保存
+  const handleSettingsSave = (settings) => {
+    const { configs, modelNames } = settings;
+    setModelConfigs(configs);
+    
+    // 更新可用模型列表
+    const updatedModels = [...new Set([...modelOptions, ...modelNames])];
+    setAvailableModels(updatedModels);
+    
+    // 如果当前选中的模型不在更新后的列表中，选择第一个可用模型
+    if (!updatedModels.includes(selectedModel)) {
+      setSelectedModel(updatedModels[0]);
     }
   };
 
@@ -789,6 +927,12 @@ export const useChatLogic = () => {
     sendDocumentChatRequest,
     activeDocument,
     setActiveDocument,
-    handleToggleSidebar: () => setIsSidebarExpanded(prev => !prev)
+    handleToggleSidebar: () => setIsSidebarExpanded(prev => !prev),
+    modelConfigs,
+    availableModels,
+    setAvailableModels,
+    handleSettingsSave,
+    setModelConfigs,
+    getConfigForModel
   };
-}; 
+};

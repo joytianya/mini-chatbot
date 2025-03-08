@@ -23,6 +23,18 @@ export const Upload = ({ darkMode, onUploadSuccess }) => {
       const formData = new FormData();
       formData.append('documents', file);
 
+      // 从localStorage获取embedding配置
+      const savedEmbeddingConfigs = localStorage.getItem('embeddingConfigs');
+      const embeddingConfigs = savedEmbeddingConfigs ? JSON.parse(savedEmbeddingConfigs) : [];
+      const activeConfig = embeddingConfigs[0]; // 使用第一个配置
+
+      // 添加embedding配置到formData
+      if (activeConfig) {
+        formData.append('embedding_base_url', activeConfig.embedding_base_url);
+        formData.append('embedding_api_key', activeConfig.embedding_api_key);
+        formData.append('embedding_model_name', activeConfig.embedding_model_name);
+      }
+
       try {
         console.log('开始上传文件:', files);
         const response = await fetch(`${serverURL}/upload`, {
@@ -237,4 +249,4 @@ export const Upload = ({ darkMode, onUploadSuccess }) => {
       )}
     </>
   );
-}; 
+};

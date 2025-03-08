@@ -46,11 +46,39 @@ function Chat() {
     sendDocumentChatRequest,  // 发送文档聊天请求
     activeDocument,      // 当前活动文档
     setActiveDocument,    // 设置当前活动文档
-    handleToggleSidebar  // 添加这一行
+    handleToggleSidebar,  // 添加这一行
+    availableModels,     // 可用模型列表
+    setAvailableModels,   // 可用模型列表的设置函数
+    setModelConfigs,      // 设置模型配置的函数
+    getConfigForModel    // 获取模型配置的函数
   } = useChatLogic();
 
   // 文件上传相关状态
   const [files, setFiles] = React.useState([]);
+
+  // 处理设置保存
+  const handleSettingsSave = (settings) => {
+    console.log('保存设置, 接收到的数据:', settings);
+    
+    const { configs, modelNames } = settings;
+    console.log('新的模型配置列表:', configs);
+    console.log('新的模型名称列表:', modelNames);
+    
+    setModelConfigs(configs);
+    
+    // 更新可用模型列表
+    const updatedModels = [...new Set([...modelOptions, ...modelNames])];
+    console.log('更新后的可用模型列表:', updatedModels);
+    
+    // 如果当前选中的模型不在更新后的列表中，选择第一个可用模型
+    if (!updatedModels.includes(selectedModel)) {
+      console.log('当前选中的模型不在更新列表中，切换到:', updatedModels[0]);
+      setSelectedModel(updatedModels[0]);
+    }
+    
+    setAvailableModels(updatedModels);
+    localStorage.setItem('modelConfigs', JSON.stringify(configs));
+  };
 
   // 渲染主界面
   return (
@@ -73,13 +101,14 @@ function Chat() {
         formatTime={formatTime}
         darkMode={darkMode}
         onToggleSidebar={handleToggleSidebar}
+        onSettingsSave={handleSettingsSave}
       />
 
       {/* 聊天区域组件 */}
       <ChatArea 
         selectedModel={selectedModel}
         setSelectedModel={setSelectedModel}
-        modelOptions={modelOptions}
+        modelOptions={availableModels}
         currentTurns={currentTurns}
         maxHistoryLength={maxHistoryLength}
         darkMode={darkMode}
@@ -126,3 +155,25 @@ function Chat() {
 
 // 导出Chat组件
 export default Chat; 
+
+const ModelSelector = ({ models, selectedModel, onModelChange, disabled }) => {
+  return (
+    <select
+      value={selectedModel}
+      onChange={(e) => onModelChange(e.target.value)}
+      disabled={disabled}
+      style={{
+        padding: '8px',
+        borderRadius: '4px',
+        border: '1px solid #ddd',
+        backgroundColor: disabled ? '#f5f5f5' : 'white'
+      }}
+    >
+      {(models || []).map((model) => (
+        <option key={model} value={model}>
+          {model}
+        </option>
+      ))}
+    </select>
+  );
+}; 

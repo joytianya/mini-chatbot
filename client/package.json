@@ -14,10 +14,12 @@
     "axios": "^1.6.0",
     "crypto-browserify": "^3.12.1",
     "dompurify": "^3.2.4",
+    "katex": "^0.16.21",
     "marked": "^15.0.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
+    "react-katex": "^3.0.1",
     "react-markdown": "^8.0.7",
     "rehype-raw": "^6.1.1",
     "remark-gfm": "^3.0.1"
