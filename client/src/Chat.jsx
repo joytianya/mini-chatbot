@@ -124,7 +124,7 @@ function Chat() {
         handleRetry={handleRetry}
         handleCopy={handleCopy}
         handleEdit={handleEdit}
-        highlightedMessageId={highlightedMessageId}
+                      highlightedMessageId={highlightedMessageId}
         chatContainerRef={chatContainerRef}
         handleScroll={handleScroll}
         loadingHistory={loadingHistory}

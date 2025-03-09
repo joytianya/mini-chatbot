@@ -11,7 +11,7 @@ from logging import Formatter, StreamHandler
 import socket
 from werkzeug.middleware.proxy_fix import ProxyFix
 import traceback
-
+from jina import JinaChatAPI
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -262,21 +262,30 @@ def chat():
         base_url = data.get('base_url', '默认的base_url')
         api_key = data.get('api_key', '默认的api_key')
         model_name = data.get('model_name', '默认的model_name')
+        is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
 
-        # 使用 base_url, api_key, model_name 调用不同的模型
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            stream=True
-        )
+        logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}")
+
+        if is_deep_research:
+            # 使用 JinaChatAPI 进行深度研究
+            chat = JinaChatAPI()
+            response = chat.stream_chat(messages)
+        else:
+            # 使用 OpenAI API 进行普通对话
+            client = OpenAI(
+                api_key=api_key,
+                base_url=base_url
+            )
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                stream=True
+            )
 
         def generate():
             full_response = []
             try:
+                #print(response)
                 for chunk in response:
                     logger.debug("收到 chunk: %s", chunk)
                     if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
@@ -339,6 +348,7 @@ def chat_with_doc():
         embedding_api_key = data['embedding_api_key']
         embedding_model_name = data['embedding_model_name']
         document_id = data.get('document_id')  # 获取document_id参数
+        is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
         
         # 打印调试信息
         logger.info("收到的参数:")
@@ -350,6 +360,7 @@ def chat_with_doc():
         logger.info(f"embedding_model_name: {embedding_model_name}")
         logger.info(f"document_id: {document_id}")
         logger.info(f"消息数量: {len(messages)}")
+        logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
         
         # 检查doc_store是否为None，如果是则重新初始化
         global doc_store
@@ -363,10 +374,7 @@ def chat_with_doc():
             if doc_store is None:
                 raise ValueError('Failed to initialize doc_store')
 
-        # 使用 base_url, api_key, model_name 调用不同的模型
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        
-        # 使用全局doc_store检索相关文档，传入document_id参数
+        # 使用doc_store检索相关文档，传入document_id参数
         relevant_docs = doc_store.search(messages[-1]['content'], k=30, document_id=document_id)
         if not relevant_docs:
             logger.warning(f"在文档 {document_id or '所有文档'} 中未找到相关内容")
@@ -393,12 +401,23 @@ def chat_with_doc():
             messages[0]['content'] = system_prompt
         else:
             messages.insert(0, {"role": "system", "content": system_prompt})
+
+        # 根据深度研究模式选择不同的API
+        if is_deep_research:
+            # 使用 JinaChatAPI 进行深度研究
+            logger.info("使用 JinaChatAPI 进行深度研究")
+            chat = JinaChatAPI()
+            response = chat.stream_chat(messages)
+        else:
+            # 使用 OpenAI API 进行普通对话
+            logger.info("使用 OpenAI API 进行普通对话")
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                stream=True
+            )
         
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            stream=True
-        )
         def generate():
             full_response = []
             try:
@@ -421,8 +440,8 @@ def chat_with_doc():
                     # 发送过渡提示
                     yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'{os.linesep}基于以上文档回答：{os.linesep}'}}]})}{os.linesep}{os.linesep}".encode('utf-8')
 
-                # 调用 OpenAI API 进行流式响应
-                logger.debug("调用 OpenAI API")
+                # 调用 API 进行流式响应
+                logger.debug(f"调用 {'JinaChatAPI' if is_deep_research else 'OpenAI API'}")
                 for chunk in response:
                     logger.debug("收到 chunk: %s", chunk)
                     if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:

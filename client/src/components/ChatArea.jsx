@@ -34,6 +34,22 @@ const ChatArea = ({
 }) => {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const [isDeepResearch, setIsDeepResearch] = useState(false);  // 添加深度研究模式状态
+
+  // 修改提交处理函数
+  const handleFormSubmit = async (e) => {
+    e?.preventDefault();
+    if (!input.trim() || streaming) return;
+
+    handleSubmit(e, isDeepResearch);
+    // 只重置高度,不主动设置焦点
+    textareaRef.current.style.height = '32px';
+  };
+
+  // 初始聚焦文本输入框
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   return (
     <div style={{ 
@@ -224,14 +240,67 @@ const ChatArea = ({
         )}
       </div>
 
+      {/* 深度研究按钮 */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        padding: '8px 0',
+        position: 'relative',
+        backgroundColor: darkMode ? '#1a1a1a' : '#fff'
+      }}>
+        <button
+          onClick={() => setIsDeepResearch(!isDeepResearch)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '20px',
+            cursor: 'pointer',
+            backgroundColor: isDeepResearch 
+              ? (darkMode ? '#1e3a5f' : '#e3f2fd')
+              : (darkMode ? '#2d2d2d' : '#f5f5f5'),
+            color: isDeepResearch
+              ? (darkMode ? '#fff' : '#1976d2')
+              : (darkMode ? '#aaa' : '#666'),
+            transition: 'all 0.3s ease',
+            fontSize: '14px',
+            fontWeight: isDeepResearch ? '500' : '400',
+            boxShadow: isDeepResearch 
+              ? (darkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(25,118,210,0.1)')
+              : 'none',
+            transform: isDeepResearch ? 'translateY(-1px)' : 'none'
+          }}
+        >
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke={isDeepResearch 
+              ? (darkMode ? '#fff' : '#1976d2')
+              : (darkMode ? '#aaa' : '#666')}
+            strokeWidth="2"
+            style={{
+              transition: 'all 0.3s ease',
+              transform: isDeepResearch ? 'rotate(180deg)' : 'none'
+            }}
+          >
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>
+          </svg>
+          深度研究
+        </button>
+      </div>
+
       {/* 输入区域 */}
       <div className="input-area" style={{ 
-        borderTop: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
         padding: '10px 15px',
         backgroundColor: darkMode ? '#2d2d2d' : '#f8f9fa'
       }}>
         <form 
-          onSubmit={handleSubmit} 
+          onSubmit={handleFormSubmit}  // 使用新的提交处理函数
           style={{ 
             display: 'flex',
             gap: '12px',
@@ -249,25 +318,43 @@ const ChatArea = ({
           
           <textarea
             ref={textareaRef}
+            autoFocus
+            onBlur={() => {
+              // 保证始终聚焦输入框
+              setTimeout(() => {
+                textareaRef.current.focus();
+              }, 0);
+            }}
             value={input}
             onChange={(e) => {
+              const cursorPosition = e.target.selectionStart;
               setInput(e.target.value);
               e.target.style.height = '32px';
               const height = Math.min(e.target.scrollHeight, 32);
               e.target.style.height = height + 'px';
+              // 恢复光标位置
+              requestAnimationFrame(() => {
+                e.target.selectionStart = cursorPosition;
+                e.target.selectionEnd = cursorPosition;
+              });
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (!streaming) {  // 只有在非流式输出时才允许发送
-                  // 检查是否有文件预览
+                if (!streaming) {
                   if (!activeDocument) {
                     console.log('无活动文档，使用普通聊天');
                   } else {
                     console.log('使用文档聊天，文档ID:', activeDocument.id);
                   }
-                  handleSubmit(e);
+                  const cursorPosition = e.target.selectionStart;
+                  handleSubmit(e, isDeepResearch);
                   e.target.style.height = '32px';
+                  // 恢复光标位置
+                  requestAnimationFrame(() => {
+                    e.target.selectionStart = cursorPosition;
+                    e.target.selectionEnd = cursorPosition;
+                  });
                 }
               }
             }}
@@ -337,4 +424,4 @@ const ChatArea = ({
   );
 };
 
-export default ChatArea; 
+export default ChatArea;

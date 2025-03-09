@@ -225,7 +225,7 @@ export const useChatLogic = () => {
     return result;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, isDeepResearch = false) => {
     e?.preventDefault();
     if (!input.trim() || streaming) return;
 
@@ -294,7 +294,8 @@ export const useChatLogic = () => {
 
       console.log('准备发送请求:', {
         selectedModel,
-        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档'
+        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
+        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式'
       });
       
       // 获取当前选中模型对应的embedding配置
@@ -318,7 +319,8 @@ export const useChatLogic = () => {
         embedding_api_key: embeddingConfig.embedding_api_key,
         embedding_model_name: embeddingConfig.embedding_model_name,
         document_id: activeDocument?.id || '',
-        stream: true
+        stream: true,
+        deep_research: isDeepResearch  // 添加深度研究模式标志
       };
 
       console.log('完整的请求数据:', {
@@ -886,7 +888,7 @@ export const useChatLogic = () => {
   };
 
   // 带文档的聊天请求
-  const sendDocumentChatRequest = async (message, documentId) => {
+  const sendDocumentChatRequest = async (message, documentId, isDeepResearch = false) => {
     const currentConfig = getConfigForModel(selectedModel);
     
     // 获取当前选中模型对应的embedding配置
@@ -910,7 +912,8 @@ export const useChatLogic = () => {
       embedding_api_key: embeddingConfig.embedding_api_key || '',
       embedding_model_name: embeddingConfig.embedding_model_name || '',
       document_id: documentId,
-      stream: true
+      stream: true,
+      deep_research: isDeepResearch  // 添加深度研究模式标志
     };
 
     console.log('发送文档请求数据:', requestBody);
