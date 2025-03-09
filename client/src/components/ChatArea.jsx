@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import MessageBubble from './MessageBubble';
 import { serverURL } from '../Config';
-import { Upload } from './Upload';  // 新增上传组件
+import { Upload } from './Upload';
 
 const ChatArea = ({
   selectedModel,
@@ -34,23 +34,38 @@ const ChatArea = ({
 }) => {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-  const [isDeepResearch, setIsDeepResearch] = useState(false);  // 添加深度研究模式状态
+  const [isDeepResearch, setIsDeepResearch] = useState(false);
+  const [isWebSearch, setIsWebSearch] = useState(false);
+  
+  // 使用这个状态跟踪用户是否正在与其他元素交互
+  const [isInteractingWithOtherElements, setIsInteractingWithOtherElements] = useState(false);
 
-  // 修改提交处理函数
   const handleFormSubmit = async (e) => {
     e?.preventDefault();
     if (!input.trim() || streaming) return;
 
-    handleSubmit(e, isDeepResearch);
-    // 重置高度并重新聚焦输入框
+    handleSubmit(e, isDeepResearch, isWebSearch);
     textareaRef.current.style.height = '32px';
-    textareaRef.current.focus();
+    
+    // 只在用户没有与其他元素交互时才自动聚焦
+    if (!isInteractingWithOtherElements) {
+      textareaRef.current.focus();
+    }
   };
 
-  // 初始聚焦文本输入框
+  // 只在初始渲染和没有与其他元素交互时聚焦文本输入框
   useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
+    if (!isInteractingWithOtherElements && !streaming) {
+      textareaRef.current?.focus();
+    }
+  }, [isInteractingWithOtherElements, streaming]);
+
+  // 设置文本区域的高度
+  const adjustTextareaHeight = (element) => {
+    if (!element) return;
+    element.style.height = '32px';
+    element.style.height = Math.min(element.scrollHeight, 32) + 'px';
+  };
 
   return (
     <div style={{ 
@@ -72,8 +87,21 @@ const ChatArea = ({
       }}>
         {/* 左侧：模型选择 */}
         <select 
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
+          value={selectedModel || ''}
+          onFocus={() => {
+            // 当用户与下拉菜单交互时，阻止文本框自动聚焦
+            setIsInteractingWithOtherElements(true);
+          }}
+          onBlur={() => {
+            // 延迟一点时间再允许文本框聚焦，确保选择完成
+            setTimeout(() => {
+              setIsInteractingWithOtherElements(false);
+            }, 200);
+          }}
+          onChange={(e) => {
+            console.log('选择模型:', e.target.value);
+            setSelectedModel(e.target.value);
+          }}
           style={{
             padding: '8px 12px',
             borderRadius: '8px',
@@ -82,35 +110,25 @@ const ChatArea = ({
             fontSize: '14px',
             color: darkMode ? '#e0e0e0' : '#2c3e50',
             cursor: 'pointer',
-            outline: 'none'
+            outline: 'none',
+            minWidth: '150px',
+            zIndex: 100
           }}
         >
-          {/* 默认模型选项 */}
-          {modelOptions.map(model => (
+          <option value="">选择模型</option>
+          {Array.isArray(modelOptions) && modelOptions.map(model => (
             <option 
               key={model} 
               value={model}
               style={{
                 backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-                color: darkMode ? '#e0e0e0' : '#2c3e50'
+                color: darkMode ? '#e0e0e0' : '#2c3e50',
+                padding: '8px'
               }}
             >
               {model}
             </option>
           ))}
-          {/* 从设置中获取的自定义模型 */}
-          {window.chatSettings?.model_name && !modelOptions.includes(window.chatSettings.model_name) && (
-            <option 
-              key={window.chatSettings.model_name} 
-              value={window.chatSettings.model_name}
-              style={{
-                backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-                color: darkMode ? '#e0e0e0' : '#2c3e50'
-              }}
-            >
-              {window.chatSettings.model_name}
-            </option>
-          )}
         </select>
 
         {/* 右侧：对话轮次和导出按钮 */}
@@ -133,7 +151,13 @@ const ChatArea = ({
           
           {/* 导出按钮 */}
           <button
-            onClick={handleExport}
+            onClick={(e) => {
+              // 阻止按钮交互时文本框获取焦点
+              setIsInteractingWithOtherElements(true);
+              handleExport();
+              // 操作完成后延迟恢复
+              setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+            }}
             style={{
               padding: '6px 12px',
               border: '1px solid ' + (darkMode ? '#444' : '#e0e0e0'),
@@ -157,7 +181,13 @@ const ChatArea = ({
           
           {/* 深色模式切换按钮 */}
           <button
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={() => {
+              // 阻止按钮交互时文本框获取焦点
+              setIsInteractingWithOtherElements(true);
+              setDarkMode(!darkMode);
+              // 操作完成后延迟恢复
+              setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+            }}
             style={{
               width: '30px',
               height: '30px',
@@ -183,6 +213,11 @@ const ChatArea = ({
       <div 
         ref={chatContainerRef}
         onScroll={handleScroll}
+        onClick={() => {
+          // 点击消息区域时临时阻止文本框获取焦点
+          setIsInteractingWithOtherElements(true);
+          setTimeout(() => setIsInteractingWithOtherElements(false), 300);
+        }}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -201,13 +236,29 @@ const ChatArea = ({
               content={msg.content}
               reasoningContent={msg.reasoning_content}
               isUser={msg.role === 'user'}
-              onRetry={msg.role === 'assistant' ? () => handleRetry(msg, isDeepResearch) : null}
-              onCopy={handleCopy}
-              onEdit={msg.role === 'user' ? (newContent) => handleEdit(msg, newContent) : null}
+              onRetry={msg.role === 'assistant' ? () => {
+                // 阻止重试操作时文本框获取焦点
+                setIsInteractingWithOtherElements(true);
+                handleRetry(msg, isDeepResearch, isWebSearch);
+                setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+              } : null}
+              onCopy={(text) => {
+                // 阻止复制操作时文本框获取焦点
+                setIsInteractingWithOtherElements(true);
+                handleCopy(text);
+                setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+              }}
+              onEdit={msg.role === 'user' ? (newContent) => {
+                // 编辑时阻止文本框获取焦点
+                setIsInteractingWithOtherElements(true);
+                handleEdit(msg, newContent, isDeepResearch, isWebSearch);
+                setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+              } : null}
               isStreaming={false}
               id={msg.id}
               highlightedMessageId={highlightedMessageId}
               darkMode={darkMode}
+              isWebSearch={isWebSearch}
             />
           )
         ))}
@@ -224,6 +275,7 @@ const ChatArea = ({
                 isStreaming={isReasoning}
                 onCopy={handleCopy}
                 darkMode={darkMode}
+                isWebSearch={isWebSearch}
               />
             )}
             {/* 显示回复内容 */}
@@ -235,63 +287,68 @@ const ChatArea = ({
                 isStreaming={true}
                 onCopy={handleCopy}
                 darkMode={darkMode}
+                isWebSearch={isWebSearch}
               />
             )}
           </>
         )}
       </div>
 
-      {/* 深度研究按钮 */}
+      {/* 功能按钮区域 */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'center', 
+        gap: '10px',
         padding: '8px 0',
         position: 'relative',
         backgroundColor: darkMode ? '#1a1a1a' : '#fff'
       }}>
+        {/* 深度研究按钮 */}
         <button
-          onClick={() => setIsDeepResearch(!isDeepResearch)}
+          onClick={() => {
+            // 阻止按钮交互时文本框获取焦点
+            setIsInteractingWithOtherElements(true);
+            setIsDeepResearch(!isDeepResearch);
+            setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+          }}
           style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+            backgroundColor: isDeepResearch ? '#4CAF50' : 'transparent',
+            color: isDeepResearch ? '#fff' : (darkMode ? '#e0e0e0' : '#000'),
+            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '20px',
-            cursor: 'pointer',
-            backgroundColor: isDeepResearch 
-              ? (darkMode ? '#1e3a5f' : '#e3f2fd')
-              : (darkMode ? '#2d2d2d' : '#f5f5f5'),
-            color: isDeepResearch
-              ? (darkMode ? '#fff' : '#1976d2')
-              : (darkMode ? '#aaa' : '#666'),
-            transition: 'all 0.3s ease',
-            fontSize: '14px',
-            fontWeight: isDeepResearch ? '500' : '400',
-            boxShadow: isDeepResearch 
-              ? (darkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(25,118,210,0.1)')
-              : 'none',
-            transform: isDeepResearch ? 'translateY(-1px)' : 'none'
+            gap: '4px'
           }}
         >
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke={isDeepResearch 
-              ? (darkMode ? '#fff' : '#1976d2')
-              : (darkMode ? '#aaa' : '#666')}
-            strokeWidth="2"
-            style={{
-              transition: 'all 0.3s ease',
-              transform: isDeepResearch ? 'rotate(180deg)' : 'none'
-            }}
-          >
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>
-          </svg>
+          <span role="img" aria-label="research">🔬</span>
           深度研究
+        </button>
+
+        {/* 联网搜索按钮 */}
+        <button
+          onClick={() => {
+            // 阻止按钮交互时文本框获取焦点
+            setIsInteractingWithOtherElements(true);
+            setIsWebSearch(!isWebSearch);
+            setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+          }}
+          style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+            backgroundColor: isWebSearch ? '#2196F3' : 'transparent',
+            color: isWebSearch ? '#fff' : (darkMode ? '#e0e0e0' : '#000'),
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          <span role="img" aria-label="web-search">🌐</span>
+          联网搜索
         </button>
       </div>
 
@@ -312,52 +369,48 @@ const ChatArea = ({
           <Upload
             darkMode={darkMode}
             onUploadSuccess={(doc) => {
+              // 阻止上传操作时文本框获取焦点
+              setIsInteractingWithOtherElements(true);
               console.log('设置活动文档:', doc);
               setActiveDocument(doc);
+              setTimeout(() => setIsInteractingWithOtherElements(false), 300);
             }}
           />
           
           <textarea
             ref={textareaRef}
-            autoFocus
-            onBlur={() => {
-              // 保证始终聚焦输入框
-              setTimeout(() => {
-                textareaRef.current.focus();
-              }, 0);
-            }}
+            autoFocus={!isInteractingWithOtherElements && !streaming}
             value={input}
             onChange={(e) => {
               const cursorPosition = e.target.selectionStart;
               setInput(e.target.value);
-              e.target.style.height = '32px';
-              const height = Math.min(e.target.scrollHeight, 32);
-              e.target.style.height = height + 'px';
-              // 恢复光标位置
+              
+              // 调整文本区域高度
+              adjustTextareaHeight(e.target);
+              
+              // 保持光标位置
               requestAnimationFrame(() => {
                 e.target.selectionStart = cursorPosition;
                 e.target.selectionEnd = cursorPosition;
               });
             }}
+            onFocus={() => {
+              // 当文本框获得焦点时，如果正在与其他元素交互，不要让文本框保持焦点
+              if (isInteractingWithOtherElements) {
+                textareaRef.current.blur();
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (!streaming || input.trim()) {  // 允许在streaming时发送新消息
+                if (!streaming || input.trim()) {
                   if (!activeDocument) {
                     console.log('无活动文档，使用普通聊天');
                   } else {
                     console.log('使用文档聊天，文档ID:', activeDocument.id);
                   }
-                  const cursorPosition = e.target.selectionStart;
-                  handleSubmit(e, isDeepResearch);
-                  e.target.style.height = '32px';
-                  // 恢复光标位置
-                  requestAnimationFrame(() => {
-                    e.target.selectionStart = cursorPosition;
-                    e.target.selectionEnd = cursorPosition;
-                  });
-                  // 重新聚焦输入框
-                  textareaRef.current.focus();
+                  handleSubmit(e, isDeepResearch, isWebSearch);
+                  textareaRef.current.style.height = '32px';
                 }
               }
             }}
@@ -369,9 +422,9 @@ const ChatArea = ({
               fontSize: '14px',
               outline: 'none',
               transition: 'border-color 0.2s, height 0.2s',
-              backgroundColor: darkMode ? '#2d2d2d' : '#fff',  // 移除streaming时的背景色变化
+              backgroundColor: darkMode ? '#2d2d2d' : '#fff',
               color: darkMode ? '#e0e0e0' : 'inherit',
-              cursor: 'text',  // 移除streaming时的cursor变化
+              cursor: streaming ? 'not-allowed' : 'text',
               resize: 'none',
               height: '32px',
               maxHeight: '80px',
@@ -379,11 +432,16 @@ const ChatArea = ({
               lineHeight: '20px'
             }}
             placeholder={streaming ? '正在生成回复...' : '按 Enter 发送，Shift+Enter 换行'}
+            disabled={streaming}
           />
           {streaming ? (
             <button 
               type="button" 
-              onClick={handleStop}
+              onClick={() => {
+                setIsInteractingWithOtherElements(true);
+                handleStop();
+                setTimeout(() => setIsInteractingWithOtherElements(false), 100);
+              }}
               style={{ 
                 padding: '12px 24px',
                 backgroundColor: darkMode ? '#ef5350' : '#ef5350',
@@ -400,19 +458,19 @@ const ChatArea = ({
           ) : (
             <button 
               type="submit"
-              // 阻止按钮点击时夺走焦点
+              // 防止按钮点击时失去焦点
               onMouseDown={(e) => e.preventDefault()}
-              disabled={streaming}
+              disabled={streaming || !input.trim()}
               className="send-button"
               style={{ 
                 padding: '12px 24px',
-                backgroundColor: streaming 
+                backgroundColor: (streaming || !input.trim())
                   ? (darkMode ? '#444' : '#e0e0e0')
                   : '#1976d2',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
-                cursor: streaming ? 'not-allowed' : 'pointer',
+                cursor: (streaming || !input.trim()) ? 'not-allowed' : 'pointer',
                 fontSize: '16px',
                 transition: 'background-color 0.2s'
               }}

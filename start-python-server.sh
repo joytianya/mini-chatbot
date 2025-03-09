@@ -27,7 +27,7 @@ source venv/bin/activate
 # 安装依赖
 echo "Installing Python dependencies..."
 pip install "flask[async]" flask-cors langchain-community langchain openai faiss-cpu python-dotenv "httpx[socks]" tiktoken
-pip install pypdf unstructured python-docx markdown
+pip install pypdf unstructured python-docx markdown crawl4ai
 #brew install libmagic  # macOS
 
 # 检查 documents 目录是否存在

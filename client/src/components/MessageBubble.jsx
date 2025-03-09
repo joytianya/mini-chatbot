@@ -12,7 +12,8 @@ const MessageBubble = ({
   isStreaming,
   id,
   highlightedMessageId,
-  darkMode  // 添加 darkMode prop
+  darkMode,
+  isWebSearch  // 添加联网搜索参数
 }) => {
   const [showButtons, setShowButtons] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -268,7 +269,7 @@ const MessageBubble = ({
                 {/* 重试按钮 - 仅对 AI 消息显示 */}
                 {!isUser && onRetry && (
                   <button
-                    onClick={onRetry}
+                    onClick={() => onRetry(isWebSearch)}  // 传递联网搜索状态
                     style={{
                       border: 'none',
                       background: 'none',

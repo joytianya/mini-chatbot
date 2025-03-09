@@ -12,6 +12,9 @@ import socket
 from werkzeug.middleware.proxy_fix import ProxyFix
 import traceback
 from jina import JinaChatAPI
+from web_kg import get_web_kg  # 添加web_kg导入
+import asyncio
+from functools import partial
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -263,8 +266,23 @@ def chat():
         api_key = data.get('api_key', '默认的api_key')
         model_name = data.get('model_name', '默认的model_name')
         is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
+        is_web_search = data.get('web_search', False)  # 获取联网搜索标志
 
-        logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}")
+        logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}, 联网搜索: {'开启' if is_web_search else '关闭'}")
+
+        # 如果启用了联网搜索，获取web搜索结果
+        if is_web_search:
+            user_query = messages[-1]['content']
+            # 使用事件循环运行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            web_search_results = loop.run_until_complete(get_web_kg(user_query))
+            loop.close()
+            
+            # 将web搜索结果添加到用户消息中
+            web_context = "\n\n联网搜索参考资料：\n" + web_search_results
+            messages[-1]['content'] = messages[-1]['content'] + web_context
+            logger.info(f"添加了联网搜索结果: {web_context}")
 
         if is_deep_research:
             # 使用 JinaChatAPI 进行深度研究
@@ -349,6 +367,7 @@ def chat_with_doc():
         embedding_model_name = data['embedding_model_name']
         document_id = data.get('document_id')  # 获取document_id参数
         is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
+        is_web_search = data.get('web_search', False)  # 获取联网搜索标志
         
         # 打印调试信息
         logger.info("收到的参数:")
@@ -361,7 +380,22 @@ def chat_with_doc():
         logger.info(f"document_id: {document_id}")
         logger.info(f"消息数量: {len(messages)}")
         logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
+        logger.info(f"联网搜索: {'开启' if is_web_search else '关闭'}")
         
+        # 如果启用了联网搜索，获取web搜索结果
+        if is_web_search:
+            user_query = messages[-1]['content']
+            # 使用事件循环运行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            web_search_results = loop.run_until_complete(get_web_kg(user_query))
+            loop.close()
+            
+            # 将web搜索结果添加到用户消息中
+            web_context = "\n\n联网搜索参考资料：\n" + web_search_results
+            messages[-1]['content'] = messages[-1]['content'] + web_context
+            logger.info(f"添加了联网搜索结果: {web_context}")
+
         # 检查doc_store是否为None，如果是则重新初始化
         global doc_store
         if doc_store is None:

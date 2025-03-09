@@ -225,7 +225,7 @@ export const useChatLogic = () => {
     return result;
   };
 
-  const handleSubmit = async (e, isDeepResearch = false) => {
+  const handleSubmit = async (e, isDeepResearch = false, isWebSearch = false) => {
     e?.preventDefault();
     if (!input.trim() || streaming) return;
 
@@ -295,7 +295,8 @@ export const useChatLogic = () => {
       console.log('准备发送请求:', {
         selectedModel,
         activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
-        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式'
+        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式',
+        isWebSearch: isWebSearch ? '联网搜索' : '离线模式'
       });
       
       // 获取当前选中模型对应的embedding配置
@@ -305,22 +306,23 @@ export const useChatLogic = () => {
       const requestBody = {
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
-          ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+          ...requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
             role: msg.role,
             content: msg.content
           })),
           { role: 'user', content: input }
         ],
         model: selectedModel,
-        base_url: currentConfig.base_url,
-        api_key: currentConfig.api_key,
+        base_url: currentConfig.base_url || '',
+        api_key: currentConfig.api_key || '',
         model_name: currentConfig.model_name || selectedModel,
-        embedding_base_url: embeddingConfig.embedding_base_url,
-        embedding_api_key: embeddingConfig.embedding_api_key,
-        embedding_model_name: embeddingConfig.embedding_model_name,
+        embedding_base_url: embeddingConfig.embedding_base_url || '',
+        embedding_api_key: embeddingConfig.embedding_api_key || '',
+        embedding_model_name: embeddingConfig.embedding_model_name || '',
         document_id: activeDocument?.id || '',
         stream: true,
-        deep_research: isDeepResearch  // 添加深度研究模式标志
+        deep_research: isDeepResearch,
+        web_search: isWebSearch  // 添加联网搜索参数
       };
 
       console.log('完整的请求数据:', {
@@ -467,7 +469,7 @@ export const useChatLogic = () => {
                 if (e.message !== '解析响应出错') {
                   setStreaming(false);
                   const errorMessage = {
-                    role: 'system',
+                    role: 'assistant',
                     content: e.message,
                     error: true
                   };
@@ -488,7 +490,7 @@ export const useChatLogic = () => {
         console.error('流式处理错误:', error);
         setStreaming(false);
         const errorMessage = {
-          role: 'system',
+          role: 'assistant',
           content: error.message || '处理响应时出错',
           error: true
         };
@@ -500,7 +502,7 @@ export const useChatLogic = () => {
   };
 
   // 处理重试
-  const handleRetry = async (message, isDeepResearch = false) => {
+  const handleRetry = async (message, isDeepResearch = false, isWebSearch = false) => {
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
     const requestMsgs = previousMessages.map(msg => ({
@@ -540,7 +542,8 @@ export const useChatLogic = () => {
       console.log('准备重试请求:', {
         selectedModel,
         activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
-        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式'
+        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式',
+        isWebSearch: isWebSearch ? '联网搜索' : '离线模式'
       });
 
       // 获取当前选中模型对应的embedding配置
@@ -550,7 +553,7 @@ export const useChatLogic = () => {
       const requestBody = {
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
-          ...requestMsgs.slice(-(currentTurns * 2))
+          ...requestMsgs.slice(-(currentTurns * 2)).slice(1)
         ],
         model: selectedModel,
         base_url: currentConfig.base_url || '',
@@ -561,7 +564,8 @@ export const useChatLogic = () => {
         embedding_model_name: embeddingConfig.embedding_model_name || '',
         document_id: activeDocument?.id || '',
         stream: true,
-        deep_research: isDeepResearch
+        deep_research: isDeepResearch,
+        web_search: isWebSearch  // 添加联网搜索参数
       };
       
       console.log('重试请求的完整数据:', {
@@ -740,7 +744,7 @@ export const useChatLogic = () => {
   };
 
   // 处理编辑
-  const handleEdit = async (message, newContent) => {
+  const handleEdit = async (message, newContent, isDeepResearch = false, isWebSearch = false) => {
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
     const editedMessage = { role: 'user', content: newContent };
@@ -782,7 +786,7 @@ export const useChatLogic = () => {
       const requestBody = {
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
-          ...previousMessages.slice(-(currentTurns * 2)).map(msg => ({
+          ...previousMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
             role: msg.role,
             content: msg.content
           })), 
@@ -797,7 +801,8 @@ export const useChatLogic = () => {
         embedding_model_name: embeddingConfig.embedding_model_name || '',
         document_id: activeDocument?.id || '',
         stream: true,
-        deep_research: isDeepResearch
+        deep_research: isDeepResearch,
+        web_search: isWebSearch  // 添加联网搜索参数
       };
       
       console.log('编辑请求的完整数据:', {
@@ -934,7 +939,7 @@ export const useChatLogic = () => {
     const requestBody = {
       messages: [
         { role: 'system', content: 'You are a helpful assistant.' },
-        ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+        ...requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
           role: msg.role,
           content: msg.content
         })),
@@ -964,7 +969,7 @@ export const useChatLogic = () => {
   };
 
   // 带文档的聊天请求
-  const sendDocumentChatRequest = async (message, documentId, isDeepResearch = false) => {
+  const sendDocumentChatRequest = async (message, documentId, isDeepResearch = false, isWebSearch = false) => {
     const currentConfig = getConfigForModel(selectedModel);
     
     // 获取当前选中模型对应的embedding配置
@@ -974,7 +979,7 @@ export const useChatLogic = () => {
     const requestBody = {
       messages: [
         { role: 'system', content: 'You are a helpful assistant.' },
-        ...requestMessages.slice(-(currentTurns * 2)).map(msg => ({
+        ...requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
           role: msg.role,
           content: msg.content
         })),
@@ -989,10 +994,18 @@ export const useChatLogic = () => {
       embedding_model_name: embeddingConfig.embedding_model_name || '',
       document_id: documentId,
       stream: true,
-      deep_research: isDeepResearch  // 添加深度研究模式标志
+      deep_research: isDeepResearch,
+      web_search: isWebSearch  // 添加联网搜索参数
     };
 
-    console.log('发送文档请求数据:', requestBody);
+    console.log('发送文档请求数据:', {
+      url: `${serverURL}/api/chat_with_doc`,
+      body: {
+        ...requestBody,
+        api_key: '***',
+        embedding_api_key: '***'
+      }
+    });
 
     const response = await fetch(`${serverURL}/api/chat_with_doc`, {
       method: 'POST',

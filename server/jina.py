@@ -42,7 +42,7 @@ class JinaChatAPI:
         """检查请求频率限制"""
         now = time.time()
         if now - self.last_request_time < 60:  # 1分钟内
-            if self.request_count >= 3:
+            if self.request_count >= 30:
                 return False
         else:
             # 重置计数器
@@ -160,7 +160,6 @@ class JinaChatAPI:
                 "content": "你是mini-deepresearch助手，是由研发人员开发的，没有实体和公司"
             }
         ] + messages
-
         try:
             response = requests.post(
                 self.base_url,
@@ -218,7 +217,7 @@ def demo():
         # 示例1: 使用send_message
         print("\n示例1 - 单条消息:")
         print("发送消息: 你好,请介绍一下自己")
-        for chunk in chat.send_message("你好,请介绍一下自己"):
+        for chunk in chat.send_message("你好,北京天气"):
             if chunk.choices[0].delta.reasoning_content:
                 content = chunk.choices[0].delta.reasoning_content
                 print(content, end="", flush=True)
