@@ -3,7 +3,7 @@ flask-cors==3.0.10
 langchain-community
 langchain
 faiss-cpu
-python-dotenv==0.19.0
+python-dotenv
 httpx[socks]
 tiktoken
 pypdf
@@ -12,4 +12,4 @@ python-docx
 markdown
 werkzeug==2.0.1
 openai==1.63.2
-crawl4ai
+crawl4ai==0.5.0.post4
