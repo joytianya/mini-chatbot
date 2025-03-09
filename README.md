@@ -13,10 +13,8 @@
   - [基础对话](#基础对话)
   - [文档对话](#文档对话)
 - [配置说明](#-配置说明)
-- [部署指南](#-部署指南)
-  - [本地开发环境](#本地开发环境)
-  - [生产环境部署](#生产环境部署)
 - [常见问题](#-常见问题)
+- [许可证](#-许可证)
 
 ## 🌟 功能特点
 
@@ -143,7 +141,42 @@ npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
 
 ### 后端部署
 
-#### 后端部署（以 Render 为例）
+#### 本地开发环境
+
+1. 进入server目录：
+```bash
+cd server
+```
+
+2. 创建并激活 Python 虚拟环境：
+```bash
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# Windows
+venv\Scripts\activate
+# Linux/Mac
+source venv/bin/activate
+```
+
+3. 安装依赖：
+```bash
+pip install -r requirements.txt
+```
+
+4. 启动开发服务器：
+```bash
+python app.py
+```
+
+> 💡 **本地开发说明：**
+> - 默认运行在 `development` 环境
+> - 支持热重载（修改代码后自动重启）
+> - 显示详细的调试信息
+> - 访问地址：`http://localhost:5001`
+
+#### 生产环境部署（以 Render 为例）
 
 1. 在 Render 上创建新的 Web Service
 2. 配置以下内容：
@@ -215,39 +248,6 @@ npm run deploy  # 这会将 dist 目录下的文件推送到 gh-pages 分支
 > - 对话模型用于处理用户的问题和生成回答
 > - Embedding模型用于处理文档并建立向量索引
 > - 两组配置可以使用相同或不同的服务提供商
-
-## 🌐 部署指南
-
-### 本地开发环境
-
-1. 克隆仓库：
-```bash
-git clone https://github.com/joytianya/mini-chatbot.git
-```
-
-2. 前端开发：
-```bash
-cd client
-npm install
-npm run dev
-```
-
-### 生产环境部署
-
-1. 在 Render 上创建新的 Web Service
-2. 配置以下内容：
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python app.py`
-3. 设置环境变量：
-   - `FLASK_ENV`: `production`  # 生产环境必须设置为 production
-   - `PORT`: `10000`  # Render 会自动分配端口，这个值会被覆盖
-   - 其他必要的环境变量（如有）
-
-> 💡 **注意：**
-> - 生产环境必须使用 `FLASK_ENV=production`，这会禁用调试模式
-> - 生产环境下不会启用热重载
-> - 错误信息会被简化，不会暴露敏感信息
-> - 性能会得到优化
 
 ## 🤔 常见问题
 
