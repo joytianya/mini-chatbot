@@ -201,7 +201,7 @@ const ChatArea = ({
               content={msg.content}
               reasoningContent={msg.reasoning_content}
               isUser={msg.role === 'user'}
-              onRetry={msg.role === 'assistant' ? () => handleRetry(msg) : null}
+              onRetry={msg.role === 'assistant' ? () => handleRetry(msg, isDeepResearch) : null}
               onCopy={handleCopy}
               onEdit={msg.role === 'user' ? (newContent) => handleEdit(msg, newContent) : null}
               isStreaming={false}

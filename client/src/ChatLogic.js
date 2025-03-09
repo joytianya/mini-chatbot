@@ -279,7 +279,7 @@ export const useChatLogic = () => {
 
     try {
       // 检查是否有必要的配置
-      if (!currentConfig.base_url || !currentConfig.api_key) {
+      if (!isDeepResearch && (!currentConfig.base_url || !currentConfig.api_key)) {
         throw new Error('请先在设置中配置模型参数');
       }
 
@@ -500,7 +500,7 @@ export const useChatLogic = () => {
   };
 
   // 处理重试
-  const handleRetry = async (message) => {
+  const handleRetry = async (message, isDeepResearch = false) => {
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
     const requestMsgs = previousMessages.map(msg => ({
@@ -526,10 +526,11 @@ export const useChatLogic = () => {
       const requestBody = {
         messages: requestMsgs,
         model: selectedModel,
-        base_url: currentConfig.base_url,
-        api_key: currentConfig.api_key,
+        base_url: currentConfig.base_url || '',
+        api_key: currentConfig.api_key || '',
         model_name: currentConfig.model_name,
-        stream: true
+        stream: true,
+        deep_research: isDeepResearch  // 添加深度研究模式标志
       };
       
       console.log('重试请求的完整数据:', requestBody);
