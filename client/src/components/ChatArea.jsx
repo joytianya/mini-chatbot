@@ -42,8 +42,9 @@ const ChatArea = ({
     if (!input.trim() || streaming) return;
 
     handleSubmit(e, isDeepResearch);
-    // 只重置高度,不主动设置焦点
+    // 重置高度并重新聚焦输入框
     textareaRef.current.style.height = '32px';
+    textareaRef.current.focus();
   };
 
   // 初始聚焦文本输入框
@@ -300,7 +301,7 @@ const ChatArea = ({
         backgroundColor: darkMode ? '#2d2d2d' : '#f8f9fa'
       }}>
         <form 
-          onSubmit={handleFormSubmit}  // 使用新的提交处理函数
+          onSubmit={handleFormSubmit}
           style={{ 
             display: 'flex',
             gap: '12px',
@@ -341,7 +342,7 @@ const ChatArea = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (!streaming) {
+                if (!streaming || input.trim()) {  // 允许在streaming时发送新消息
                   if (!activeDocument) {
                     console.log('无活动文档，使用普通聊天');
                   } else {
@@ -355,10 +356,11 @@ const ChatArea = ({
                     e.target.selectionStart = cursorPosition;
                     e.target.selectionEnd = cursorPosition;
                   });
+                  // 重新聚焦输入框
+                  textareaRef.current.focus();
                 }
               }
             }}
-            disabled={streaming}  // 在流式输出时禁用输入框
             style={{ 
               flex: 1, 
               padding: '6px 12px',
@@ -367,11 +369,9 @@ const ChatArea = ({
               fontSize: '14px',
               outline: 'none',
               transition: 'border-color 0.2s, height 0.2s',
-              backgroundColor: darkMode 
-                ? (streaming ? '#1a1a1a' : '#2d2d2d')
-                : (streaming ? '#f5f5f5' : '#fff'),
+              backgroundColor: darkMode ? '#2d2d2d' : '#fff',  // 移除streaming时的背景色变化
               color: darkMode ? '#e0e0e0' : 'inherit',
-              cursor: streaming ? 'not-allowed' : 'text',
+              cursor: 'text',  // 移除streaming时的cursor变化
               resize: 'none',
               height: '32px',
               maxHeight: '80px',
@@ -399,7 +399,9 @@ const ChatArea = ({
             </button>
           ) : (
             <button 
-              type="submit" 
+              type="submit"
+              // 阻止按钮点击时夺走焦点
+              onMouseDown={(e) => e.preventDefault()}
               disabled={streaming}
               className="send-button"
               style={{ 
