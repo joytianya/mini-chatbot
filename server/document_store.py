@@ -53,9 +53,20 @@ class ArkEmbeddings:
             logger.info(f"处理第 {i//batch_size + 1} 批，共 {len(batch_texts)} 个文档")
             
             try:
+                # 确保文本是UTF-8编码
+                encoded_texts = []
+                for text in batch_texts:
+                    if isinstance(text, str):
+                        # 如果是字符串，确保是UTF-8编码
+                        encoded_text = text.encode('utf-8').decode('utf-8')
+                    else:
+                        # 如果不是字符串，转换为字符串
+                        encoded_text = str(text).encode('utf-8').decode('utf-8')
+                    encoded_texts.append(encoded_text)
+
                 response = self.client.embeddings.create(
                     model=self.model_name,
-                    input=batch_texts,
+                    input=encoded_texts,
                     encoding_format="float"
                 )
                 batch_embeddings = [embedding.embedding for embedding in response.data]
@@ -69,12 +80,19 @@ class ArkEmbeddings:
     
     def embed_query(self, text):
         """将查询转换为向量"""
-        response = self.client.embeddings.create(
-            model=self.model_name,
-            input=[text],
-            encoding_format="float"
-        )
-        return response.data[0].embedding
+        try:
+            # 确保查询文本是UTF-8编码
+            encoded_text = text.encode('utf-8').decode('utf-8') if isinstance(text, str) else str(text).encode('utf-8').decode('utf-8')
+            
+            response = self.client.embeddings.create(
+                model=self.model_name,
+                input=[encoded_text],
+                encoding_format="float"
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            logger.error(f"生成查询向量时出错: {str(e)}")
+            raise
 
 class DocumentStore:
     _instance = None

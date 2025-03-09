@@ -523,19 +523,57 @@ export const useChatLogic = () => {
       const currentConfig = getConfigForModel(selectedModel);
       console.log('重试请求的模型配置:', currentConfig);
 
+      // 检查是否有必要的配置
+      if (!isDeepResearch && (!currentConfig.base_url || !currentConfig.api_key)) {
+        throw new Error('请先在设置中配置模型参数');
+      }
+
+      // 如果是文档聊天，检查 embedding 配置
+      if (activeDocument) {
+        const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+        const embeddingConfig = embeddingConfigs[0];
+        if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
+          throw new Error('请先在设置中配置 Embedding 参数');
+        }
+      }
+
+      console.log('准备重试请求:', {
+        selectedModel,
+        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
+        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式'
+      });
+
+      // 获取当前选中模型对应的embedding配置
+      const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+      const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
+
       const requestBody = {
-        messages: requestMsgs,
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          ...requestMsgs.slice(-(currentTurns * 2))
+        ],
         model: selectedModel,
         base_url: currentConfig.base_url || '',
         api_key: currentConfig.api_key || '',
-        model_name: currentConfig.model_name,
+        model_name: currentConfig.model_name || selectedModel,
+        embedding_base_url: embeddingConfig.embedding_base_url || '',
+        embedding_api_key: embeddingConfig.embedding_api_key || '',
+        embedding_model_name: embeddingConfig.embedding_model_name || '',
+        document_id: activeDocument?.id || '',
         stream: true,
-        deep_research: isDeepResearch  // 添加深度研究模式标志
+        deep_research: isDeepResearch
       };
       
-      console.log('重试请求的完整数据:', requestBody);
+      console.log('重试请求的完整数据:', {
+        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
+        body: {
+          ...requestBody,
+          api_key: '***',
+          embedding_api_key: '***'
+        }
+      });
 
-      const response = await fetch(`${serverURL}/api/chat`, {
+      const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -722,22 +760,56 @@ export const useChatLogic = () => {
     try {
       const currentConfig = getConfigForModel(selectedModel);
       console.log('编辑消息使用的模型配置:', currentConfig);
+
+      // 检查是否有必要的配置
+      if (!isDeepResearch && (!currentConfig.base_url || !currentConfig.api_key)) {
+        throw new Error('请先在设置中配置模型参数');
+      }
+
+      // 如果是文档聊天，检查 embedding 配置
+      if (activeDocument) {
+        const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+        const embeddingConfig = embeddingConfigs[0];
+        if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
+          throw new Error('请先在设置中配置 Embedding 参数');
+        }
+      }
+
+      // 获取当前选中模型对应的embedding配置
+      const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
+      const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
       
       const requestBody = {
-        messages: [...previousMessages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })), editedMessage],
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          ...previousMessages.slice(-(currentTurns * 2)).map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })), 
+          editedMessage
+        ],
         model: selectedModel,
-        base_url: currentConfig.base_url,
-        api_key: currentConfig.api_key,
-        model_name: currentConfig.model_name,
-        stream: true
+        base_url: currentConfig.base_url || '',
+        api_key: currentConfig.api_key || '',
+        model_name: currentConfig.model_name || selectedModel,
+        embedding_base_url: embeddingConfig.embedding_base_url || '',
+        embedding_api_key: embeddingConfig.embedding_api_key || '',
+        embedding_model_name: embeddingConfig.embedding_model_name || '',
+        document_id: activeDocument?.id || '',
+        stream: true,
+        deep_research: isDeepResearch
       };
       
-      console.log('编辑请求的完整数据:', requestBody);
+      console.log('编辑请求的完整数据:', {
+        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
+        body: {
+          ...requestBody,
+          api_key: '***',
+          embedding_api_key: '***'
+        }
+      });
 
-      const response = await fetch(`${serverURL}/api/chat`, {
+      const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -748,6 +820,10 @@ export const useChatLogic = () => {
         mode: 'cors'
       });
 
+      if (!response.ok) {
+        throw new Error(`API 请求失败: ${response.status}`);
+      }
+
       await handleStreamResponse(response, updatedMessages);
     } catch (error) {
       console.error('编辑请求失败:', error);
@@ -756,8 +832,7 @@ export const useChatLogic = () => {
         role: 'assistant', 
         content: '编辑请求失败：' + error.message
       };
-      setDisplayMessages(prev => [...prev, errorMessage]);
-      setRequestMessages(prev => [...prev, errorMessage]);
+      updateMessageHistory(updatedMessages, errorMessage);
     }
   };
 
