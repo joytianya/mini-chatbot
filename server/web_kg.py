@@ -4,9 +4,6 @@ from crawl4ai import AsyncWebCrawler
 import json
 # SearXNG搜索函数
 def search_with_searxng(query, num_results=5, engines="google,bing"):
-    #url = 'http://localhost:8080/search'
-    #url = 'https://searxng-app.onrender.com/search'
-    #url = "https://search-pth0.onrender.com"
     url = 'https://searxng-render.onrender.com/search'
     params = {
         'q': query,
@@ -44,9 +41,11 @@ async def get_web_kg(query):
         crawl_single_page(result['url'], result['title'])
         for result in search_results
     ]
-
-    crawled_contents = await asyncio.gather(*tasks)
-
+    try:
+        crawled_contents = await asyncio.gather(*tasks)
+    except Exception as e:
+        print(f"抓取失败: {e}")
+        crawled_contents = []*len(search_results)
     # 组合搜索结果与抓取内容
     combined_results = []
     for idx, result in enumerate(search_results):
@@ -59,8 +58,11 @@ async def get_web_kg(query):
         combined_results.append(combined_result)
 
     # 返回组合后的结构化数据
-
-    return json.dumps(combined_results, ensure_ascii=False, indent=2)
+    # 标题以及摘要标识的组合，带上第几个文档标识
+    summary_combined = ""
+    for idx, item in enumerate(combined_results):
+        summary_combined += f"第{idx+1}个网站资料：网站url: {item['url']} \n 标题：{item['title']} \n 摘要：{item['summary']}\n"
+    return combined_results, summary_combined
 
     # 显示组合后的结构化数据
     #for item in combined_results:

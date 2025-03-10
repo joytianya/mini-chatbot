@@ -276,11 +276,11 @@ def chat():
             # 使用事件循环运行异步函数
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            web_search_results = loop.run_until_complete(get_web_kg(user_query))
+            web_search_results, summary_combined = loop.run_until_complete(get_web_kg(user_query))
             loop.close()
             
             # 将web搜索结果添加到用户消息中
-            web_context = "\n\n联网搜索参考资料：\n" + web_search_results
+            web_context = "\n\n作为助手，你通过联网搜索获取的资料如下：\n" + summary_combined
             messages[-1]['content'] = messages[-1]['content'] + web_context
             logger.info(f"添加了联网搜索结果: {web_context}")
 
@@ -388,11 +388,11 @@ def chat_with_doc():
             # 使用事件循环运行异步函数
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            web_search_results = loop.run_until_complete(get_web_kg(user_query))
+            web_search_results, summary_combined = loop.run_until_complete(get_web_kg(user_query))
             loop.close()
             
             # 将web搜索结果添加到用户消息中
-            web_context = "\n\n联网搜索参考资料：\n" + web_search_results
+            web_context = "\n\n你通过联网搜索获取的资料如下：\n" + summary_combined
             messages[-1]['content'] = messages[-1]['content'] + web_context
             logger.info(f"添加了联网搜索结果: {web_context}")
 
