@@ -45,7 +45,7 @@ async def get_web_kg(query):
         crawled_contents = await asyncio.gather(*tasks)
     except Exception as e:
         print(f"抓取失败: {e}")
-        crawled_contents = []*len(search_results)
+        crawled_contents = [{"content": ""}]*len(search_results)
     # 组合搜索结果与抓取内容
     combined_results = []
     for idx, result in enumerate(search_results):
