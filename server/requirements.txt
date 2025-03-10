@@ -13,3 +13,4 @@ markdown
 werkzeug==2.0.1
 openai==1.63.2
 crawl4ai==0.5.0.post4
+gunicorn
