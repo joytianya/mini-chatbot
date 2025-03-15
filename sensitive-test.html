@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>敏感信息掩码测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+        #sensitiveMap {
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .highlight {
+            background-color: yellow;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .toggle-button {
+            background-color: #4CAF50;
+        }
+        .keyword-highlight {
+            background-color: #ffeb3b;
+            color: #000;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>敏感信息掩码测试工具</h1>
+    
+    <div class="test-section">
+        <h2>输入测试文本</h2>
+        <textarea id="inputText" placeholder="在此输入包含敏感信息的文本..."></textarea>
+        <div>
+            <button id="testButton">测试掩码</button>
+            <button id="loadSample">加载示例</button>
+        </div>
+    </div>
+    
+    <div class="result-section" id="resultSection" style="display: none;">
+        <h2>掩码结果</h2>
+        
+        <div class="search-box">
+            <input type="text" id="searchKeyword" class="search-input" placeholder="搜索关键词...">
+            <button id="searchButton">搜索</button>
+            <button id="toggleButton" class="toggle-button">显示原始信息</button>
+        </div>
+        
+        <div id="resultDisplay" style="
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        "></div>
+        
+        <h2>敏感信息映射</h2>
+        <div id="sensitiveMap"></div>
+    </div>
+
+    <script>
+        // 当前处理的敏感信息映射
+        let currentSensitiveInfoMap = {};
+        let maskedText = '';
+        let showOriginal = false;
+
+        // 清除当前敏感信息映射
+        function clearSensitiveInfoMap() {
+            currentSensitiveInfoMap = {};
+        }
+
+        // 获取当前敏感信息映射
+        function getSensitiveInfoMap() {
+            return {...currentSensitiveInfoMap};
+        }
+
+        // 敏感信息检测和掩码处理
+        function maskSensitiveInfo(text) {
+            if (!text) return text;
+            
+            console.log('开始处理文本，长度:', text.length);
+            
+            // 敏感信息模式列表
+            const patterns = [
+                // 手机号码 - 匹配所有11位数字
+                {
+                    regex: /\b1\d{10}\b/g,
+                    mask: (match) => {
+                        console.log(`检测到手机号码: ${match}`);
+                        const maskId = `PHONE_${Object.keys(currentSensitiveInfoMap).length}`;
+                        currentSensitiveInfoMap[maskId] = match;
+                        return maskId;
+                    }
+                },
+                // 带前缀的手机号码
+                {
+                    regex: /(?:电话|联系电话|手机|联系方式|联系|电话号码|手机号码|手机号|电话号|联系电话|联系号码|联系人电话|电话|Tel|Telephone|Phone|Mobile|Contact|联系人|联系人号码)[:：]?\s*1\d{10}/g,
+                    mask: (match) => {
+                        console.log(`检测到带前缀的手机号码: ${match}`);
+                        // 提取手机号码
+                        const phoneNumber = match.match(/1\d{10}/)[0];
+                        const maskId = `PHONE_${Object.keys(currentSensitiveInfoMap).length}`;
+                        currentSensitiveInfoMap[maskId] = phoneNumber;
+                        // 保留前缀，替换手机号
+                        return match.replace(phoneNumber, maskId);
+                    }
+                },
+                // 邮箱
+                {
+                    regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+                    mask: (match) => {
+                        console.log(`检测到邮箱: ${match}`);
+                        const maskId = `EMAIL_${Object.keys(currentSensitiveInfoMap).length}`;
+                        currentSensitiveInfoMap[maskId] = match;
+                        return maskId;
+                    }
+                },
+                // 身份证号
+                {
+                    regex: /\b[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}(?:\d|X|x)\b/g,
+                    mask: (match) => {
+                        console.log(`检测到身份证号: ${match}`);
+                        const maskId = `ID_${Object.keys(currentSensitiveInfoMap).length}`;
+                        currentSensitiveInfoMap[maskId] = match;
+                        return maskId;
+                    }
+                },
+                // 银行卡号
+                {
+                    regex: /\b\d{16,19}\b/g,
+                    mask: (match) => {
+                        // 只处理可能是银行卡的数字
+                        if (match.length >= 16 && match.length <= 19) {
+                            console.log(`检测到银行卡号: ${match}`);
+                            const maskId = `CARD_${Object.keys(currentSensitiveInfoMap).length}`;
+                            currentSensitiveInfoMap[maskId] = match;
+                            return maskId;
+                        }
+                        return match;
+                    }
+                }
+            ];
+            
+            let processedText = text;
+            
+            // 应用所有模式
+            patterns.forEach(pattern => {
+                processedText = processedText.replace(pattern.regex, pattern.mask);
+            });
+            
+            return processedText;
+        }
+
+        // 恢复掩码处理的敏感信息
+        function unmaskSensitiveInfo(text, mappings) {
+            if (!text || !mappings) return text;
+            
+            let processedText = text;
+            
+            // 替换所有掩码标识符
+            Object.entries(mappings).forEach(([maskId, originalValue]) => {
+                const regex = new RegExp(maskId, 'g');
+                processedText = processedText.replace(regex, originalValue);
+            });
+            
+            return processedText;
+        }
+
+        // 高亮关键词
+        function highlightKeyword(text, keyword) {
+            if (!keyword || !text) return text;
+            
+            const regex = new RegExp(`(${keyword})`, 'gi');
+            return text.replace(regex, '<span class="keyword-highlight">$1</span>');
+        }
+
+        // 示例文本
+        const sampleText = `测试电话号码识别功能
+===========================
+
+普通11位手机号码：
+13812345678
+14712345678
+15612345678
+
+带前缀的手机号码：
+电话：13812345678
+联系电话：14712345678
+手机：15612345678
+
+混合在文本中的手机号码：
+我的手机号是13812345678，请联系我。
+如有问题，请拨打客服电话14712345678。
+张先生的联系方式是15612345678，李女士的联系电话是16612345678。`;
+
+        // 更新显示内容
+        function updateDisplay() {
+            const displayText = showOriginal 
+                ? unmaskSensitiveInfo(maskedText, currentSensitiveInfoMap)
+                : maskedText;
+            
+            const keyword = document.getElementById('searchKeyword').value;
+            const resultDisplay = document.getElementById('resultDisplay');
+            
+            if (keyword) {
+                resultDisplay.innerHTML = highlightKeyword(displayText, keyword);
+            } else {
+                resultDisplay.textContent = displayText;
+            }
+            
+            document.getElementById('toggleButton').textContent = 
+                showOriginal ? '显示掩码信息' : '显示原始信息';
+        }
+
+        // 事件处理
+        document.getElementById('testButton').addEventListener('click', function() {
+            const inputText = document.getElementById('inputText').value;
+            if (!inputText) {
+                alert('请输入测试文本');
+                return;
+            }
+            
+            clearSensitiveInfoMap();
+            maskedText = maskSensitiveInfo(inputText);
+            showOriginal = false;
+            
+            updateDisplay();
+            
+            const sensitiveMap = getSensitiveInfoMap();
+            let mapHtml = '';
+            
+            if (Object.keys(sensitiveMap).length > 0) {
+                mapHtml = '<table style="width:100%; border-collapse:collapse;">';
+                mapHtml += '<tr><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">掩码ID</th><th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">原始值</th></tr>';
+                
+                Object.entries(sensitiveMap).forEach(([key, value]) => {
+                    mapHtml += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${key}</td><td style="padding:8px; border-bottom:1px solid #eee;">${value}</td></tr>`;
+                });
+                
+                mapHtml += '</table>';
+            } else {
+                mapHtml = '<p>没有检测到敏感信息</p>';
+            }
+            
+            document.getElementById('sensitiveMap').innerHTML = mapHtml;
+            document.getElementById('resultSection').style.display = 'block';
+        });
+
+        document.getElementById('loadSample').addEventListener('click', function() {
+            document.getElementById('inputText').value = sampleText;
+        });
+
+        document.getElementById('toggleButton').addEventListener('click', function() {
+            showOriginal = !showOriginal;
+            updateDisplay();
+        });
+
+        document.getElementById('searchButton').addEventListener('click', function() {
+            updateDisplay();
+        });
+
+        document.getElementById('searchKeyword').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                updateDisplay();
+            }
+        });
+    </script>
+</body>
+</html> 
