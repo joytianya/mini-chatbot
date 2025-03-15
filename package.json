@@ -1,0 +1,24 @@
+{
+  "name": "mini-chatbot",
+  "homepage": "https://joytianya.github.io/mini-chatbot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "dependencies": {
+    "@types/react": "^19.0.10",
+    "dompurify": "^3.2.4",
+    "katex": "^0.16.21",
+    "react": "^19.0.0",
+    "react-katex": "^3.0.1",
+    "react-toastify": "^11.0.5"
+  },
+  "devDependencies": {
+    "gh-pages": "^3.2.3"
+  }
+}

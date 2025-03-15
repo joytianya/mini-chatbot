@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: mini-chatbot-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server/app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
