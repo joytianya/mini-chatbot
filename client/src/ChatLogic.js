@@ -193,6 +193,12 @@ export const useChatLogic = () => {
 
   // 添加 updateMessageHistory 辅助函数
   const updateMessageHistory = (currentMessages, newMessage) => {
+    // 确保新消息包含会话哈希值
+    if (!newMessage.sessionHash) {
+      newMessage.sessionHash = sessionHash;
+      console.log('为新消息添加会话哈希值:', newMessage.sessionHash);
+    }
+    
     const newDisplayMessages = [...currentMessages, newMessage];
     
     // 更新对话历史，保持当前对话的所有属性
@@ -208,7 +214,8 @@ export const useChatLogic = () => {
           ...conv,
           title,
           messages: newDisplayMessages,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sessionHash: sessionHash  // 确保对话也包含会话哈希值
         };
       }
       return conv;
@@ -218,7 +225,8 @@ export const useChatLogic = () => {
     setDisplayMessages(newDisplayMessages);
     setRequestMessages([...requestMessages, {
       role: 'assistant',
-      content: newMessage.content
+      content: newMessage.content,
+      sessionHash: newMessage.sessionHash  // 确保请求消息也包含会话哈希值
     }]);
     localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
@@ -733,9 +741,51 @@ export const useChatLogic = () => {
   const handleRetry = async (message, isDeepResearch = false, isWebSearch = false) => {
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
+    
+    // 使用当前会话哈希值
+    const currentSessionHash = sessionHash;
+    console.log('重试消息，当前会话哈希值:', currentSessionHash);
+    
+    // 获取用户最后一条消息的内容
+    const lastUserMessage = previousMessages.filter(msg => msg.role === 'user').pop();
+    let userContent = lastUserMessage ? lastUserMessage.content : '';
+    let userOriginalContent = lastUserMessage && lastUserMessage.originalContent ? lastUserMessage.originalContent : null;
+    let isMasked = lastUserMessage ? lastUserMessage.isMasked : false;
+    
+    // 处理敏感信息
+    if (sensitiveInfoProtectionEnabled && userContent) {
+      console.log('敏感信息保护已启用，处理用户输入');
+      
+      // 如果原始消息已经被掩码处理，使用原始内容
+      if (isMasked && userOriginalContent) {
+        console.log('使用原始消息的掩码处理结果');
+        userContent = lastUserMessage.content;
+      } else {
+        // 否则重新处理敏感信息
+        const processedContent = maskSensitiveInfo(userContent, currentSessionHash);
+        
+        // 检查是否有敏感信息被掩码
+        const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
+        isMasked = possibleMaskPatterns.some(pattern => pattern.test(processedContent));
+        
+        if (isMasked) {
+          console.log('用户输入包含敏感信息，已进行掩码处理');
+          console.log('原始输入:', userContent);
+          console.log('处理后输入:', processedContent);
+          userOriginalContent = userContent;
+          userContent = processedContent;
+        } else {
+          console.log('用户输入不包含敏感信息，无需掩码处理');
+          userOriginalContent = null;
+        }
+      }
+    }
+    
+    // 更新请求消息
     const requestMsgs = previousMessages.map(msg => ({
       role: msg.role,
-      content: msg.content
+      content: msg.content,
+      sessionHash: msg.sessionHash || currentSessionHash
     }));
     
     setDisplayMessages(previousMessages);
@@ -771,7 +821,8 @@ export const useChatLogic = () => {
         selectedModel,
         activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
         isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式',
-        isWebSearch: isWebSearch ? '联网搜索' : '离线模式'
+        isWebSearch: isWebSearch ? '联网搜索' : '离线模式',
+        sessionHash: currentSessionHash
       });
 
       // 获取当前选中模型对应的embedding配置
@@ -793,7 +844,8 @@ export const useChatLogic = () => {
         document_id: activeDocument?.id || '',
         stream: true,
         deep_research: isDeepResearch,
-        web_search: isWebSearch  // 添加联网搜索参数
+        web_search: isWebSearch,  // 添加联网搜索参数
+        session_hash: currentSessionHash  // 添加会话哈希值
       };
       
       console.log('重试请求的完整数据:', {
@@ -830,7 +882,8 @@ export const useChatLogic = () => {
         setStreaming(false);
         const errorMessage = {
           role: 'assistant',
-          content: '重试失败：' + error.message
+          content: '重试失败：' + error.message,
+          sessionHash: currentSessionHash
         };
         updateMessageHistory(previousMessages, errorMessage);
       }
@@ -1058,13 +1111,57 @@ export const useChatLogic = () => {
   const handleEdit = async (message, newContent, isDeepResearch = false, isWebSearch = false) => {
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
-    const editedMessage = { role: 'user', content: newContent };
+    
+    // 使用当前会话哈希值
+    const currentSessionHash = sessionHash;
+    console.log('编辑消息，当前会话哈希值:', currentSessionHash);
+    
+    // 处理敏感信息
+    let processedInput = newContent;
+    let userOriginalInput = newContent;
+    let isMasked = false;
+    
+    if (sensitiveInfoProtectionEnabled) {
+      console.log('敏感信息保护已启用，处理编辑后的用户输入');
+      
+      // 使用会话哈希值处理敏感信息
+      processedInput = maskSensitiveInfo(newContent, currentSessionHash);
+      
+      // 检查是否有敏感信息被掩码
+      const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
+      isMasked = possibleMaskPatterns.some(pattern => pattern.test(processedInput));
+      
+      if (isMasked) {
+        console.log('编辑后的用户输入包含敏感信息，已进行掩码处理');
+        console.log('原始输入:', newContent);
+        console.log('处理后输入:', processedInput);
+      } else {
+        console.log('编辑后的用户输入不包含敏感信息，无需掩码处理');
+        userOriginalInput = null;  // 如果没有敏感信息，不需要保存原始输入
+      }
+    } else {
+      userOriginalInput = null;  // 如果未启用敏感信息保护，不需要保存原始输入
+    }
+    
+    // 创建编辑后的消息
+    const editedMessage = {
+      role: 'user', 
+      content: processedInput,
+      originalContent: userOriginalInput,
+      isMasked: isMasked,
+      id: Date.now().toString(),
+      isDeepResearch: isDeepResearch,
+      isWebSearch: isWebSearch,
+      sessionHash: currentSessionHash  // 添加会话哈希值
+    };
+    
     const updatedMessages = [...previousMessages, editedMessage];
     
     setDisplayMessages(updatedMessages);
     setRequestMessages([...previousMessages.map(msg => ({
       role: msg.role,
-      content: msg.content
+      content: msg.content,
+      sessionHash: msg.sessionHash || currentSessionHash
     })), editedMessage]);
     
     setStreaming(true);
@@ -1099,7 +1196,8 @@ export const useChatLogic = () => {
           { role: 'system', content: 'You are a helpful assistant.' },
           ...previousMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
             role: msg.role,
-            content: msg.content
+            content: msg.content,
+            sessionHash: msg.sessionHash || currentSessionHash
           })), 
           editedMessage
         ],
@@ -1113,7 +1211,8 @@ export const useChatLogic = () => {
         document_id: activeDocument?.id || '',
         stream: true,
         deep_research: isDeepResearch,
-        web_search: isWebSearch  // 添加联网搜索参数
+        web_search: isWebSearch,  // 添加联网搜索参数
+        session_hash: currentSessionHash  // 添加会话哈希值
       };
       
       console.log('编辑请求的完整数据:', {
@@ -1146,7 +1245,8 @@ export const useChatLogic = () => {
       setStreaming(false);
       const errorMessage = {
         role: 'assistant', 
-        content: '编辑请求失败：' + error.message
+        content: '编辑请求失败：' + error.message,
+        sessionHash: currentSessionHash
       };
       updateMessageHistory(updatedMessages, errorMessage);
     }

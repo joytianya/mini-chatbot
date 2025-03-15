@@ -103,7 +103,11 @@ const SensitiveMessageWrapper = ({ message, isHighlighted, sensitiveInfoProtecti
         isUser={message.role === 'user'}
         onRetry={message.role === 'assistant' ? () => {
           setShowOriginal(false);
-          handleRetry(message, isDeepResearch, isWebSearch);
+          if (message.onRetry) {
+            message.onRetry();
+          } else {
+            console.warn('onRetry function is not defined for this message');
+          }
         } : null}
         onCopy={() => handleCopy(getDisplayContent(message))}
         onEdit={message.role === 'user' ? (newContent) => {
@@ -205,10 +209,20 @@ const SensitiveMessageWrapper = ({ message, isHighlighted, sensitiveInfoProtecti
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
+              {showOriginal ? (
+                <>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <line x1="3" y1="3" x2="21" y2="21"></line>
+                </>
+              ) : (
+                <>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </>
+              )}
             </svg>
-            显示反映射结果
+            {showOriginal ? '关闭反映射结果' : '显示反映射结果'}
           </button>
           
           <button 
