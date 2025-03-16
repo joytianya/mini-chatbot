@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Settings } from './Settings';
+import './Sidebar.css';
 
 const Sidebar = ({
   isSidebarExpanded,
@@ -18,7 +19,8 @@ const Sidebar = ({
   setSelectedModel,
   handleSettingsSave,
   sensitiveInfoProtectionEnabled,
-  toggleSensitiveInfoProtection
+  toggleSensitiveInfoProtection,
+  handleToggleSidebar
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -52,24 +54,29 @@ const Sidebar = ({
         position: 'relative'
       }}>
         {/* 标题区域 */}
-        <div className="title-area" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: isSidebarExpanded ? 'space-between' : 'center',
-          padding: isSidebarExpanded ? '15px' : '10px 15px',
-          borderBottom: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
-          height: '60px',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-          transition: 'all 0.3s linear'
-        }}>
+        <div 
+          className="title-area" 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isSidebarExpanded ? 'space-between' : 'center',
+            padding: isSidebarExpanded ? '15px' : '10px 15px',
+            borderBottom: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
+            height: '60px',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            transition: 'all 0.3s linear',
+            cursor: 'pointer'
+          }}
+          onClick={handleToggleSidebar}
+          title={isSidebarExpanded ? "收起侧边栏" : "展开侧边栏"}
+        >
           <div 
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '10px',
               minWidth: isSidebarExpanded ? 'auto' : '32px',
-              cursor: 'pointer',
               transition: 'all 0.3s linear',
               height: '44px',
               justifyContent: 'center'
@@ -273,8 +280,21 @@ const Sidebar = ({
                       padding: '4px',
                       cursor: 'pointer',
                       color: darkMode ? '#aaa' : '#666',
-                      borderRadius: '4px'
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background-color 0.2s, color 0.2s'
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = darkMode ? '#444' : '#f0f0f0';
+                      e.currentTarget.style.color = '#f44336';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = darkMode ? '#aaa' : '#666';
+                    }}
+                    title="删除对话"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M3 6h18"/>
@@ -327,16 +347,16 @@ const Sidebar = ({
           </div>
 
           {/* 底部操作区域 */}
-          <div className="bottom-actions" style={{
-            marginTop: 'auto',
-            padding: '10px',
-            borderTop: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
+          <div style={{
             display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
+            flexDirection: isSidebarExpanded ? 'column' : 'column',
+            alignItems: 'center',
+            marginTop: 'auto',
+            padding: isSidebarExpanded ? '12px' : '8px',
+            width: '100%'
           }}>
             {/* 敏感信息保护开关 */}
-            {isSidebarExpanded && (
+            {isSidebarExpanded ? (
               <div 
                 className="action-button"
                 onClick={toggleSensitiveInfoProtection}
@@ -346,35 +366,53 @@ const Sidebar = ({
                   padding: '8px 12px',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: sensitiveInfoProtectionEnabled ? (darkMode ? '#304254' : '#e3f2fd') : 'transparent',
+                  backgroundColor: 'transparent',
                   color: darkMode ? '#fff' : '#333',
                   transition: 'background-color 0.2s',
                   marginBottom: '8px'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkMode ? '#333' : '#f5f5f5'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <div style={{ marginRight: '8px' }}>
-                  {sensitiveInfoProtectionEnabled ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                      <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-                      <line x1="3" y1="3" x2="21" y2="21"></line>
-                    </svg>
-                  )}
+                <div style={{ marginRight: '8px', color: sensitiveInfoProtectionEnabled ? '#4caf50' : '#9e9e9e' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
                 </div>
                 <span style={{ fontSize: '14px' }}>
-                  {sensitiveInfoProtectionEnabled ? '敏感信息保护已开启' : '敏感信息保护已关闭'}
+                  敏感信息保护 {sensitiveInfoProtectionEnabled ? '开' : '关'}
                 </span>
+              </div>
+            ) : (
+              <div
+                onClick={toggleSensitiveInfoProtection}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: sensitiveInfoProtectionEnabled ? '#4caf50' : '#9e9e9e',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  transition: 'transform 0.2s linear',
+                  marginBottom: '8px'
+                }}
+                title={`敏感信息保护 ${sensitiveInfoProtectionEnabled ? '开' : '关'}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
               </div>
             )}
 
-            {/* 深色模式开关 */}
-            {isSidebarExpanded && (
+            {/* 深色模式切换 */}
+            {isSidebarExpanded ? (
               <div 
                 className="action-button"
                 onClick={() => setDarkMode(!darkMode)}
@@ -392,7 +430,7 @@ const Sidebar = ({
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkMode ? '#333' : '#f5f5f5'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <div style={{ marginRight: '8px' }}>
+                <div style={{ marginRight: '8px', color: darkMode ? '#ffc107' : '#9e9e9e' }}>
                   {darkMode ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="5"></circle>
@@ -412,18 +450,79 @@ const Sidebar = ({
                   )}
                 </div>
                 <span style={{ fontSize: '14px' }}>
-                  {darkMode ? '切换到浅色模式' : '切换到深色模式'}
+                  {darkMode ? '浅色模式' : '深色模式'}
                 </span>
+              </div>
+            ) : (
+              <div
+                onClick={() => setDarkMode(!darkMode)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: darkMode ? '#ffc107' : '#9e9e9e',
+                  color: darkMode ? '#333' : '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  transition: 'transform 0.2s linear',
+                  marginBottom: '8px'
+                }}
+                title={darkMode ? '切换到浅色模式' : '切换到深色模式'}
+              >
+                {darkMode ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                  </svg>
+                )}
               </div>
             )}
 
-            {/* 底部按钮区域 */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
+            {/* 清空所有对话按钮 */}
+            {isSidebarExpanded ? (
+              <div 
+                className="action-button"
+                onClick={handleClearAll}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: 'transparent',
+                  color: darkMode ? '#fff' : '#333',
+                  transition: 'background-color 0.2s',
+                  marginBottom: '8px'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkMode ? '#333' : '#f5f5f5'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{ marginRight: '8px', color: '#f44336' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize: '14px' }}>
+                  清空所有对话
+                </span>
+              </div>
+            ) : (
               <div
                 onClick={handleClearAll}
                 style={{
@@ -438,7 +537,8 @@ const Sidebar = ({
                   cursor: 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
-                  transition: 'transform 0.2s linear'
+                  transition: 'transform 0.2s linear',
+                  marginBottom: '8px'
                 }}
                 title="清除所有对话"
               >
@@ -447,6 +547,37 @@ const Sidebar = ({
                   <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                 </svg>
               </div>
+            )}
+
+            {/* 设置按钮 */}
+            {isSidebarExpanded ? (
+              <div 
+                className="action-button"
+                onClick={() => setIsSettingsOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: 'transparent',
+                  color: darkMode ? '#fff' : '#333',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = darkMode ? '#333' : '#f5f5f5'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{ marginRight: '8px', color: '#607d8b' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize: '14px' }}>
+                  设置
+                </span>
+              </div>
+            ) : (
               <div
                 onClick={() => setIsSettingsOpen(true)}
                 style={{
@@ -470,7 +601,7 @@ const Sidebar = ({
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

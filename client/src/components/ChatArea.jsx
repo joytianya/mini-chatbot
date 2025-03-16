@@ -297,8 +297,8 @@ const ChatArea = ({
   input = '',
   setInput,
   handleStop,
-  activeDocument,
-  setActiveDocument,
+  activeDocuments,
+  setActiveDocuments,
   setDisplayMessages,
   sensitiveInfoProtectionEnabled,
   handleFileUpload,
@@ -351,49 +351,69 @@ const ChatArea = ({
   // 处理文件上传成功
   const handleUploadSuccess = (fileInfo) => {
     console.log('文件上传成功，信息:', fileInfo);
-    // 保存上传的文件信息，以便后续可以再次打开编辑器
-    setUploadedFileInfo(fileInfo);
     
-    // 更新全局敏感信息映射表
-    if (fileInfo && fileInfo.sensitiveMap) {
-      console.log('文件上传成功，更新全局敏感信息映射表');
-      
-      // 获取文件哈希值，如果没有则使用默认值
-      const fileHash = fileInfo.fileHash || 'default';
-      console.log(`使用文件哈希值: ${fileHash} 更新全局映射表`);
-      
-      // 获取当前映射表状态
-      const globalMap = ensureGlobalMapExists();
-      console.log('原全局映射表条目数:', Object.keys(globalMap).length);
-      
-      // 将文件的敏感信息映射合并到全局映射表中，使用文件哈希作为键
-      updateGlobalSensitiveInfoMap(fileInfo.sensitiveMap, fileHash);
-      
-      console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-      console.log('全局映射表详细内容:');
-      Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-        if (typeof value === 'object') {
-          console.log(`  ${index+1}. ${key} => 包含 ${Object.keys(value).length} 条映射`);
-        } else {
-          console.log(`  ${index+1}. ${key} => ${value}`);
+    // 确保fileInfo是数组
+    const fileInfoArray = Array.isArray(fileInfo) ? fileInfo : [fileInfo];
+    
+    // 保存上传的文件信息，以便后续可以再次打开编辑器
+    setUploadedFileInfo(fileInfoArray);
+    
+    // 更新活动文档列表
+    if (setActiveDocuments && fileInfoArray.length > 0) {
+      const documents = fileInfoArray.map(info => {
+        if (info && info.processedFile) {
+          return {
+            id: info.processedFile.id,
+            name: info.processedFile.name || (info.originalFile ? info.originalFile.name : '未命名文档')
+          };
         }
-      });
+        return null;
+      }).filter(Boolean);
+      
+      if (documents.length > 0) {
+        setActiveDocuments(documents);
+      }
     }
     
+    // 更新全局敏感信息映射表
+    fileInfoArray.forEach(info => {
+      if (info && info.sensitiveMap) {
+        console.log('文件上传成功，更新全局敏感信息映射表');
+        
+        // 获取文件哈希值，如果没有则使用默认值
+        const fileHash = info.fileHash || 'default';
+        console.log(`使用文件哈希值: ${fileHash} 更新全局映射表`);
+        
+        // 获取当前映射表状态
+        const globalMap = ensureGlobalMapExists();
+        console.log('原全局映射表条目数:', Object.keys(globalMap).length);
+        
+        // 将文件的敏感信息映射合并到全局映射表中，使用文件哈希作为键
+        updateGlobalSensitiveInfoMap(info.sensitiveMap, fileHash);
+        
+        console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
+        console.log('全局映射表详细内容:');
+        Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
+          if (typeof value === 'object') {
+            console.log(`  ${index+1}. ${key} => 包含 ${Object.keys(value).length} 条映射`);
+          } else {
+            console.log(`  ${index+1}. ${key} => ${value}`);
+          }
+        });
+      }
+    });
+    
     // 如果启用了敏感信息保护，显示敏感信息编辑器
-    if (fileInfo && sensitiveInfoProtectionEnabled) {
+    if (fileInfoArray.length > 0 && sensitiveInfoProtectionEnabled) {
       setShowSensitiveEditor(true);
       // 设置正在编辑敏感信息，防止输入框获取焦点
       setIsEditingSensitiveInfo(true);
-    } else {
-      // 如果没有启用敏感信息保护，直接设置活动文档
-      setActiveDocument(fileInfo);
     }
   };
 
   // 处理敏感信息编辑器保存
   const handleEditorSave = (newDocument) => {
-    setActiveDocument(newDocument);
+    setActiveDocuments(newDocument);
     setShowSensitiveEditor(false);
     // 编辑器关闭后，重置编辑状态
     setIsEditingSensitiveInfo(false);
@@ -524,27 +544,21 @@ const ChatArea = ({
     };
   }, [isInteractingWithOtherElements, isEditingSensitiveInfo, showSensitiveEditor, isEditingMessage, streaming]);
 
-  // 处理文本输入框获取焦点
+  // 处理文本框获取焦点
   const handleTextareaFocus = (e) => {
-    // 如果正在与其他元素交互，阻止获取焦点
-    if (isInteractingWithOtherElements) {
+    // 如果正在编辑消息或敏感信息，不自动聚焦输入框
+    if (isEditingMessage || isEditingSensitiveInfo) {
       e.preventDefault();
       e.target.blur();
       return;
     }
-
-    // 如果正在编辑敏感信息，阻止获取焦点
-    if (isEditingSensitiveInfo || showSensitiveEditor) {
-      e.preventDefault();
-      e.target.blur();
-      return;
-    }
-
-    // 如果正在编辑消息，阻止获取焦点
-    if (isEditingMessage) {
-      e.preventDefault();
-      e.target.blur();
-      return;
+    
+    // 设置输入框状态为聚焦
+    setInputFocused(true);
+    
+    // 如果有onFocus回调，调用它
+    if (onFocus) {
+      onFocus();
     }
   };
 
@@ -628,19 +642,30 @@ const ChatArea = ({
           }}
         >
           <option value="">选择模型</option>
-          {Array.isArray(modelOptions) && modelOptions.map(model => (
-            <option 
-              key={model} 
-              value={model}
-              style={{
-                backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-                color: darkMode ? '#e0e0e0' : '#2c3e50',
-                padding: '8px'
-              }}
-            >
-              {model}
-            </option>
-          ))}
+          {Array.isArray(modelOptions) && modelOptions.map(model => {
+            // 获取模型配置
+            const modelConfig = JSON.parse(localStorage.getItem('modelConfigs') || '[]')
+              .find(config => config.model_name === model);
+            
+            // 显示模型名称，如果有配置则显示配置名称
+            const displayName = modelConfig ? 
+              `${modelConfig.name} (${model})` : 
+              model;
+            
+            return (
+              <option 
+                key={model} 
+                value={model}
+                style={{
+                  backgroundColor: darkMode ? '#2d2d2d' : '#fff',
+                  color: darkMode ? '#e0e0e0' : '#2c3e50',
+                  padding: '8px'
+                }}
+              >
+                {displayName}
+              </option>
+            );
+          })}
         </select>
 
         {/* 右侧：对话轮次和导出按钮 */}
@@ -924,8 +949,14 @@ const ChatArea = ({
                     // 开始编辑消息时，设置编辑状态为true
                     handleMessageEditStateChange(true);
                     
+                    // 确保消息对象有id
+                    const messageToEdit = {
+                      ...msg,
+                      id: msg.id || `temp_${Date.now()}`
+                    };
+                    
                     // 调用编辑处理函数
-                    handleEdit(msg, newContent, isDeepResearch, isWebSearch);
+                    handleEdit(messageToEdit, newContent, isDeepResearch, isWebSearch);
                   } : null,
                   isStreaming: false,
                   isWebSearch: isWebSearch
@@ -1056,11 +1087,13 @@ const ChatArea = ({
             darkMode={darkMode}
             sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
             handleFileUpload={handleFileUpload}
-            onUploadSuccess={(doc) => {
+            onUploadSuccess={(docs) => {
               // 阻止上传操作时文本框获取焦点
               setIsInteractingWithOtherElements(true);
-              console.log('设置活动文档:', doc);
-              setActiveDocument(doc);
+              console.log('设置活动文档:', docs);
+              // 确保docs是数组
+              const docsArray = Array.isArray(docs) ? docs : (docs ? [docs] : []);
+              setActiveDocuments(docsArray);
               setTimeout(() => setIsInteractingWithOtherElements(false), 300);
             }}
             setUploadedFileInfo={setUploadedFileInfo}
@@ -1088,10 +1121,12 @@ const ChatArea = ({
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 if (!streaming || currentInput.trim()) {
-                  if (!activeDocument) {
+                  if (!activeDocuments || activeDocuments.length === 0) {
                     console.log('无活动文档，使用普通聊天');
                   } else {
-                    console.log('使用文档聊天，文档ID:', activeDocument.id);
+                    // 确保activeDocuments是数组
+                    const docArray = Array.isArray(activeDocuments) ? activeDocuments : [activeDocuments];
+                    console.log('使用文档聊天，文档IDs:', docArray.map(doc => doc.id).join(', '));
                   }
                   if (handleSubmit) {
                     handleSubmit(e, isDeepResearch, isWebSearch);

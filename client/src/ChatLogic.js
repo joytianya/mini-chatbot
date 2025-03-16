@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { maxHistoryLength, serverURL } from './Config';
 // 导入敏感信息处理工具
 import { 
@@ -120,45 +120,43 @@ export const useChatLogic = () => {
   });
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem('chatHistory');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map(chat => ({
-        ...chat,
-        title: chat.title || '新对话',
-        lastMessage: chat.lastMessage || ''
-      }));
-    }
-    return [{ 
-      id: Date.now().toString(),
-      title: '新对话',
-      lastMessage: '',
-      timestamp: Date.now(),
-      active: true,
-      messages: [{ role: "system", content: "You are a helpful assistant." }]
-    }];
+    return saved ? JSON.parse(saved) : [];
   });
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
-  const [editingTitle, setEditingTitle] = useState(null);
-  const [editingTitleValue, setEditingTitleValue] = useState('');
-  const [displayLimit, setDisplayLimit] = useState(20);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [sentMessageId, setSentMessageId] = useState(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
-  const [abortController, setAbortController] = useState(null);
-  const [userHasScrolled, setUserHasScrolled] = useState(false);
-  const [activeDocument, setActiveDocument] = useState(null);
-  const [currentTurns, setCurrentTurns] = useState(2);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [availableModels, setAvailableModels] = useState(() => {
+    const saved = localStorage.getItem('availableModels');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [modelConfigs, setModelConfigs] = useState(() => {
     const saved = localStorage.getItem('modelConfigs');
     return saved ? JSON.parse(saved) : [];
   });
-  const [availableModels, setAvailableModels] = useState(() => {
-    const saved = localStorage.getItem('modelConfigs');
-    const configs = saved ? JSON.parse(saved) : [];
-    return configs
-      .map(config => config.model_name)
-      .filter(name => name && name.trim() !== '');
+  const [embeddingConfig, setEmbeddingConfig] = useState(() => {
+    const saved = localStorage.getItem('embeddingConfigs');
+    return saved ? JSON.parse(saved)[0] : null;
   });
+  const [activeDocuments, setActiveDocuments] = useState([]);
+  const [sessionHash, setSessionHash] = useState(() => {
+    // 尝试从localStorage获取会话哈希值
+    const saved = localStorage.getItem('sessionHash');
+    if (saved) {
+      return saved;
+    }
+    // 如果没有，生成一个新的
+    const newHash = generateSessionHash();
+    localStorage.setItem('sessionHash', newHash);
+    return newHash;
+  });
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const [abortController, setAbortController] = useState(null);
+  const [displayLimit, setDisplayLimit] = useState(50); // 默认显示50条消息
+
+  // 计算当前对话轮数
+  const currentTurns = useMemo(() => {
+    return displayMessages.filter(msg => msg.role === 'user').length;
+  }, [displayMessages]);
 
   // Refs
   const chatContainerRef = useRef(null);
@@ -178,7 +176,23 @@ export const useChatLogic = () => {
   };
 
   const handleScroll = (e) => {
-    const { scrollTop } = e.target;
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    
+    // 检测用户是否手动滚动
+    if (Math.abs(lastScrollPosition.current - scrollTop) > 10) {
+      setUserHasScrolled(true);
+      lastUserInteraction.current = Date.now();
+    }
+    
+    // 检测是否滚动到底部
+    if (scrollTop + clientHeight >= scrollHeight - 10) {
+      setUserHasScrolled(false);
+    }
+    
+    // 保存最后的滚动位置
+    lastScrollPosition.current = scrollTop;
+    
+    // 加载更多历史消息
     if (scrollTop === 0 && !loadingHistory) {
       setLoadingHistory(true);
       setTimeout(() => {
@@ -265,199 +279,93 @@ export const useChatLogic = () => {
     return result;
   };
 
+  // 当用户提交表单时隐藏敏感信息编辑器
   const handleSubmit = async (e, isDeepResearch = false, isWebSearch = false) => {
     e?.preventDefault();
     if (!input.trim() || streaming) return;
 
-    // 使用当前会话哈希值
-    const currentSessionHash = sessionHash;
-    console.log('提交消息，当前会话哈希值:', currentSessionHash);
-    
-    // 获取当前选中模型的配置
-    const currentConfig = getConfigForModel(selectedModel);
-    
-    // 处理敏感信息
-    let processedInput = input;
-    let userOriginalInput = input;  // 重命名变量，避免重复声明
-    let isMasked = false;
-    
-    if (sensitiveInfoProtectionEnabled) {
-      console.log('敏感信息保护已启用，处理用户输入');
-      
-      // 使用会话哈希值处理敏感信息
-      processedInput = maskSensitiveInfo(input, currentSessionHash);
-      
-      // 检查是否有敏感信息被掩码
-      const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
-      isMasked = possibleMaskPatterns.some(pattern => pattern.test(processedInput));
-      
-      if (isMasked) {
-        console.log('用户输入包含敏感信息，已进行掩码处理');
-        console.log('原始输入:', input);
-        console.log('处理后输入:', processedInput);
-      } else {
-        console.log('用户输入不包含敏感信息，无需掩码处理');
-        userOriginalInput = null;  // 如果没有敏感信息，不需要保存原始输入
-      }
-    } else {
-      userOriginalInput = null;  // 如果未启用敏感信息保护，不需要保存原始输入
-    }
-    
-    // 创建新的用户消息
+    // 创建新消息
     const newMessage = {
-      role: 'user',
-      content: processedInput,
-      originalContent: userOriginalInput,
-      isMasked: isMasked,
       id: Date.now().toString(),
-      isDeepResearch: isDeepResearch,
-      isWebSearch: isWebSearch,
-      sessionHash: currentSessionHash  // 添加会话哈希值
-    };
-    
-    let updatedDisplayMessages = [...displayMessages, newMessage];
-    let updatedRequestMessages = [...requestMessages, {
       role: 'user',
-      content: processedInput
-    }];
-    
-    setSentMessageId(newMessage.id);
-    setTimeout(() => setSentMessageId(null), 1000);
-    
-    const updatedConversations = conversations.map(conv => {
-      if (conv.active) {
-        const userMessages = conv.messages.filter(msg => msg.role === 'user');
-        const isFirstUserMessage = userMessages.length === 0;
+      content: input,
+      timestamp: Date.now()
+    };
+
+    // 如果启用了敏感信息保护，处理用户输入
+    if (sensitiveInfoProtectionEnabled) {
+      // 确保全局映射表存在
+      ensureGlobalMapExists();
+      console.log('处理用户输入，当前全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap || {}).length);
+      
+      // 掩码处理用户输入
+      const maskedInput = maskSensitiveInfo(input);
+      
+      // 获取并保存当前查询的敏感信息映射
+      const queryMap = getSensitiveInfoMap();
+      if (Object.keys(queryMap).length > 0) {
+        console.log('用户输入中的敏感信息已被掩码处理:', queryMap);
         
-        return {
-          ...conv,
-          title: isFirstUserMessage 
-            ? (userOriginalInput?.length > 50 ? userOriginalInput.slice(0, 50) + '...' : userOriginalInput)
-            : conv.title,
-          lastMessage: userOriginalInput?.length > 20 ? userOriginalInput.slice(0, 20) + '...' : userOriginalInput,
-          messages: updatedDisplayMessages,
-          timestamp: Date.now()
-        };
+        // 将新的敏感信息映射合并到全局映射表中，使用会话哈希作为键
+        updateGlobalSensitiveInfoMap(queryMap, sessionHash);
+        console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
+        
+        // 保存会话映射到localStorage
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        
+        // 设置消息的原始内容和掩码内容
+        newMessage.originalContent = input;
+        newMessage.content = maskedInput;
+        newMessage.isMasked = true;
       }
-      return conv;
-    });
+    }
 
-    setDisplayMessages(updatedDisplayMessages);
-    setRequestMessages(updatedRequestMessages);
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
-    setConversations(updatedConversations);
+    // 更新显示消息
+    setDisplayMessages(prev => [...prev, newMessage]);
+    
+    // 更新请求消息
+    setRequestMessages(prev => [...prev, newMessage]);
+    
+    // 清空输入框
     setInput('');
-
+    
+    // 设置流式响应状态
     setStreaming(true);
     setCurrentResponse('');
     setReasoningText('');
     setIsReasoning(false);
-
-    const controller = new AbortController();
-    setAbortController(controller);
-
+    
     try {
-      // 检查是否有必要的配置
-      if (!isDeepResearch && (!currentConfig.base_url || !currentConfig.api_key)) {
-        throw new Error('请先在设置中配置模型参数');
-      }
-
-      // 如果是文档聊天，检查 embedding 配置
-      if (activeDocument) {
-        const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
-        const embeddingConfig = embeddingConfigs[0];
-        if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
-          throw new Error('请先在设置中配置 Embedding 参数');
-        }
-      }
-
-      console.log('准备发送请求:', {
-        selectedModel,
-        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
-        isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式',
-        isWebSearch: isWebSearch ? '联网搜索' : '离线模式'
-      });
+      let response;
       
-      // 获取当前选中模型对应的embedding配置
-      const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
-      const embeddingConfig = embeddingConfigs[0] || {}; // 使用第一个embedding配置
-      
-      const requestBody = {
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant.' },
-          ...requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          { role: 'user', content: processedInput }
-        ],
-        model: selectedModel,
-        base_url: currentConfig.base_url || '',
-        api_key: currentConfig.api_key || '',
-        model_name: currentConfig.model_name || selectedModel,
-        embedding_base_url: embeddingConfig.embedding_base_url || '',
-        embedding_api_key: embeddingConfig.embedding_api_key || '',
-        embedding_model_name: embeddingConfig.embedding_model_name || '',
-        document_id: activeDocument?.id || '',
-        stream: true,
-        deep_research: isDeepResearch,
-        web_search: isWebSearch  // 添加联网搜索参数
-      };
-
-      console.log('完整的请求数据:', {
-        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
-        body: {
-          ...requestBody,
-          api_key: '***',
-          embedding_api_key: '***'
-        }
-      });
-
-      const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-        credentials: 'include',
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (errorData.error?.code === 'MissingParameter') {
-          throw new Error('缺少必要参数，请检查模型配置是否完整');
-        } else if (errorData.error?.code === 'TimeoutError') {
-          throw new Error('请求超时，请稍后重试或减少搜索范围');
-        } else if (errorData.error?.code === 'MemoryError') {
-          throw new Error('服务器内存不足，请稍后重试或减少搜索范围');
-        } else {
-          throw new Error(errorData.error?.message || '请求失败，请稍后重试');
-        }
-      }
-      await handleStreamResponse(response, updatedDisplayMessages);
-      
-      setHighlightedMessageId(newMessage.id);
-      setTimeout(() => setHighlightedMessageId(null), 500);
-
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('请求被用户取消');
+      // 根据是否有活动文档决定使用哪种请求
+      if (activeDocuments && activeDocuments.length > 0) {
+        console.log('使用文档聊天请求，文档IDs:', activeDocuments.map(doc => doc.id));
+        // 提取所有文档ID
+        const documentIds = activeDocuments.map(doc => doc.id);
+        response = await sendDocumentChatRequest(input, documentIds, isDeepResearch, isWebSearch);
       } else {
-        console.error('请求失败:', error);
-        setStreaming(false);
-        const errorMessage = {
-          role: 'assistant',
-          content: error.message || '请求失败，请稍后重试',
-          error: true
-        };
-        updateMessageHistory(updatedDisplayMessages, errorMessage);
+        console.log('使用普通聊天请求');
+        response = await sendChatRequest(input, isDeepResearch, isWebSearch);
       }
-    } finally {
-      setAbortController(null);
+      
+      // 处理响应
+      await handleResponse(response, newMessage.id);
+    } catch (error) {
+      console.error('处理请求时出错:', error);
       setStreaming(false);
+      
+      // 添加错误消息
+      const errorMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `发生错误: ${error.message}`,
+        timestamp: Date.now(),
+        error: true
+      };
+      
+      setDisplayMessages(prev => [...prev, errorMessage]);
+      setRequestMessages(prev => [...prev, errorMessage]);
     }
   };
 
@@ -482,21 +390,17 @@ export const useChatLogic = () => {
   };
 
   // 处理流式响应
-  const handleStreamResponse = async (response, currentMessages) => {
+  const handleResponse = async (response, messageId) => {
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('响应错误:', errorText);
-      throw new Error(`服务器错误: ${response.status} ${errorText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || '请求失败，请稍后重试');
     }
-    
+
     const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
+    const decoder = new TextDecoder();
     let responseText = '';
-    let reasoningText = '';
-    let currentIsReasoning = false;
     let lastResponseTime = Date.now();
     
-    // 在函数内部使用会话哈希值
     const currentSessionHash = sessionHash;
     console.log('当前会话哈希值:', currentSessionHash);
     
@@ -603,142 +507,99 @@ export const useChatLogic = () => {
                           console.error('保存全局映射表到localStorage时出错:', error);
                         }
                       } else {
-                        console.warn('在所有文档的映射表中都没有找到缺失的掩码标识符');
+                        console.log('未找到缺失的映射，使用原始响应');
                         finalResponse = responseText;
-                        sensitiveMap = {...sessionMap};
-                        isMasked = true;
                       }
                     } else {
-                      console.log('所有掩码标识符在会话映射表中都存在，可以进行反映射');
+                      console.log('所有掩码标识符都在会话映射表中，使用会话映射表进行反映射');
                       finalResponse = unmaskSensitiveInfo(responseText, sessionMap);
                       sensitiveMap = {...sessionMap};
                       isMasked = true;
                     }
                   } else {
-                    console.log('AI回复中没有检测到掩码标识符，无需反映射');
+                    console.log('未在AI回复中找到掩码标识符，使用原始响应');
+                    finalResponse = responseText;
                   }
                 } else {
-                  console.log('AI回复不包含掩码标识符，无需反映射');
+                  console.log('AI回复中不包含掩码标识符，使用原始响应');
+                  finalResponse = responseText;
                 }
-              } else {
-                console.log('敏感信息保护未启用，不进行反映射');
               }
               
-              // 强制设置isMasked为true，确保显示反映射按钮
-              isMasked = true;
-              
-              const newMessage = {
+              // 添加AI回复消息
+              const aiMessage = {
+                id: Date.now().toString(),
                 role: 'assistant',
-                content: responseText,  // 保存原始响应内容
-                originalContent: isMasked ? responseText : null,  // 原始掩码内容
-                reasoning_content: reasoningText,
-                sensitiveMap: sensitiveMap,  // 添加映射，可能为空
-                isMasked: isMasked,  // 设置为true，以便显示反映射按钮
-                sessionHash: currentSessionHash  // 添加会话哈希值
+                content: responseText,
+                originalContent: isMasked ? finalResponse : null,
+                sensitiveMap: isMasked ? sensitiveMap : null,
+                isMasked: isMasked,
+                timestamp: Date.now(),
+                sessionHash: currentSessionHash
               };
               
-              console.log('添加新的助手消息:', {
-                isMasked,
-                hasSensitiveMap: !!newMessage.sensitiveMap,
-                mapSize: newMessage.sensitiveMap ? Object.keys(newMessage.sensitiveMap).length : 0,
-                hasOriginalContent: !!newMessage.originalContent,
-                contentLength: newMessage.content.length,
-                originalContentLength: newMessage.originalContent ? newMessage.originalContent.length : 0,
-                sessionHash: newMessage.sessionHash
-              });
+              setDisplayMessages(prev => [...prev, aiMessage]);
+              setRequestMessages(prev => [...prev, {
+                role: 'assistant',
+                content: responseText
+              }]);
               
-              updateMessageHistory(currentMessages, newMessage);
-            } else {
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.error) {
-                  const errorCode = parsed.error.code;
-                  let errorMessage = '发生错误';
-                  
-                  switch (errorCode) {
-                    case 'TimeoutError':
-                      errorMessage = '请求超时，请稍后重试或减少搜索范围';
-                      break;
-                    case 'MemoryError':
-                      errorMessage = '服务器内存不足，请稍后重试或减少搜索范围';
-                      break;
-                    case 'AccountOverdueError':
-                      errorMessage = '账户余额不足，请联系管理员充值';
-                      break;
-                    default:
-                      errorMessage = parsed.error.message || '未知错误，请稍后重试';
-                  }
-                  
-                  throw new Error(errorMessage);
-                }
-
-                const content = parsed.choices[0]?.delta?.content;
-                const reasoningContent = parsed.choices[0]?.delta?.reasoning_content;
-                
-                if (content) {
-                  responseText += content;
-                  
-                  // 实时显示响应内容，如果启用了敏感信息保护，尝试反映射
-                  let displayContent = responseText;
-                  if (sensitiveInfoProtectionEnabled) {
-                    // 获取当前的敏感信息映射
-                    const currentMap = getSensitiveInfoMap();
-                    
-                    // 尝试反映射，但不更新sensitiveMap
-                    if (Object.keys(currentMap).length > 0) {
-                      displayContent = unmaskSensitiveInfo(responseText, currentMap);
-                    }
-                  }
-                  
-                  setCurrentResponse(displayContent);
-                  if (currentIsReasoning) {
-                    currentIsReasoning = false;
-                    setIsReasoning(false);
-                  }
-                }
-                if (reasoningContent) {
-                  reasoningText += reasoningContent;
-                  setReasoningText(reasoningText);
-                  setIsReasoning(true);
-                }
-              } catch (e) {
-                if (e.message !== '解析响应出错') {
-                  setStreaming(false);
-                  const errorMessage = {
-                    role: 'assistant',
-                    content: e.message,
-                    error: true
-                  };
-                  updateMessageHistory(currentMessages, errorMessage);
-                  throw e;
-                } else {
-                  console.error('解析响应出错:', e);
-                }
+              // 高亮消息
+              setHighlightedMessageId(messageId);
+              setTimeout(() => setHighlightedMessageId(null), 500);
+              
+              break;
+            }
+            
+            try {
+              const parsedData = JSON.parse(data);
+              
+              // 处理推理内容
+              if (parsedData.choices && 
+                  parsedData.choices[0] && 
+                  parsedData.choices[0].delta && 
+                  parsedData.choices[0].delta.reasoning_content) {
+                const content = parsedData.choices[0].delta.reasoning_content;
+                setReasoningText(prev => prev + content);
+                setIsReasoning(true);
               }
+              // 处理正常内容
+              else if (parsedData.choices && 
+                       parsedData.choices[0] && 
+                       parsedData.choices[0].delta && 
+                       parsedData.choices[0].delta.content) {
+                const content = parsedData.choices[0].delta.content;
+                responseText += content;
+                setCurrentResponse(responseText);
+                setIsReasoning(false);
+              }
+              // 处理新格式的内容
+              else if (parsedData.content !== undefined) {
+                const content = parsedData.content;
+                responseText += content;
+                setCurrentResponse(responseText);
+                setIsReasoning(false);
+              }
+            } catch (e) {
+              console.error('解析数据时出错:', e, 'data:', data);
             }
           }
         }
       }
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('请求被用户取消');
-      } else {
-        console.error('流式处理错误:', error);
-        setStreaming(false);
-        const errorMessage = {
-          role: 'assistant',
-          content: error.message || '处理响应时出错，请稍后重试',
-          error: true
-        };
-        updateMessageHistory(currentMessages, errorMessage);
-      }
-      // 确保停止流式响应
-      setStreaming(false);
+      console.error('处理流式响应时出错:', error);
+      throw error;
     }
   };
 
   // 处理重试
   const handleRetry = async (message, isDeepResearch = false, isWebSearch = false) => {
+    // 确保 message 对象存在
+    if (!message) {
+      console.error('重试失败: message 对象为空');
+      return;
+    }
+    
     const messageIndex = displayMessages.findIndex(msg => msg === message);
     const previousMessages = displayMessages.slice(0, messageIndex);
     
@@ -809,7 +670,7 @@ export const useChatLogic = () => {
       }
 
       // 如果是文档聊天，检查 embedding 配置
-      if (activeDocument) {
+      if (activeDocuments && activeDocuments.length > 0) {
         const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
         const embeddingConfig = embeddingConfigs[0];
         if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
@@ -819,7 +680,7 @@ export const useChatLogic = () => {
 
       console.log('准备重试请求:', {
         selectedModel,
-        activeDocument: activeDocument ? `使用文档 ${activeDocument.name}` : '未使用文档',
+        activeDocuments: activeDocuments && activeDocuments.length > 0 ? `使用文档 ${activeDocuments.map(doc => doc.name).join(', ')}` : '未使用文档',
         isDeepResearch: isDeepResearch ? '深度研究模式' : '普通模式',
         isWebSearch: isWebSearch ? '联网搜索' : '离线模式',
         sessionHash: currentSessionHash
@@ -841,15 +702,20 @@ export const useChatLogic = () => {
         embedding_base_url: embeddingConfig.embedding_base_url || '',
         embedding_api_key: embeddingConfig.embedding_api_key || '',
         embedding_model_name: embeddingConfig.embedding_model_name || '',
-        document_id: activeDocument?.id || '',
+        document_ids: activeDocuments && activeDocuments.length > 0 ? activeDocuments.map(doc => doc.id) : [],
         stream: true,
         deep_research: isDeepResearch,
         web_search: isWebSearch,  // 添加联网搜索参数
         session_hash: currentSessionHash  // 添加会话哈希值
       };
       
+      // 为了兼容性，如果只有一个文档ID，也添加document_id参数
+      if (activeDocuments && activeDocuments.length === 1) {
+        requestBody.document_id = activeDocuments[0].id;
+      }
+      
       console.log('重试请求的完整数据:', {
-        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
+        url: `${serverURL}/api${activeDocuments && activeDocuments.length > 0 ? '/chat_with_doc' : '/chat'}`,
         body: {
           ...requestBody,
           api_key: '***',
@@ -857,7 +723,7 @@ export const useChatLogic = () => {
         }
       });
 
-      const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
+      const response = await fetch(`${serverURL}/api${activeDocuments && activeDocuments.length > 0 ? '/chat_with_doc' : '/chat'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -873,7 +739,9 @@ export const useChatLogic = () => {
         throw new Error(`API 请求失败: ${response.status}`);
       }
 
-      await handleStreamResponse(response, previousMessages);
+      // 生成一个临时消息ID，用于高亮显示
+      const tempMessageId = Date.now().toString();
+      await handleResponse(response, tempMessageId);
     } catch (error) {
       if (error.name === 'AbortError') {
         console.log('请求被用户取消');
@@ -894,12 +762,17 @@ export const useChatLogic = () => {
 
   // 处理新对话
   const handleNewChat = () => {
+    // 生成新的会话哈希值
+    const newSessionHash = generateSessionHash();
+    
+    // 创建新的会话
     const newConversation = {
       id: Date.now().toString(),
       title: '新对话',
       active: true,
       messages: [{ role: "system", content: "You are a helpful assistant." }],
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      sessionHash: newSessionHash // 添加新的会话哈希值
     };
 
     const updatedConversations = conversations.map(conv => ({
@@ -908,10 +781,31 @@ export const useChatLogic = () => {
     }));
     updatedConversations.unshift(newConversation);
 
+    // 更新会话列表
     setConversations(updatedConversations);
     setDisplayMessages(newConversation.messages);
     setRequestMessages(newConversation.messages);
     localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    
+    // 更新当前会话哈希值
+    setSessionHash(newSessionHash);
+    localStorage.setItem('sessionHash', newSessionHash);
+    
+    // 确保全局映射表存在
+    ensureGlobalMapExists();
+    
+    // 为新会话创建空的映射表
+    if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[newSessionHash]) {
+      window.currentSensitiveInfoMap[newSessionHash] = {};
+      console.log('为新会话创建空的映射表，会话哈希值:', newSessionHash);
+      
+      // 保存到localStorage
+      try {
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+      } catch (error) {
+        console.error('保存全局映射表到localStorage时出错:', error);
+      }
+    }
   };
 
   // 处理对话点击
@@ -927,6 +821,65 @@ export const useChatLogic = () => {
     setReasoningText('');
     setStreaming(false);
     
+    // 更新当前会话哈希值
+    if (conv.sessionHash) {
+      setSessionHash(conv.sessionHash);
+      localStorage.setItem('sessionHash', conv.sessionHash);
+      console.log('切换到会话，哈希值:', conv.sessionHash);
+      
+      // 确保全局映射表存在
+      ensureGlobalMapExists();
+      
+      // 为会话创建映射表（如果不存在）
+      if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[conv.sessionHash]) {
+        window.currentSensitiveInfoMap[conv.sessionHash] = {};
+        console.log('为会话创建空的映射表，会话哈希值:', conv.sessionHash);
+        
+        // 保存到localStorage
+        try {
+          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        } catch (error) {
+          console.error('保存全局映射表到localStorage时出错:', error);
+        }
+      }
+    } else {
+      // 如果会话没有哈希值，生成一个新的
+      const newSessionHash = generateSessionHash();
+      setSessionHash(newSessionHash);
+      localStorage.setItem('sessionHash', newSessionHash);
+      
+      // 更新会话的哈希值
+      const updatedWithHash = updatedConversations.map(c => {
+        if (c.id === conv.id) {
+          return { ...c, sessionHash: newSessionHash };
+        }
+        return c;
+      });
+      localStorage.setItem('chatHistory', JSON.stringify(updatedWithHash));
+      setConversations(updatedWithHash);
+      
+      console.log('会话没有哈希值，生成新的哈希值:', newSessionHash);
+      
+      // 确保全局映射表存在
+      ensureGlobalMapExists();
+      
+      // 为会话创建映射表
+      if (window.currentSensitiveInfoMap) {
+        window.currentSensitiveInfoMap[newSessionHash] = {};
+        console.log('为会话创建空的映射表，会话哈希值:', newSessionHash);
+        
+        // 保存到localStorage
+        try {
+          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        } catch (error) {
+          console.error('保存全局映射表到localStorage时出错:', error);
+        }
+      }
+    }
+    
+    // 清空当前活动文档
+    setActiveDocuments([]);
+    
     const messages = conv.messages || [{ role: "system", content: "You are a helpful assistant." }];
     setDisplayMessages(messages);
     setRequestMessages(messages.map(msg => ({
@@ -934,9 +887,15 @@ export const useChatLogic = () => {
       content: msg.content
     })));
 
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
+    // 重置用户滚动状态，确保滚动到底部
+    setUserHasScrolled(false);
+    
+    // 使用setTimeout确保DOM更新后再滚动
+    setTimeout(() => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      }
+    }, 100);
   };
 
   // 处理删除对话
@@ -967,18 +926,45 @@ export const useChatLogic = () => {
   // 处理清除所有对话
   const handleClearAll = () => {
     if (window.confirm('确定要清除所有对话吗？')) {
+      // 生成新的会话哈希值
+      const newSessionHash = generateSessionHash();
+      
       const newConversation = {
         id: Date.now().toString(),
         title: '新对话',
         active: true,
         messages: [{ role: "system", content: "You are a helpful assistant." }],
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sessionHash: newSessionHash // 添加新的会话哈希值
       };
       
       setConversations([newConversation]);
       setDisplayMessages(newConversation.messages);
       setRequestMessages(newConversation.messages);
       localStorage.setItem('chatHistory', JSON.stringify([newConversation]));
+      
+      // 更新当前会话哈希值
+      setSessionHash(newSessionHash);
+      localStorage.setItem('sessionHash', newSessionHash);
+      
+      // 清空当前活动文档
+      setActiveDocuments([]);
+      
+      // 确保全局映射表存在
+      ensureGlobalMapExists();
+      
+      // 为新会话创建空的映射表
+      if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[newSessionHash]) {
+        window.currentSensitiveInfoMap[newSessionHash] = {};
+        console.log('为新会话创建空的映射表，会话哈希值:', newSessionHash);
+        
+        // 保存到localStorage
+        try {
+          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        } catch (error) {
+          console.error('保存全局映射表到localStorage时出错:', error);
+        }
+      }
     }
   };
 
@@ -1109,7 +1095,17 @@ export const useChatLogic = () => {
 
   // 处理编辑
   const handleEdit = async (message, newContent, isDeepResearch = false, isWebSearch = false) => {
+    if (!message) {
+      console.error('编辑消息失败: 消息对象为空');
+      return;
+    }
+    
     const messageIndex = displayMessages.findIndex(msg => msg === message);
+    if (messageIndex === -1) {
+      console.error('编辑消息失败: 未找到消息');
+      return;
+    }
+    
     const previousMessages = displayMessages.slice(0, messageIndex);
     
     // 使用当前会话哈希值
@@ -1132,37 +1128,29 @@ export const useChatLogic = () => {
       isMasked = possibleMaskPatterns.some(pattern => pattern.test(processedInput));
       
       if (isMasked) {
-        console.log('编辑后的用户输入包含敏感信息，已进行掩码处理');
-        console.log('原始输入:', newContent);
-        console.log('处理后输入:', processedInput);
+        console.log('检测到敏感信息，已进行掩码处理');
+        userOriginalInput = newContent;
       } else {
-        console.log('编辑后的用户输入不包含敏感信息，无需掩码处理');
-        userOriginalInput = null;  // 如果没有敏感信息，不需要保存原始输入
+        console.log('未检测到敏感信息');
       }
-    } else {
-      userOriginalInput = null;  // 如果未启用敏感信息保护，不需要保存原始输入
     }
     
-    // 创建编辑后的消息
-    const editedMessage = {
-      role: 'user', 
+    // 更新消息
+    const updatedMessage = {
+      ...message,
       content: processedInput,
-      originalContent: userOriginalInput,
-      isMasked: isMasked,
-      id: Date.now().toString(),
-      isDeepResearch: isDeepResearch,
-      isWebSearch: isWebSearch,
-      sessionHash: currentSessionHash  // 添加会话哈希值
+      originalContent: isMasked ? userOriginalInput : undefined,
+      id: message.id || Date.now().toString() // 确保消息有ID
     };
     
-    const updatedMessages = [...previousMessages, editedMessage];
+    const updatedMessages = [...previousMessages, updatedMessage];
     
     setDisplayMessages(updatedMessages);
     setRequestMessages([...previousMessages.map(msg => ({
       role: msg.role,
       content: msg.content,
       sessionHash: msg.sessionHash || currentSessionHash
-    })), editedMessage]);
+    })), updatedMessage]);
     
     setStreaming(true);
     setCurrentResponse('');
@@ -1179,7 +1167,7 @@ export const useChatLogic = () => {
       }
 
       // 如果是文档聊天，检查 embedding 配置
-      if (activeDocument) {
+      if (activeDocuments) {
         const embeddingConfigs = JSON.parse(localStorage.getItem('embeddingConfigs') || '[]');
         const embeddingConfig = embeddingConfigs[0];
         if (!embeddingConfig?.embedding_base_url || !embeddingConfig?.embedding_api_key) {
@@ -1199,7 +1187,7 @@ export const useChatLogic = () => {
             content: msg.content,
             sessionHash: msg.sessionHash || currentSessionHash
           })), 
-          editedMessage
+          updatedMessage
         ],
         model: selectedModel,
         base_url: currentConfig.base_url || '',
@@ -1208,7 +1196,7 @@ export const useChatLogic = () => {
         embedding_base_url: embeddingConfig.embedding_base_url || '',
         embedding_api_key: embeddingConfig.embedding_api_key || '',
         embedding_model_name: embeddingConfig.embedding_model_name || '',
-        document_id: activeDocument?.id || '',
+        document_id: activeDocuments ? activeDocuments[0].id : '',
         stream: true,
         deep_research: isDeepResearch,
         web_search: isWebSearch,  // 添加联网搜索参数
@@ -1216,7 +1204,7 @@ export const useChatLogic = () => {
       };
       
       console.log('编辑请求的完整数据:', {
-        url: `${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`,
+        url: `${serverURL}/api${activeDocuments ? '/chat_with_doc' : '/chat'}`,
         body: {
           ...requestBody,
           api_key: '***',
@@ -1224,7 +1212,7 @@ export const useChatLogic = () => {
         }
       });
 
-      const response = await fetch(`${serverURL}/api${activeDocument ? '/chat_with_doc' : '/chat'}`, {
+      const response = await fetch(`${serverURL}/api${activeDocuments ? '/chat_with_doc' : '/chat'}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1239,7 +1227,9 @@ export const useChatLogic = () => {
         throw new Error(`API 请求失败: ${response.status}`);
       }
 
-      await handleStreamResponse(response, updatedMessages);
+      // 生成一个临时消息ID，用于高亮显示
+      const tempMessageId = updatedMessage.id || Date.now().toString();
+      await handleResponse(response, tempMessageId);
     } catch (error) {
       console.error('编辑请求失败:', error);
       setStreaming(false);
@@ -1334,7 +1324,7 @@ export const useChatLogic = () => {
   });
 
   // 文件上传处理
-  const handleFileUpload = async (files, embeddingConfig, setActiveDocument, setUploadStatus, sensitiveInfoProtectionEnabled) => {
+  const handleFileUpload = async (files, embeddingConfig, setActiveDocuments, setUploadStatus, sensitiveInfoProtectionEnabled) => {
     if (!files || files.length === 0) {
       console.error('没有选择文件');
       return null;
@@ -1550,11 +1540,14 @@ export const useChatLogic = () => {
   };
 
   // 修改sendChatRequest函数
-  const sendChatRequest = async (message) => {
+  const sendChatRequest = async (message, isDeepResearch = false, isWebSearch = false) => {
     const currentConfig = getConfigForModel(selectedModel);
     console.log('当前模型配置:', currentConfig);
     console.log('当前对话轮数:', currentTurns);
     console.log('当前请求消息:', requestMessages);
+    console.log('深度研究模式:', isDeepResearch);
+    console.log('联网搜索模式:', isWebSearch);
+    
     const headers = {
       'Content-Type': 'application/json',
     };
@@ -1604,10 +1597,16 @@ export const useChatLogic = () => {
       base_url: currentConfig.base_url,
       api_key: currentConfig.api_key,
       model_name: currentConfig.model_name || selectedModel,  // 确保有 model_name
-      stream: true
+      stream: true,
+      deep_research: isDeepResearch,
+      web_search: isWebSearch,
+      session_hash: sessionHash
     };
 
-    console.log('发送请求数据:', requestBody);  // 添加日志
+    console.log('发送请求数据:', {
+      ...requestBody,
+      api_key: '***' // 隐藏 API 密钥
+    });
 
     const response = await fetch(`${serverURL}/api/chat`, {
       method: 'POST',
@@ -1624,11 +1623,20 @@ export const useChatLogic = () => {
   };
 
   // 带文档的聊天请求
-  const sendDocumentChatRequest = async (message, documentId, isDeepResearch = false, isWebSearch = false) => {
+  const sendDocumentChatRequest = async (message, documentIds, isDeepResearch = false, isWebSearch = false) => {
     const currentConfig = getConfigForModel(selectedModel);
     console.log('当前模型配置:', currentConfig);
     console.log('当前对话轮数:', currentTurns);
     console.log('当前请求消息:', requestMessages);
+    
+    // 处理文档ID参数，确保它是数组形式
+    let docIds = [];
+    if (Array.isArray(documentIds)) {
+      docIds = documentIds;
+    } else if (documentIds) {
+      docIds = [documentIds]; // 兼容单个文档ID的情况
+    }
+    console.log('处理的文档IDs:', docIds);
     
     // 处理消息中的敏感信息
     let processedMessage = message;
@@ -1657,12 +1665,14 @@ export const useChatLogic = () => {
         queryMappings[queryId] = queryMap;
         localStorage.setItem('querySensitiveMappings', JSON.stringify(queryMappings));
         
-        // 将当前查询ID与文档ID关联
+        // 将当前查询ID与所有文档ID关联
         const docQueryMap = JSON.parse(localStorage.getItem('documentQueryMap') || '{}');
-        if (!docQueryMap[documentId]) {
-          docQueryMap[documentId] = [];
-        }
-        docQueryMap[documentId].push(queryId);
+        docIds.forEach(docId => {
+          if (!docQueryMap[docId]) {
+            docQueryMap[docId] = [];
+          }
+          docQueryMap[docId].push(queryId);
+        });
         localStorage.setItem('documentQueryMap', JSON.stringify(docQueryMap));
       }
     }
@@ -1691,12 +1701,20 @@ export const useChatLogic = () => {
       base_url: currentConfig.base_url,
       api_key: currentConfig.api_key,
       model_name: currentConfig.model_name || selectedModel,
-      document_id: documentId,
+      document_ids: docIds,  // 使用文档ID列表
       deep_research: isDeepResearch,
       web_search: isWebSearch,
       stream: true,
-      sensitive_info_protected: sensitiveInfoProtectionEnabled
+      sensitive_info_protected: sensitiveInfoProtectionEnabled,
+      embedding_base_url: embeddingConfig?.embedding_base_url || '',
+      embedding_api_key: embeddingConfig?.embedding_api_key || '',
+      embedding_model_name: embeddingConfig?.embedding_model_name || ''
     };
+
+    // 为了兼容性，如果只有一个文档ID，也添加document_id参数
+    if (docIds.length === 1) {
+      requestBody.document_id = docIds[0];
+    }
 
     console.log('发送文档聊天请求数据:', requestBody);
 
@@ -1761,31 +1779,6 @@ export const useChatLogic = () => {
     });
   };
 
-  // 初始化会话哈希值
-  const [sessionHash, setSessionHash] = useState('');
-  useEffect(() => {
-    const hash = generateSessionHash();
-    setSessionHash(hash);
-    console.log('初始化会话哈希值:', hash);
-    
-    // 确保全局映射表存在
-    ensureGlobalMapExists();
-    
-    // 为当前会话创建一个空的映射表
-    if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[hash]) {
-      window.currentSensitiveInfoMap[hash] = {};
-      console.log(`为会话 ${hash} 创建空映射表`);
-      
-      // 将更新后的全局映射表保存到localStorage
-      try {
-        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        console.log('已将更新后的全局映射表保存到localStorage');
-      } catch (error) {
-        console.error('保存全局映射表到localStorage时出错:', error);
-      }
-    }
-  }, []);
-
   return {
     displayMessages,
     setDisplayMessages,
@@ -1819,8 +1812,8 @@ export const useChatLogic = () => {
     loadingHistory,
     sendChatRequest,
     sendDocumentChatRequest,
-    activeDocument,
-    setActiveDocument,
+    activeDocuments,
+    setActiveDocuments,
     handleToggleSidebar: () => setIsSidebarExpanded(prev => !prev),
     availableModels,
     setAvailableModels,

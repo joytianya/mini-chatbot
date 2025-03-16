@@ -11,6 +11,8 @@ import { useChatLogic } from './ChatLogic';
 import axios from 'axios';
 // 导入敏感信息演示组件
 import SensitiveInfoDemo from './components/SensitiveInfoDemo';
+// 导入错误边界组件
+import ErrorBoundary from './components/ErrorBoundary';
 import './Chat.css';
 
 // 主聊天组件
@@ -51,8 +53,8 @@ function Chat() {
     loadingHistory,      // 是否正在加载历史记录
     sendChatRequest,     // 发送普通聊天请求
     sendDocumentChatRequest,  // 发送文档聊天请求
-    activeDocument,      // 当前活动文档
-    setActiveDocument,    // 设置当前活动文档
+    activeDocuments,      // 当前活动文档列表
+    setActiveDocuments,    // 设置当前活动文档列表
     handleToggleSidebar,  // 添加这一行
     availableModels,     // 可用模型列表
     setAvailableModels,   // 可用模型列表的设置函数
@@ -115,96 +117,99 @@ function Chat() {
 
   // 渲染主界面
   return (
-    <div className={`chat-container ${darkMode ? 'dark-mode' : ''}`}>
-      {/* 侧边栏组件 */}
-      <Sidebar 
-        isSidebarExpanded={isSidebarExpanded}
-        handleNewChat={handleNewChat}
-        conversations={conversations}
-        handleConversationClick={handleConversationClick}
-        handleDeleteConversation={handleDeleteConversation}
-        streaming={streaming}
-        handleClearAll={handleClearAll}
-        handleExport={handleExport}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        availableModels={availableModels}
-        selectedModel={selectedModel}
-        setSelectedModel={setSelectedModel}
-        handleSettingsSave={saveModelConfigs}
-        sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-        toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
-        formatTime={formatTime}
-        onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
-        onToggleSettings={toggleSettings}
-        editingTitle={editingTitle}
-        editingTitleValue={editingTitleValue}
-        onTitleEdit={handleTitleEdit}
-        onTitleChange={handleTitleChange}
-        onTitleSave={handleTitleSave}
-        onTitleCancel={handleTitleCancel}
-      />
-      
-      {/* 聊天区域 */}
-      <div className="main-content">
-        {/* 敏感信息演示组件 - 仅在没有对话时显示 */}
-        {/* {displayMessages.length <= 1 && sensitiveInfoProtectionEnabled && (
-          <div style={{ padding: '20px', overflowY: 'auto' }}>
-            <SensitiveInfoDemo darkMode={darkMode} />
-          </div>
-        )} */}
-        
-        {/* 聊天区域组件 */}
-        <ChatArea 
-          displayMessages={displayMessages}
-          setDisplayMessages={setDisplayMessages}
-          currentResponse={currentResponse}
-          reasoningText={reasoningText}
-          isReasoning={isReasoning}
+    <ErrorBoundary>
+      <div className={`chat-container ${darkMode ? 'dark-mode' : ''}`}>
+        {/* 侧边栏组件 */}
+        <Sidebar 
+          isSidebarExpanded={isSidebarExpanded}
+          handleNewChat={handleNewChat}
+          conversations={conversations}
+          handleConversationClick={handleConversationClick}
+          handleDeleteConversation={handleDeleteConversation}
           streaming={streaming}
+          handleClearAll={handleClearAll}
+          handleExport={handleExport}
           darkMode={darkMode}
-          chatContainerRef={chatContainerRef}
-          handleScroll={handleScroll}
-          handleRetry={handleRetry}
-          handleCopy={handleCopy}
-          handleEdit={handleEdit}
-          formatTime={formatTime}
-          highlightedMessageId={highlightedMessageId}
-          loadingHistory={loadingHistory}
-          activeDocument={activeDocument}
-          setActiveDocument={setActiveDocument}
-          sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          handleStop={handleStop}
+          setDarkMode={setDarkMode}
+          availableModels={availableModels}
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
-          modelOptions={availableModels}
-          currentTurns={currentTurns}
-          maxHistoryLength={maxHistoryLength}
-          setDarkMode={setDarkMode}
-          handleExport={handleExport}
-          handleFileUpload={handleFileUpload}
-          sessionHash={sessionHash}
-        />
-      </div>
-      
-      {showSettings && (
-        <Settings
-          isOpen={showSettings}
-          onClose={toggleSettings}
-          darkMode={darkMode}
-          initialSettings={{
-            modelConfigs: JSON.parse(localStorage.getItem('modelConfigs') || '[]'),
-            embeddingConfigs: JSON.parse(localStorage.getItem('embeddingConfigs') || '[]')
-          }}
-          onSave={saveModelConfigs}
+          handleSettingsSave={saveModelConfigs}
           sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
           toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
+          formatTime={formatTime}
+          handleToggleSidebar={handleToggleSidebar}
+          editingTitle={editingTitle}
+          editingTitleValue={editingTitleValue}
+          onTitleEdit={handleTitleEdit}
+          onTitleChange={handleTitleChange}
+          onTitleSave={handleTitleSave}
+          onTitleCancel={handleTitleCancel}
         />
-      )}
-    </div>
+        
+        {/* 聊天区域 */}
+        <div className="main-content">
+          {/* 敏感信息演示组件 - 仅在没有对话时显示 */}
+          {/* {displayMessages.length <= 1 && sensitiveInfoProtectionEnabled && (
+            <div style={{ padding: '20px', overflowY: 'auto' }}>
+              <SensitiveInfoDemo darkMode={darkMode} />
+            </div>
+          )} */}
+          
+          {/* 聊天区域组件 */}
+          <ErrorBoundary>
+            <ChatArea 
+              displayMessages={displayMessages}
+              setDisplayMessages={setDisplayMessages}
+              currentResponse={currentResponse}
+              reasoningText={reasoningText}
+              isReasoning={isReasoning}
+              streaming={streaming}
+              darkMode={darkMode}
+              chatContainerRef={chatContainerRef}
+              handleScroll={handleScroll}
+              handleRetry={handleRetry}
+              handleCopy={handleCopy}
+              handleEdit={handleEdit}
+              formatTime={formatTime}
+              highlightedMessageId={highlightedMessageId}
+              loadingHistory={loadingHistory}
+              activeDocuments={activeDocuments}
+              setActiveDocuments={setActiveDocuments}
+              sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
+              input={input}
+              setInput={setInput}
+              handleSubmit={handleSubmit}
+              handleStop={handleStop}
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
+              modelOptions={availableModels}
+              currentTurns={currentTurns}
+              maxHistoryLength={maxHistoryLength}
+              setDarkMode={setDarkMode}
+              handleExport={handleExport}
+              handleFileUpload={handleFileUpload}
+              sessionHash={sessionHash}
+            />
+          </ErrorBoundary>
+        </div>
+        
+        {showSettings && (
+          <Settings
+            isOpen={showSettings}
+            onClose={toggleSettings}
+            darkMode={darkMode}
+            initialSettings={{
+              modelConfigs: JSON.parse(localStorage.getItem('modelConfigs') || '[]'),
+              embeddingConfigs: JSON.parse(localStorage.getItem('embeddingConfigs') || '[]')
+            }}
+            onSave={saveModelConfigs}
+            sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
+            toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
+          />
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
 

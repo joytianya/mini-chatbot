@@ -125,8 +125,8 @@ CORS(app,
                 "https://joytianya.github.io",
                 "https://mini-chatbot-backend.onrender.com"
             ],
-            "methods": ["GET", "POST", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Accept"],
+            "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
             "supports_credentials": True,
             "expose_headers": ["Content-Type", "X-CSRFToken"],
             "max_age": 3600
@@ -406,7 +406,11 @@ def chat_with_doc():
         embedding_base_url = data['embedding_base_url']
         embedding_api_key = data['embedding_api_key']
         embedding_model_name = data['embedding_model_name']
-        document_id = data.get('document_id')  # 获取document_id参数
+        document_ids = data.get('document_ids', [])  # 获取document_ids参数作为列表
+        # 兼容旧版本，如果提供了单个document_id，将其添加到document_ids列表中
+        if data.get('document_id') and data.get('document_id') not in document_ids:
+            document_ids.append(data.get('document_id'))
+        
         is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
         is_web_search = data.get('web_search', False)  # 获取联网搜索标志
         
@@ -418,7 +422,7 @@ def chat_with_doc():
         logger.info(f"embedding_base_url: {embedding_base_url}")
         logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
         logger.info(f"embedding_model_name: {embedding_model_name}")
-        logger.info(f"document_id: {document_id}")
+        logger.info(f"document_ids: {document_ids}")
         logger.info(f"消息数量: {len(messages)}")
         logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
         logger.info(f"联网搜索: {'开启' if is_web_search else '关闭'}")
@@ -451,107 +455,105 @@ def chat_with_doc():
                 base_url=embedding_base_url,
                 model_name=embedding_model_name
             )
-            if doc_store is None:
-                raise ValueError('Failed to initialize doc_store')
-
-        # 使用doc_store检索相关文档，传入document_id参数
-        relevant_docs = doc_store.search(messages[-1]['content'], k=30, document_id=document_id)
-        if not relevant_docs:
-            logger.warning(f"在文档 {document_id or '所有文档'} 中未找到相关内容")
         
-        # 构建并记录上下文
-        context = "\n\n".join([f"文档片段 {i+1}:\n{doc.page_content}" for i, doc in enumerate(relevant_docs)])
-        messages[-1]['content'] = messages[-1]['content'] + "\n\n" + context
-        CustomLogger.chat_completion(messages[-1]['content'], len(relevant_docs), context)
+        # 获取用户最新的问题
+        user_query = messages[-1]['content']
+        logger.info(f"用户问题: {user_query}")
         
-        # 构建系统提示词
-        system_prompt = f"""你好!我是一个专业的AI助手,很高兴为你提供帮助。我会仔细阅读以下参考文档来回答你的问题:
-
-在回答过程中,我会:
-- 优先使用文档中的信息进行回答
-- 用简洁清晰的语言表达
-- 使用 Markdown 格式来组织回答，包括标题、列表、代码块等
-
-如果文档中没有找到相关信息,我会坦诚地告诉你。请问有什么我可以帮你的吗?"""
-        if messages[0]['role'] == 'system':
-            messages[0]['content'] = system_prompt
-        else:
-            messages.insert(0, {'role': 'system', 'content': system_prompt})
-    
-
-        # 根据深度研究模式选择不同的API
-        if is_deep_research:
-            # 使用 JinaChatAPI 进行深度研究
-            logger.info("使用 JinaChatAPI 进行深度研究")
-            chat = JinaChatAPI()
-            response = chat.stream_chat(messages)
-        else:
-            # 使用 OpenAI API 进行普通对话
-            logger.info("使用 OpenAI API 进行普通对话")
-            client = OpenAI(api_key=api_key, base_url=base_url)
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                stream=True
-            )
-        
-        def generate():
-            full_response = []
-            try:
-                # 发送初始推理内容
-                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': '正在分析相关文档...\n'}}]})}\n\n".encode('utf-8')
-                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'找到 {len(relevant_docs)} 个相关文档片段。\n'}}]})}\n\n".encode('utf-8')
-                
-                # 可以选择性地显示找到的文档片段
-                if relevant_docs:
-                    # 发送相关文档内容的标题
-                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'相关文档内容：\n'}}]})}\n\n".encode('utf-8')
-                    
-                    # 遍历并发送每个文档片段
-                    for i, doc in enumerate(relevant_docs):
-                        # 处理可能的None值
-                        content = doc.page_content if doc and hasattr(doc, 'page_content') else ''
-                        if content:
-                            yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'片段 {i+1}：{content}\n'}}]})}\n\n".encode('utf-8')
-                    
-                    # 发送过渡提示
-                    yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': f'\n基于以上文档回答：\n'}}]})}\n\n".encode('utf-8')
-
-                # 调用 API 进行流式响应
-                logger.debug(f"调用 {'JinaChatAPI' if is_deep_research else 'OpenAI API'}")
-                for chunk in response:
-                    logger.debug("收到 chunk: %s", chunk)
-                    if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                        if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                            content = chunk.choices[0].delta.reasoning_content
-                            yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
-                            full_response.append(content)
-                        elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                            content = chunk.choices[0].delta.content
-                            yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n".encode('utf-8')
-                            full_response.append(content)
+        # 获取相关文档内容
+        context = ""
+        if document_ids:
+            # 如果提供了文档ID列表，则在这些文档中搜索
+            logger.info(f"在指定的 {len(document_ids)} 个文档中搜索相关内容")
+            for doc_id in document_ids:
+                logger.info(f"搜索文档: {doc_id}")
+                try:
+                    # 在每个文档中搜索相关内容
+                    docs = doc_store.search(user_query, k=5, document_id=doc_id)
+                    if docs:
+                        # 将每个文档的搜索结果添加到上下文中
+                        doc_context = "\n\n".join([doc.page_content for doc in docs])
+                        context += f"\n\n文档 {doc_id} 的相关内容:\n{doc_context}"
+                        logger.info(f"在文档 {doc_id} 中找到 {len(docs)} 个相关片段")
                     else:
-                        logger.error("收到 chunk 中没有 choices 字段")
-                if is_web_search:
-                    yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\n\n相关网页链接：{search_result_urls_str}\n'}}]})}\n\n".encode('utf-8')
+                        logger.warning(f"在文档 {doc_id} 中未找到相关内容")
+                except Exception as e:
+                    logger.error(f"搜索文档 {doc_id} 时出错: {str(e)}")
+        else:
+            # 如果没有提供文档ID，则在所有文档中搜索
+            logger.info("在所有文档中搜索相关内容")
+            docs = doc_store.search(user_query, k=5)
+            context = "\n\n".join([doc.page_content for doc in docs])
+            logger.info(f"找到 {len(docs)} 个相关片段")
+        
+        # 如果没有找到相关内容，记录警告
+        if not context.strip():
+            logger.warning("未找到相关文档内容")
+            context = "未找到相关文档内容。"
+        
+        # 记录聊天完成信息
+        CustomLogger.chat_completion(user_query, len(context.split("\n")), context)
+        
+        # 构建系统消息
+        system_message = {
+            "role": "system",
+            "content": f"""你是一个智能助手，可以回答用户关于文档的问题。
+请基于以下文档内容回答用户的问题。如果文档内容中没有相关信息，请诚实地告诉用户你不知道，不要编造答案。
 
-                yield b"data: [DONE]\n\n"
-                CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
-            except Exception as e:
-                logger.error("生成响应流时出错: %s", str(e))
-                yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
-                yield b"data: [DONE]\n\n"
+文档内容:
+{context}
 
+请注意:
+1. 回答要简洁明了，直接基于文档内容回答问题
+2. 如果文档内容不足以回答问题，请明确告知用户
+3. 不要在回答中包含"根据文档内容"、"文档中提到"等词语
+4. 如果用户问题与文档无关，请礼貌地将话题引导回文档内容"""
+        }
+        
+        # 构建请求消息
+        request_messages = [system_message]
+        for msg in messages[1:]:  # 跳过原始系统消息
+            request_messages.append(msg)
+        
+        # 创建客户端
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+        
+        # 发送请求
+        logger.info(f"发送请求到模型: {model_name}")
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[m for m in request_messages],
+            stream=True,
+            temperature=0.7,
+        )
+        
+        # 返回流式响应
+        @stream_with_context
+        def generate():
+            full_response = ""
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield f"data: {json.dumps({'content': content, 'done': False})}\n\n"
+            
+            # 记录完整响应
+            CustomLogger.response_complete(user_query, full_response)
+            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+        
         return Response(
-            stream_with_context(generate()),
+            generate(),
             mimetype='text/event-stream',
             headers=headers,
             direct_passthrough=True
         )
-
     except Exception as e:
-        logger.error(f"处理请求时出错: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        error_msg = f"处理请求时出错: {str(e)}"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 500, headers
 
 @app.errorhandler(Exception)
 def handle_error(error):

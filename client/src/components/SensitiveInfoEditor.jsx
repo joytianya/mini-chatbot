@@ -27,14 +27,19 @@ const SensitiveInfoEditor = ({
     const loadFileContents = async () => {
       setIsLoading(true);
       console.log('开始加载文件内容...');
-      console.log('原始文件:', originalFile);
-      console.log('处理后文件:', processedFile);
-      console.log('敏感信息映射:', sensitiveMap);
+      
+      // 确保文件信息是数组，并获取第一个文件
+      const fileInfoArray = Array.isArray(originalFile) ? originalFile : [originalFile];
+      const firstFile = fileInfoArray[0];
+      
+      console.log('原始文件:', firstFile?.originalFile);
+      console.log('处理后文件:', firstFile?.processedFile);
+      console.log('敏感信息映射:', firstFile?.sensitiveMap);
       
       try {
-        if (originalFile) {
+        if (firstFile?.originalFile) {
           console.log('读取原始文件内容...');
-          const originalContent = await readFileAsText(originalFile);
+          const originalContent = await readFileAsText(firstFile.originalFile);
           console.log('原始文件内容长度:', originalContent.length);
           console.log('原始文件内容示例:', originalContent.substring(0, 100));
           setOriginalText(originalContent);
@@ -42,9 +47,9 @@ const SensitiveInfoEditor = ({
           console.warn('没有提供原始文件');
         }
         
-        if (processedFile) {
+        if (firstFile?.processedFile) {
           console.log('读取处理后文件内容...');
-          const maskedContent = await readFileAsText(processedFile);
+          const maskedContent = await readFileAsText(firstFile.processedFile);
           console.log('处理后文件内容长度:', maskedContent.length);
           console.log('处理后文件内容示例:', maskedContent.substring(0, 100));
           setMaskedText(maskedContent);
@@ -53,10 +58,10 @@ const SensitiveInfoEditor = ({
           console.warn('没有提供处理后文件');
         }
         
-        if (sensitiveMap) {
+        if (firstFile?.sensitiveMap) {
           console.log('设置敏感信息映射...');
-          console.log('敏感信息映射条目数:', Object.keys(sensitiveMap).length);
-          setCurrentSensitiveMap(sensitiveMap);
+          console.log('敏感信息映射条目数:', Object.keys(firstFile.sensitiveMap).length);
+          setCurrentSensitiveMap(firstFile.sensitiveMap);
         } else {
           console.warn('没有提供敏感信息映射');
         }

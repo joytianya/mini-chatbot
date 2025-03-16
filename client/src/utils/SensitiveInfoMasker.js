@@ -24,12 +24,35 @@ const initGlobalSensitiveInfoMap = () => {
       window.currentSensitiveInfoMap = JSON.parse(savedMap);
       console.log('从localStorage恢复全局敏感信息映射表');
       console.log('恢复的映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-      console.log('全局映射表详细内容:');
-      Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-        console.log(`  ${index+1}. ${key} => ${value}`);
+      
+      // 检查并修复映射表结构
+      let needsUpdate = false;
+      Object.keys(window.currentSensitiveInfoMap).forEach(key => {
+        // 检查是否有[object Object]的情况
+        if (typeof window.currentSensitiveInfoMap[key] === 'string' && 
+            window.currentSensitiveInfoMap[key].includes('[object Object]')) {
+          console.log(`发现错误的映射表项: ${key} => ${window.currentSensitiveInfoMap[key]}`);
+          // 修复为空对象
+          window.currentSensitiveInfoMap[key] = {};
+          needsUpdate = true;
+        }
+        
+        // 确保每个会话的映射表是对象而不是其他类型
+        if (typeof window.currentSensitiveInfoMap[key] !== 'object' || 
+            window.currentSensitiveInfoMap[key] === null) {
+          console.log(`修复映射表项: ${key} 的类型为 ${typeof window.currentSensitiveInfoMap[key]}`);
+          window.currentSensitiveInfoMap[key] = {};
+          needsUpdate = true;
+        }
       });
+      
+      // 如果有修复，保存回localStorage
+      if (needsUpdate) {
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        console.log('已修复并保存全局映射表');
+      }
     } else {
-      // 初始化为对象，用于存储不同文档的映射表
+      // 初始化为对象，用于存储不同会话的映射表
       window.currentSensitiveInfoMap = {};
       console.log('未找到保存的全局映射表，初始化为空对象');
     }
@@ -81,10 +104,10 @@ export const generateFileHash = (file) => {
 /**
  * 确保全局映射表存在
  * 在每次使用前调用此函数，确保全局映射表存在
- * @param {string} [docHash] 文档哈希值，如果提供则返回特定文档的映射表
+ * @param {string} [sessionHash] 会话哈希值，如果提供则返回特定会话的映射表
  */
-export const ensureGlobalMapExists = (docHash) => {
-  console.log('调用 ensureGlobalMapExists 函数', docHash ? `文档哈希: ${docHash}` : '无文档哈希');
+export const ensureGlobalMapExists = (sessionHash) => {
+  console.log('调用 ensureGlobalMapExists 函数', sessionHash ? `会话哈希: ${sessionHash}` : '无会话哈希');
   
   if (!window.currentSensitiveInfoMap) {
     console.log('全局映射表不存在，初始化全局敏感信息映射表');
@@ -96,11 +119,8 @@ export const ensureGlobalMapExists = (docHash) => {
         window.currentSensitiveInfoMap = JSON.parse(savedMap);
         console.log('从localStorage恢复全局敏感信息映射表');
         console.log('恢复的映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-        console.log('全局映射表详细内容:');
-        Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-          console.log(`  ${index+1}. ${key} => ${value}`);
-        });
       } else {
+        // 初始化为对象，用于存储不同会话的映射表
         window.currentSensitiveInfoMap = {};
         console.log('未找到保存的全局映射表，初始化为空对象');
       }
@@ -108,68 +128,26 @@ export const ensureGlobalMapExists = (docHash) => {
       console.error('恢复全局映射表时出错:', error);
       window.currentSensitiveInfoMap = {};
     }
-  } else {
-    console.log('全局映射表已存在，条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-    
-    // 检查全局映射表是否为空，如果为空尝试从localStorage恢复
-    if (Object.keys(window.currentSensitiveInfoMap).length === 0) {
-      console.log('全局映射表为空，尝试从localStorage恢复');
+  }
+  
+  // 如果提供了会话哈希值，确保该会话的映射表存在
+  if (sessionHash) {
+    if (!window.currentSensitiveInfoMap[sessionHash]) {
+      window.currentSensitiveInfoMap[sessionHash] = {};
+      console.log('为会话创建空的映射表，会话哈希值:', sessionHash);
+      
+      // 保存到localStorage
       try {
-        const savedMap = localStorage.getItem('globalSensitiveInfoMap');
-        if (savedMap) {
-          window.currentSensitiveInfoMap = JSON.parse(savedMap);
-          console.log('从localStorage恢复全局敏感信息映射表');
-          console.log('恢复的映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-          console.log('全局映射表详细内容:');
-          Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-            console.log(`  ${index+1}. ${key} => ${value}`);
-          });
-        }
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
       } catch (error) {
-        console.error('恢复全局映射表时出错:', error);
+        console.error('保存全局映射表到localStorage时出错:', error);
       }
     }
-  }
-  
-  // 如果提供了文档哈希，返回特定文档的映射表
-  if (docHash) {
-    // 如果该文档的映射表不存在，初始化为空对象
-    if (!window.currentSensitiveInfoMap[docHash]) {
-      console.log(`文档 ${docHash} 的映射表不存在，初始化为空对象`);
-      window.currentSensitiveInfoMap[docHash] = {};
-    }
     
-    console.log(`返回文档 ${docHash} 的映射表，条目数:`, Object.keys(window.currentSensitiveInfoMap[docHash]).length);
-    return window.currentSensitiveInfoMap[docHash];
+    return window.currentSensitiveInfoMap[sessionHash];
   }
   
-  // 如果没有提供文档哈希，返回默认映射表或第一个非空的文档映射表
-  if (!window.currentSensitiveInfoMap['default']) {
-    window.currentSensitiveInfoMap['default'] = {};
-  }
-  
-  // 检查默认映射表是否为空
-  if (Object.keys(window.currentSensitiveInfoMap['default']).length === 0) {
-    console.log('默认映射表为空，尝试查找非空的文档映射表');
-    
-    // 查找第一个非空的文档映射表
-    const nonEmptyMapKey = Object.keys(window.currentSensitiveInfoMap).find(key => 
-      key !== 'default' && 
-      typeof window.currentSensitiveInfoMap[key] === 'object' && 
-      Object.keys(window.currentSensitiveInfoMap[key]).length > 0
-    );
-    
-    if (nonEmptyMapKey) {
-      console.log(`找到非空的文档映射表: ${nonEmptyMapKey}，条目数:`, Object.keys(window.currentSensitiveInfoMap[nonEmptyMapKey]).length);
-      console.log(`使用文档 ${nonEmptyMapKey} 的映射表代替默认映射表`);
-      return window.currentSensitiveInfoMap[nonEmptyMapKey];
-    } else {
-      console.log('未找到非空的文档映射表，返回空的默认映射表');
-    }
-  }
-  
-  console.log('返回默认映射表，条目数:', Object.keys(window.currentSensitiveInfoMap['default']).length);
-  return window.currentSensitiveInfoMap['default'];
+  return window.currentSensitiveInfoMap;
 };
 
 /**
@@ -488,62 +466,48 @@ export const maskSensitiveInfo = (text, sessionHash) => {
 };
 
 /**
- * 将掩码后的敏感信息恢复为原始信息
- * @param {string} text - 包含掩码后敏感信息的文本
- * @param {Object} sensitiveInfoMap - 敏感信息映射表
- * @param {boolean} [useLooseMatching=false] - 是否使用宽松匹配（不要求单词边界）
- * @returns {string} - 恢复原始敏感信息后的文本
+ * 反映射敏感信息，将掩码替换回原始信息
+ * @param {string} text 包含掩码的文本
+ * @param {Object} sensitiveInfoMap 敏感信息映射表
+ * @param {string} [sessionHash] 会话哈希值，用于查找会话特定的映射表
+ * @returns {string} 反映射后的文本
  */
-export function unmaskSensitiveInfo(text, sensitiveInfoMap, useLooseMatching = false) {
-  if (!text) return text;
+export const unmaskSensitiveInfo = (text, sensitiveInfoMap = {}, sessionHash) => {
+  console.log('调用 unmaskSensitiveInfo 函数');
   
-  // 确保全局映射表存在
-  ensureGlobalMapExists();
+  if (!text) {
+    console.log('文本为空，无需反映射');
+    return '';
+  }
   
-  // 如果没有提供映射表，尝试使用全局映射表
+  // 如果没有提供映射表，尝试使用会话映射表
+  if (Object.keys(sensitiveInfoMap).length === 0 && sessionHash) {
+    console.log('未提供映射表，尝试使用会话映射表，会话哈希值:', sessionHash);
+    
+    // 确保全局映射表存在
+    ensureGlobalMapExists();
+    
+    // 获取会话映射表
+    if (window.currentSensitiveInfoMap && window.currentSensitiveInfoMap[sessionHash]) {
+      sensitiveInfoMap = window.currentSensitiveInfoMap[sessionHash];
+      console.log('使用会话映射表，条目数:', Object.keys(sensitiveInfoMap).length);
+    } else {
+      console.log('会话映射表不存在或为空，无法反映射');
+      return text;
+    }
+  }
+  
+  // 如果映射表为空，直接返回原文本
   if (!sensitiveInfoMap || Object.keys(sensitiveInfoMap).length === 0) {
-    console.log('未提供映射表或映射表为空，尝试使用全局映射表');
+    console.log('映射表为空，无法反映射');
     
     // 检查文本中是否包含掩码标识符
     const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
-    const maskIdsInText = [];
-    possibleMaskPatterns.forEach(pattern => {
-      const matches = text.match(new RegExp(pattern, 'g'));
-      if (matches) {
-        maskIdsInText.push(...matches);
-      }
-    });
+    const hasMaskIds = possibleMaskPatterns.some(pattern => pattern.test(text));
     
-    if (maskIdsInText.length > 0) {
-      console.log('文本中检测到的掩码标识符:', maskIdsInText);
-      
-      // 创建一个合并的映射表，包含所有文档的映射
-      const mergedMap = {};
-      
-      // 获取所有文档的映射表
-      const allMaps = getAllDocumentMaps();
-      
-      // 遍历所有文档的映射表，查找掩码标识符
-      let foundMappings = false;
-      Object.entries(allMaps).forEach(([docHash, docMap]) => {
-        if (typeof docMap === 'object') {
-          maskIdsInText.forEach(id => {
-            if (docMap[id] && !mergedMap[id]) {
-              mergedMap[id] = docMap[id];
-              console.log(`从文档 ${docHash} 的映射表添加: ${id} => ${docMap[id]}`);
-              foundMappings = true;
-            }
-          });
-        }
-      });
-      
-      if (foundMappings) {
-        console.log('使用合并后的全局映射表进行反映射，映射条目数:', Object.keys(mergedMap).length);
-        sensitiveInfoMap = mergedMap;
-      } else {
-        console.warn('在所有文档的映射表中都没有找到匹配的掩码标识符');
-        return text;
-      }
+    if (hasMaskIds) {
+      console.warn('警告：文本中包含掩码标识符，但映射表为空，无法反映射');
+      return text;
     } else {
       console.log('文本中没有检测到掩码标识符，无需反映射');
       return text;
@@ -552,10 +516,6 @@ export function unmaskSensitiveInfo(text, sensitiveInfoMap, useLooseMatching = f
   
   console.log('开始反映射敏感信息');
   console.log('映射表条目数:', Object.keys(sensitiveInfoMap).length);
-  console.log('映射表详细内容:');
-  Object.entries(sensitiveInfoMap).forEach(([key, value], index) => {
-    console.log(`  ${index+1}. ${key} => ${value}`);
-  });
 
   // 检查文本中是否包含掩码标识符
   const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
@@ -574,34 +534,47 @@ export function unmaskSensitiveInfo(text, sensitiveInfoMap, useLooseMatching = f
     const missingMaskIds = maskIdsInText.filter(id => !sensitiveInfoMap[id]);
     if (missingMaskIds.length > 0) {
       console.warn('警告：以下掩码标识符在映射表中不存在:', missingMaskIds);
-      console.warn('当前映射表中的键:', Object.keys(sensitiveInfoMap));
       
-      // 尝试从所有文档的映射表中查找缺失的标识符
-      console.log('尝试从所有文档的映射表中查找缺失的标识符');
-      const allMaps = getAllDocumentMaps();
-      let foundMissingMappings = false;
-      
-      // 创建一个新的映射表，包含原始映射表和从全局映射表中找到的缺失映射
-      const enhancedMap = {...sensitiveInfoMap};
-      
-      // 遍历所有文档的映射表，查找缺失的掩码标识符
-      Object.entries(allMaps).forEach(([docHash, docMap]) => {
-        if (typeof docMap === 'object') {
-          missingMaskIds.forEach(id => {
-            if (docMap[id] && !enhancedMap[id]) {
-              enhancedMap[id] = docMap[id];
-              console.log(`从文档 ${docHash} 的映射表添加缺失的映射: ${id} => ${docMap[id]}`);
-              foundMissingMappings = true;
+      // 如果提供了会话哈希值，尝试从全局映射表中查找缺失的标识符
+      if (sessionHash && window.currentSensitiveInfoMap) {
+        console.log('尝试从全局映射表中查找缺失的标识符');
+        
+        // 创建一个新的映射表，包含原始映射表和从全局映射表中找到的缺失映射
+        const enhancedMap = {...sensitiveInfoMap};
+        let foundMissingMappings = false;
+        
+        // 遍历全局映射表中的所有会话映射表
+        Object.entries(window.currentSensitiveInfoMap).forEach(([hash, sessionMap]) => {
+          if (hash !== sessionHash && typeof sessionMap === 'object') {
+            missingMaskIds.forEach(id => {
+              if (sessionMap[id] && !enhancedMap[id]) {
+                enhancedMap[id] = sessionMap[id];
+                console.log(`从会话 ${hash} 的映射表添加缺失的映射: ${id} => ${sessionMap[id]}`);
+                foundMissingMappings = true;
+              }
+            });
+          }
+        });
+        
+        if (foundMissingMappings) {
+          console.log('使用增强后的映射表进行反映射');
+          sensitiveInfoMap = enhancedMap;
+          
+          // 更新会话映射表
+          if (window.currentSensitiveInfoMap[sessionHash]) {
+            window.currentSensitiveInfoMap[sessionHash] = enhancedMap;
+            
+            // 保存到localStorage
+            try {
+              localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+              console.log('更新后的映射表已保存到localStorage');
+            } catch (error) {
+              console.error('保存全局映射表到localStorage时出错:', error);
             }
-          });
+          }
+        } else {
+          console.warn('在全局映射表中都没有找到缺失的掩码标识符');
         }
-      });
-      
-      if (foundMissingMappings) {
-        console.log('使用增强后的映射表进行反映射');
-        sensitiveInfoMap = enhancedMap;
-      } else {
-        console.warn('在所有文档的映射表中都没有找到缺失的掩码标识符');
       }
     }
   } else {
@@ -639,21 +612,8 @@ export function unmaskSensitiveInfo(text, sensitiveInfoMap, useLooseMatching = f
   
   console.log(`反映射完成，共替换了 ${replacementCount} 处敏感信息`);
   
-  // 检查是否还有未替换的掩码标识符
-  const remainingMaskIds = [];
-  possibleMaskPatterns.forEach(pattern => {
-    const matches = result.match(new RegExp(pattern, 'g'));
-    if (matches) {
-      remainingMaskIds.push(...matches);
-    }
-  });
-  
-  if (remainingMaskIds.length > 0) {
-    console.warn('警告：反映射后仍有未替换的掩码标识符:', remainingMaskIds);
-  }
-  
   return result;
-}
+};
 
 /**
  * 处理文件中的敏感信息
