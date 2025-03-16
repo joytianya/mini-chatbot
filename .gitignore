@@ -49,3 +49,5 @@ ipynb/test.py
 __pycache__
 
 test-*
+
+.cursorrules

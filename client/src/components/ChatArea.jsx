@@ -313,6 +313,10 @@ const ChatArea = ({
   const [isInteractingWithOtherElements, setIsInteractingWithOtherElements] = useState(false);
   // 添加状态跟踪用户是否正在编辑消息
   const [isEditingMessage, setIsEditingMessage] = useState(false);
+  // 添加状态跟踪输入框是否聚焦
+  const [inputFocused, setInputFocused] = useState(false);
+  // 添加状态跟踪流式消息的 ID
+  const [streamingMessageId] = useState(() => Date.now().toString());
   // 本地输入状态，如果外部 input 未提供
   const [localInput, setLocalInput] = useState('');
 
@@ -555,11 +559,6 @@ const ChatArea = ({
     
     // 设置输入框状态为聚焦
     setInputFocused(true);
-    
-    // 如果有onFocus回调，调用它
-    if (onFocus) {
-      onFocus();
-    }
   };
 
   // 处理消息编辑状态变化
@@ -937,7 +936,7 @@ const ChatArea = ({
           return (
             msg.role !== 'system' && (
               <SensitiveMessageWrapper 
-                key={msg.id || index} 
+                key={`${msg.id}-${index}`}
                 message={{
                   ...msg,
                   onRetry: msg.role === 'assistant' ? () => {
@@ -959,7 +958,8 @@ const ChatArea = ({
                     handleEdit(messageToEdit, newContent, isDeepResearch, isWebSearch);
                   } : null,
                   isStreaming: false,
-                  isWebSearch: isWebSearch
+                  isWebSearch: isWebSearch,
+                  reasoning_content: msg.reasoning_content  // 确保推理内容被传递
                 }}
                 isHighlighted={msg.id === highlightedMessageId}
                 sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
@@ -974,39 +974,22 @@ const ChatArea = ({
         {/* 显示正在生成的消息 */}
         {streaming && (
           <>
-            {/* 显示推理过程 */}
-            {reasoningText && (
-              <SensitiveMessageWrapper 
-                message={{
-                  role: 'assistant',
-                  content: null,
-                  reasoning_content: reasoningText,
-                  isStreaming: true,
-                  isWebSearch: isWebSearch
-                }}
-                isHighlighted={false}
-                sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-                darkMode={darkMode}
-                onEditStateChange={handleMessageEditStateChange}
-                sessionHash={sessionHash}
-              />
-            )}
-            {/* 显示回复内容 */}
-            {currentResponse && (
-              <SensitiveMessageWrapper 
-                message={{
-                  role: 'assistant',
-                  content: currentResponse,
-                  isStreaming: true,
-                  isWebSearch: isWebSearch
-                }}
-                isHighlighted={false}
-                sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-                darkMode={darkMode}
-                onEditStateChange={handleMessageEditStateChange}
-                sessionHash={sessionHash}
-              />
-            )}
+            {/* 显示当前正在生成的消息 */}
+            <SensitiveMessageWrapper 
+              key={`streaming-${streamingMessageId}`}
+              message={{
+                role: 'assistant',
+                content: currentResponse,
+                reasoning_content: reasoningText,
+                isStreaming: true,
+                isWebSearch: isWebSearch
+              }}
+              isHighlighted={false}
+              sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
+              darkMode={darkMode}
+              onEditStateChange={handleMessageEditStateChange}
+              sessionHash={sessionHash}
+            />
           </>
         )}
       </div>

@@ -65,6 +65,61 @@ const MessageBubble = ({
     return <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
   };
 
+  // 渲染推理内容
+  const renderReasoningContent = () => {
+    if (!reasoningContent) return null;
+
+    return (
+      <div 
+        className="reasoning-bubble"
+        style={{
+          padding: '8px 12px',
+          backgroundColor: darkMode ? '#1a1a1a' : '#f5f5f5',
+          borderRadius: '8px',
+          fontSize: '14px',
+          color: darkMode ? '#aaaaaa' : '#666',
+          cursor: 'pointer',
+          userSelect: 'text'
+        }}
+        onClick={handleReasoningClick}
+      >
+        <div style={{ 
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span style={{ fontWeight: 500 }}>
+            {isStreaming ? '思考中...' : '思考过程'}
+          </span>
+          <svg 
+            width="12" 
+            height="12" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            style={{
+              transform: isReasoningExpanded ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.3s ease'
+            }}
+          >
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        {isReasoningExpanded && (
+          <div style={{ 
+            marginTop: '8px',
+            whiteSpace: 'pre-wrap'
+          }}>
+            <div className="markdown-content">
+              {renderMarkdown(reasoningContent)}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // 渲染消息内容
   const renderContent = () => {
     // 如果是用户消息，直接显示文本内容
@@ -124,55 +179,7 @@ const MessageBubble = ({
       onMouseLeave={() => setShowButtons(false)}
     >
       {/* 推理内容部分 */}
-      {reasoningContent && (
-        <div 
-          className="reasoning-bubble"
-          style={{
-            padding: '8px 12px',
-            backgroundColor: darkMode ? '#1a1a1a' : '#f5f5f5',  // 深色模式背景
-            borderRadius: '8px',
-            fontSize: '14px',
-            color: darkMode ? '#aaaaaa' : '#666',  // 深色模式文字颜色
-            cursor: 'pointer',
-            userSelect: 'text'
-          }}
-          onClick={handleReasoningClick}
-        >
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span style={{ fontWeight: 500 }}>
-              {isStreaming ? '思考中...' : '思考过程'}
-            </span>
-            <svg 
-              width="12" 
-              height="12" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2"
-              style={{
-                transform: isReasoningExpanded ? 'rotate(180deg)' : 'none',
-                transition: 'transform 0.3s ease'
-              }}
-            >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
-          {isReasoningExpanded && (
-            <div style={{ 
-              marginTop: '8px',
-              whiteSpace: 'pre-wrap'
-            }}>
-              <div className="markdown-content">
-                {renderMarkdown(reasoningContent)}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {renderReasoningContent()}
 
       {/* 消息内容部分 */}
       <div style={{ 

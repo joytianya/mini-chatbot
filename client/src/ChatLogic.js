@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { maxHistoryLength, serverURL } from './Config';
 // 导入敏感信息处理工具
 import { 
@@ -62,19 +62,6 @@ export const formatTime = (timestamp) => {
   }
 };
 
-// 在文件顶部添加 updateState 函数的定义
-const updateState = (setReasoningText, setCurrentResponse, scrollToBottom) => 
-  (newReasoningText, newResponseText, isReasoning) => {
-    requestAnimationFrame(() => {
-      if (isReasoning) {
-        setReasoningText(newReasoningText);
-      } else {
-        setCurrentResponse(newResponseText);
-      }
-      scrollToBottom();
-    });
-  };
-
 export const useChatLogic = () => {
   // 所有状态定义放在最前面
   const [displayMessages, setDisplayMessages] = useState(() => {
@@ -82,7 +69,10 @@ export const useChatLogic = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       const activeConversation = parsed.find(conv => conv.active);
-      return activeConversation?.messages || [{ role: "system", content: "You are a helpful assistant." }];
+      return activeConversation?.messages?.map(msg => ({
+        ...msg,
+        reasoning_content: msg.reasoning_content || null  // 确保加载推理内容
+      })) || [{ role: "system", content: "You are a helpful assistant." }];
     }
     return [{ role: "system", content: "You are a helpful assistant." }];
   });
@@ -92,7 +82,11 @@ export const useChatLogic = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       const activeConversation = parsed.find(conv => conv.active);
-      return activeConversation?.requestMessages || [{ role: "system", content: "You are a helpful assistant." }];
+      return activeConversation?.messages?.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        reasoning_content: msg.reasoning_content || null  // 确保加载推理内容
+      })) || [{ role: "system", content: "You are a helpful assistant." }];
     }
     return [{ role: "system", content: "You are a helpful assistant." }];
   });
@@ -165,7 +159,7 @@ export const useChatLogic = () => {
   const lastScrollPosition = useRef(0);
 
   // 滚动相关函数
-  const scrollToBottom = (force = false) => {
+  const scrollToBottom = useCallback((force = false) => {
     if (!chatContainerRef.current) return;
     const { scrollHeight, clientHeight } = chatContainerRef.current;
     const shouldScroll = force || 
@@ -173,7 +167,7 @@ export const useChatLogic = () => {
     if (shouldScroll) {
       chatContainerRef.current.scrollTop = scrollHeight - clientHeight;
     }
-  };
+  }, [userHasScrolled]);
 
   const handleScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
@@ -202,8 +196,19 @@ export const useChatLogic = () => {
     }
   };
 
-  // 创建 updateState 实例
-  const updateStateInstance = updateState(setReasoningText, setCurrentResponse, scrollToBottom);
+  // 将 updateState 函数移到 hook 内部
+  const updateStateInstance = useMemo(() => {
+    return (newReasoningText, newResponseText, isReasoning) => {
+      requestAnimationFrame(() => {
+        if (isReasoning) {
+          setReasoningText(newReasoningText);
+        } else {
+          setCurrentResponse(newResponseText);
+        }
+        scrollToBottom();
+      });
+    };
+  }, [setReasoningText, setCurrentResponse, scrollToBottom]);
 
   // 添加 updateMessageHistory 辅助函数
   const updateMessageHistory = (currentMessages, newMessage) => {
@@ -321,7 +326,28 @@ export const useChatLogic = () => {
     }
 
     // 更新显示消息
-    setDisplayMessages(prev => [...prev, newMessage]);
+    setDisplayMessages(prev => {
+      const newMessages = [...prev, newMessage];
+      
+      // 更新本地存储
+      const updatedConversations = conversations.map(conv => {
+        if (conv.active) {
+          return {
+            ...conv,
+            messages: newMessages.map(msg => ({
+              ...msg,
+              reasoning_content: msg.reasoning_content || null  // 确保推理内容被保存
+            })),
+            timestamp: Date.now()
+          };
+        }
+        return conv;
+      });
+      localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+      setConversations(updatedConversations);
+      
+      return newMessages;
+    });
     
     // 更新请求消息
     setRequestMessages(prev => [...prev, newMessage]);
@@ -399,6 +425,7 @@ export const useChatLogic = () => {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let responseText = '';
+    let reasoningContent = '';  // 用于累积当前轮的思考过程
     let lastResponseTime = Date.now();
     
     const currentSessionHash = sessionHash;
@@ -526,11 +553,12 @@ export const useChatLogic = () => {
                 }
               }
               
-              // 添加AI回复消息
+              // 添加AI回复消息，同时包含思考过程和内容
               const aiMessage = {
                 id: Date.now().toString(),
                 role: 'assistant',
                 content: responseText,
+                reasoning_content: reasoningContent,  // 使用累积的思考过程
                 originalContent: isMasked ? finalResponse : null,
                 sensitiveMap: isMasked ? sensitiveMap : null,
                 isMasked: isMasked,
@@ -538,10 +566,35 @@ export const useChatLogic = () => {
                 sessionHash: currentSessionHash
               };
               
-              setDisplayMessages(prev => [...prev, aiMessage]);
+              // 更新显示消息和请求消息
+              setDisplayMessages(prev => {
+                const newMessages = [...prev, aiMessage];
+                
+                // 更新本地存储，确保保存推理内容
+                const updatedConversations = conversations.map(conv => {
+                  if (conv.active) {
+                    return {
+                      ...conv,
+                      messages: newMessages.map(msg => ({
+                        ...msg,
+                        reasoning_content: msg.reasoning_content || null  // 确保推理内容被保存
+                      })),
+                      timestamp: Date.now()
+                    };
+                  }
+                  return conv;
+                });
+                localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+                setConversations(updatedConversations);
+                
+                return newMessages;
+              });
+              
               setRequestMessages(prev => [...prev, {
                 role: 'assistant',
-                content: responseText
+                content: responseText,
+                reasoning_content: reasoningContent,  // 使用累积的思考过程
+                sessionHash: currentSessionHash
               }]);
               
               // 高亮消息
@@ -560,7 +613,8 @@ export const useChatLogic = () => {
                   parsedData.choices[0].delta && 
                   parsedData.choices[0].delta.reasoning_content) {
                 const content = parsedData.choices[0].delta.reasoning_content;
-                setReasoningText(prev => prev + content);
+                reasoningContent += content;  // 累积思考过程
+                setReasoningText(reasoningContent);  // 更新显示的思考过程
                 setIsReasoning(true);
               }
               // 处理正常内容
@@ -1140,6 +1194,7 @@ export const useChatLogic = () => {
       ...message,
       content: processedInput,
       originalContent: isMasked ? userOriginalInput : undefined,
+      reasoning_content: message.reasoning_content || null,  // 保留原有的推理内容
       id: message.id || Date.now().toString() // 确保消息有ID
     };
     
@@ -1149,6 +1204,7 @@ export const useChatLogic = () => {
     setRequestMessages([...previousMessages.map(msg => ({
       role: msg.role,
       content: msg.content,
+      reasoning_content: msg.reasoning_content || null,  // 保留推理内容
       sessionHash: msg.sessionHash || currentSessionHash
     })), updatedMessage]);
     
@@ -1566,37 +1622,41 @@ export const useChatLogic = () => {
       const queryMap = getSensitiveInfoMap();
       if (Object.keys(queryMap).length > 0) {
         console.log('查询中的敏感信息已被掩码处理:', queryMap);
-        
-        // 将新的敏感信息映射合并到全局映射表中
         updateGlobalSensitiveInfoMap(queryMap);
-        console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
       }
     }
 
     // 处理历史消息中的敏感信息
-    const processedMessages = requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => {
+    const processedMessages = requestMessages.map(msg => {
+      // 保留系统消息
+      if (msg.role === 'system') {
+        return msg;
+      }
+      // 处理用户消息中的敏感信息
       if (sensitiveInfoProtectionEnabled && msg.role === 'user') {
         return {
           role: msg.role,
-          content: maskSensitiveInfo(msg.content)
+          content: maskSensitiveInfo(msg.content),
+          reasoning_content: msg.reasoning_content || null
         };
       }
+      // 保持 AI 消息不变，但确保包含推理内容
       return {
         role: msg.role,
-        content: msg.content
+        content: msg.content,
+        reasoning_content: msg.reasoning_content || null
       };
     });
 
     const requestBody = {
       messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
         ...processedMessages,
         { role: 'user', content: processedMessage }
       ],
       model: selectedModel,
       base_url: currentConfig.base_url,
       api_key: currentConfig.api_key,
-      model_name: currentConfig.model_name || selectedModel,  // 确保有 model_name
+      model_name: currentConfig.model_name || selectedModel,
       stream: true,
       deep_research: isDeepResearch,
       web_search: isWebSearch,
@@ -1605,7 +1665,12 @@ export const useChatLogic = () => {
 
     console.log('发送请求数据:', {
       ...requestBody,
-      api_key: '***' // 隐藏 API 密钥
+      api_key: '***',
+      messages: requestBody.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content ? msg.content.substring(0, 50) + '...' : '',
+        reasoning_content: msg.reasoning_content ? msg.reasoning_content.substring(0, 50) + '...' : null
+      }))
     });
 
     const response = await fetch(`${serverURL}/api/chat`, {
@@ -1634,7 +1699,7 @@ export const useChatLogic = () => {
     if (Array.isArray(documentIds)) {
       docIds = documentIds;
     } else if (documentIds) {
-      docIds = [documentIds]; // 兼容单个文档ID的情况
+      docIds = [documentIds];
     }
     console.log('处理的文档IDs:', docIds);
     
@@ -1643,29 +1708,19 @@ export const useChatLogic = () => {
     let originalMessage = message;
     
     if (sensitiveInfoProtectionEnabled) {
-      // 不再清除之前的敏感信息映射，而是确保全局映射表存在
       ensureGlobalMapExists();
-      console.log('保持全局敏感信息映射表，当前条目数:', Object.keys(window.currentSensitiveInfoMap || {}).length);
-      
-      // 掩码处理消息
       processedMessage = maskSensitiveInfo(message);
       
-      // 获取并保存当前查询的敏感信息映射
       const queryMap = getSensitiveInfoMap();
       if (Object.keys(queryMap).length > 0) {
-        console.log('查询中的敏感信息已被掩码处理:', queryMap);
-        
-        // 将新的敏感信息映射合并到全局映射表中
         updateGlobalSensitiveInfoMap(queryMap);
-        console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
         
-        // 保存查询映射到localStorage
+        // 保存查询映射和文档关联
         const queryMappings = JSON.parse(localStorage.getItem('querySensitiveMappings') || '{}');
         const queryId = Date.now().toString();
         queryMappings[queryId] = queryMap;
         localStorage.setItem('querySensitiveMappings', JSON.stringify(queryMappings));
         
-        // 将当前查询ID与所有文档ID关联
         const docQueryMap = JSON.parse(localStorage.getItem('documentQueryMap') || '{}');
         docIds.forEach(docId => {
           if (!docQueryMap[docId]) {
@@ -1678,22 +1733,29 @@ export const useChatLogic = () => {
     }
     
     // 处理历史消息中的敏感信息
-    const processedMessages = requestMessages.slice(-(currentTurns * 2)).slice(1).map(msg => {
+    const processedMessages = requestMessages.map(msg => {
+      // 保留系统消息
+      if (msg.role === 'system') {
+        return msg;
+      }
+      // 处理用户消息中的敏感信息
       if (sensitiveInfoProtectionEnabled && msg.role === 'user') {
         return {
           role: msg.role,
-          content: maskSensitiveInfo(msg.content)
+          content: maskSensitiveInfo(msg.content),
+          reasoning_content: msg.reasoning_content || null
         };
       }
+      // 保持 AI 消息不变，但确保包含推理内容
       return {
         role: msg.role,
-        content: msg.content
+        content: msg.content,
+        reasoning_content: msg.reasoning_content || null
       };
     });
 
     const requestBody = {
       messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
         ...processedMessages,
         { role: 'user', content: processedMessage }
       ],
@@ -1701,7 +1763,7 @@ export const useChatLogic = () => {
       base_url: currentConfig.base_url,
       api_key: currentConfig.api_key,
       model_name: currentConfig.model_name || selectedModel,
-      document_ids: docIds,  // 使用文档ID列表
+      document_ids: docIds,
       deep_research: isDeepResearch,
       web_search: isWebSearch,
       stream: true,
@@ -1716,7 +1778,16 @@ export const useChatLogic = () => {
       requestBody.document_id = docIds[0];
     }
 
-    console.log('发送文档聊天请求数据:', requestBody);
+    console.log('发送文档聊天请求数据:', {
+      ...requestBody,
+      api_key: '***',
+      embedding_api_key: '***',
+      messages: requestBody.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content ? msg.content.substring(0, 50) + '...' : '',
+        reasoning_content: msg.reasoning_content ? msg.reasoning_content.substring(0, 50) + '...' : null
+      }))
+    });
 
     const response = await fetch(`${serverURL}/api/document_chat`, {
       method: 'POST',
@@ -1732,13 +1803,11 @@ export const useChatLogic = () => {
     // 保存原始消息和处理后的消息，以便在显示时恢复
     if (sensitiveInfoProtectionEnabled) {
       setDisplayMessages(prev => {
-        // 找到最后一条用户消息
         const lastUserMsgIndex = prev.findIndex(msg => 
           msg.role === 'user' && msg.content === processedMessage
         );
         
         if (lastUserMsgIndex !== -1) {
-          // 添加原始消息作为元数据
           const updatedMessages = [...prev];
           updatedMessages[lastUserMsgIndex] = {
             ...updatedMessages[lastUserMsgIndex],
