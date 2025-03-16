@@ -4,7 +4,7 @@ from crawl4ai import AsyncWebCrawler
 import json
 import re
 from bs4 import BeautifulSoup
-from searx_client import multi_search
+from searx_client import MultiSearXClient
 # SearXNG搜索函数
 def search_with_searxng(query, num_results=5, engines="google,bing"):
     url = 'https://searxng-render.onrender.com/search'
@@ -102,9 +102,10 @@ async def crawl_single_page_jina(url):
 # 主函数：搜索+抓取网页内容
 async def get_web_kg(query):
     try:
-
+        multi_client = MultiSearXClient()
         #search_results = search_with_searxng(query)
-        search_results = multi_search(query)
+        search_results = multi_client.multi_search(query)
+
     except Exception as e:
         print(f"搜索失败: {e}")
         search_results = []

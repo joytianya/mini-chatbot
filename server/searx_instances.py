@@ -58,7 +58,7 @@ class SearxSpaceParser:
         print(sorted_instances[:1])
         # 打印前10个实例的基本信息
         print("\n前10个响应最快的实例：")
-        for idx, instance in enumerate(reversed(sorted_instances[:10]), 1):
+        for idx, instance in enumerate(sorted_instances[:10]):
             print(f"{idx}. URL: {instance['url']}")
             print(f"   版本: {instance.get('version', '未知')}")
             print(f"   搜索平均响应时间: {instance['search_mean']:.3f}s" 

@@ -5,71 +5,148 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 import time
 import random
 import urllib.parse
 import os
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import concurrent.futures
 from typing import List, Dict, Optional
+
+class MultiSearXClient:
+    """
+    A client that manages multiple SearXNG instances for parallel searching.
+    """
+    def __init__(self, instances_file: str = None, max_instances: int = 10):
+        # 如果没有指定文件路径,使用当前脚本所在目录下的json文件
+        if instances_file is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            instances_file = os.path.join(current_dir, "searx_instances_sorted.json")
+        self.instances_file = instances_file
+        self.max_instances = max_instances
+        self.instances: List[Dict] = self._load_instances()
+        self.clients: List[SearXNGSeleniumClient] = []
+        self.search_stats: Dict[str, int] = {}  # 用于存储每个实例的结果数量
+        self._initialize_clients()
+    
+    def _load_instances(self) -> List[Dict]:
+        """Load SearX instances from the JSON file."""
+        try:
+            with open(self.instances_file, 'r') as f:
+                instances = json.load(f)
+            print(f"加载{len(instances)}个实例")
+            return instances[:self.max_instances]  # Only use top N instances
+        except Exception as e:
+            print(f"Error loading instances file: {e}")
+            return []
+    
+    def _initialize_clients(self):
+        """Initialize SearXNG clients for each instance."""
+        for instance in self.instances:
+            try:
+                client = SearXNGSeleniumClient(base_url=instance['url'])
+                self.clients.append(client)
+                self.search_stats[instance['url']] = 0  # 初始化统计
+            except Exception as e:
+                print(f"Failed to initialize client for {instance['url']}: {e}")
+    
+    def multi_search(self, query: str, group_size: int = 2, **kwargs) -> List[Dict]:
+        """
+        按组执行搜索,每组有指定数量的搜索引擎实例。如果一组有结果就返回,否则继续下一组。
+        
+        Args:
+            query: 搜索查询
+            group_size: 每组包含的搜索引擎实例数量
+            **kwargs: 额外的搜索参数
+        
+        Returns:
+            去重后的搜索结果列表
+        """
+        results = []
+        self.search_stats = {client.base_url: 0 for client in self.clients}  # 重置统计
+        print(f"搜索{len(self.clients)}个实例")
+        # 将clients分组
+        client_groups = [self.clients[i:i+group_size] for i in range(0, len(self.clients), group_size)]
+        
+        for group_idx, client_group in enumerate(client_groups):
+            group_results = []
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(client_group)) as executor:
+                future_to_client = {
+                    executor.submit(self._search_with_client, client, query, **kwargs): client 
+                    for client in client_group
+                }
+                
+                for future in concurrent.futures.as_completed(future_to_client):
+                    client = future_to_client[future]
+                    try:
+                        client_results = future.result()
+                        self.search_stats[client.base_url] = len(client_results)  # 更新统计
+                        group_results.extend(client_results)
+                    except Exception as e:
+                        print(f"Error with client {client.base_url}: {e}")
+            
+            # 如果当前组有结果,就不再继续搜索下一组
+            if group_results:
+                print(f"\n第{group_idx + 1}组搜索成功")
+                results = group_results
+                break
+            else:
+                print(f"\n第{group_idx + 1}组搜索无结果,尝试下一组")
+        
+        # 打印每个实例的结果统计
+        print("\n各搜索引擎结果统计:")
+        for url, count in self.search_stats.items():
+            print(f"- {url}: {count} 个结果")
+        
+        return self._deduplicate_results(results)
+    
+    def _search_with_client(self, client: 'SearXNGSeleniumClient', query: str, **kwargs) -> List[Dict]:
+        """Perform search with a single client."""
+        try:
+            soup_results = client.search(query, **kwargs)
+            return client.parse_results(soup_results)
+        except Exception as e:
+            print(f"Search failed for {client.base_url}: {e}")
+            return []
+    
+    def _deduplicate_results(self, results: List[Dict]) -> List[Dict]:
+        """Remove duplicate results based on URL."""
+        seen_urls = set()
+        unique_results = []
+        
+        for result in results:
+            url = result.get('url')
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                unique_results.append(result)
+        
+        return unique_results
+    
+    def close(self):
+        """Close all client instances."""
+        for client in self.clients:
+            try:
+                client.close()
+            except:
+                pass
 
 class SearXNGSeleniumClient:
     """
     A client for interacting with a SearXNG search engine instance using Selenium.
     """
     
-    # 定义可用的搜索参数
-    TIME_RANGES = {
-        'day': '1d',      # 最近一天
-        'week': '1w',     # 最近一周
-        'month': '1M',    # 最近一月
-        'year': '1y',     # 最近一年
-    }
-    
-    LANGUAGES = {
-        'zh-CN': '简体中文',
-        'zh-TW': '繁体中文',
-        'en': 'English',
-        'auto': '自动检测',
-        'all': '所有语言'
-    }
-    
-    SAFESEARCH = {
-        0: '关闭',        # 无过滤
-        1: '中等',        # 中等过滤
-        2: '严格'         # 严格过滤
-    }
-    
-    def __init__(self, 
-                 base_url="https://search.inetol.net", 
-                 timeout=30,
-                 language='auto',
-                 time_range=None,
-                 safesearch=1,
-                 categories=None):
+    def __init__(self, base_url="https://search.inetol.net", timeout=10):
         """
         Initialize the SearXNG Selenium client.
         
         Args:
             base_url (str): The base URL of the SearXNG instance
             timeout (int): Timeout in seconds for page loading
-            language (str): Default search language (e.g., 'zh-CN', 'en', 'auto')
-            time_range (str): Default time range filter (e.g., 'day', 'week', 'month', 'year')
-            safesearch (int): Safe search level (0=关闭, 1=中等, 2=严格)
-            categories (list): Default search categories (e.g., ['general', 'news'])
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-        
-        # 验证并设置默认搜索参数
-        self.language = language if language in self.LANGUAGES else 'auto'
-        self.time_range = self.TIME_RANGES.get(time_range, '')
-        self.safesearch = safesearch if safesearch in self.SAFESEARCH else 1
-        self.categories = categories or ['general']
-        
         self.driver = None
         self.init_driver()
     
@@ -94,24 +171,20 @@ class SearXNGSeleniumClient:
         options.add_experimental_option('useAutomationExtension', False)
         
         try:
-            # 使用webdriver_manager自动安装和管理ChromeDriver
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=options)
+            self.driver = webdriver.Chrome(options=options)
             self.driver.set_page_load_timeout(self.timeout)
         except Exception as e:
             print(f"Failed to initialize Chrome driver: {e}")
             print("Trying Firefox as fallback...")
             try:
-                # 使用webdriver_manager自动安装和管理GeckoDriver
                 from selenium.webdriver.firefox.options import Options as FirefoxOptions
                 firefox_options = FirefoxOptions()
                 firefox_options.add_argument('--headless')
-                service = Service(GeckoDriverManager().install())
-                self.driver = webdriver.Firefox(service=service, options=firefox_options)
+                self.driver = webdriver.Firefox(options=firefox_options)
                 self.driver.set_page_load_timeout(self.timeout)
             except Exception as e2:
                 print(f"Failed to initialize Firefox driver: {e2}")
-                print("Please ensure you have either Chrome or Firefox browser installed.")
+                print("Please ensure you have either Chrome or Firefox and the appropriate WebDriver installed.")
                 raise
     
     def __del__(self):
@@ -160,56 +233,33 @@ class SearXNGSeleniumClient:
             print(f"Error while visiting homepage: {e}")
             return False
     
-    def search(self, 
-               query: str,
-               categories: List[str] = None,
-               language: str = None,
-               time_range: str = None,
-               safesearch: int = None,
-               page: int = 1) -> BeautifulSoup:
+    def search(self, query, category='general', language='auto', time_range='', page=1):
         """
         Perform a search query on the SearXNG instance.
         
         Args:
             query (str): The search query
-            categories (list): Search categories (e.g., ['general', 'news'])
-            language (str): Result language (e.g., 'zh-CN', 'en', 'auto')
-            time_range (str): Time filter ('day', 'week', 'month', 'year')
-            safesearch (int): Safe search level (0=关闭, 1=中等, 2=严格)
-            page (int): Results page number
+            category (str): The search category (default: 'general')
+            language (str): The language for results (default: 'auto')
+            time_range (str): Time filter for results (default: '')
+            page (int): Results page number (default: 1)
         
         Returns:
             BeautifulSoup object with the parsed HTML results
         """
         try:
-            # First visit the homepage if not already done
-            if not hasattr(self, 'homepage_visited') or not self.homepage_visited:
-                self.homepage_visited = self.visit_homepage()
-                if not self.homepage_visited:
-                    print("Could not load homepage, attempting search directly...")
-            
-            # 使用传入的参数，如果没有则使用默认值
-            search_categories = categories or self.categories
-            search_language = language or self.language
-            search_time_range = self.TIME_RANGES.get(time_range, '') if time_range else self.time_range
-            search_safesearch = safesearch if safesearch in self.SAFESEARCH else self.safesearch
-            
             # Construct the search URL
             search_params = {
-                'q': query,
-                'language': search_language,
-                'safesearch': str(search_safesearch)
+                'q': query
             }
             
-            # 添加时间范围参数
-            if search_time_range:
-                search_params['time_range'] = search_time_range
-            
-            # 添加分类参数
-            for category in search_categories:
+            # Add optional parameters
+            if category:
                 search_params[f'category_{category}'] = '1'
-            
-            # 添加页码
+            if language:
+                search_params['language'] = language
+            if time_range:
+                search_params['time_range'] = time_range
             if page > 1:
                 search_params['pageno'] = str(page)
             
@@ -217,16 +267,18 @@ class SearXNGSeleniumClient:
             query_string = '&'.join([f"{k}={urllib.parse.quote(v)}" for k, v in search_params.items()])
             search_url = f"{self.base_url}/search?{query_string}"
             
-            print(f"搜索URL: {search_url}")
+            print(f"Navigating to search URL: {search_url}")
             self.driver.get(search_url)
             
             # Wait for results to load
             try:
+                # Wait for results container or search input to confirm page loaded
                 WebDriverWait(self.driver, self.timeout).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '.result, #q'))
                 )
             except TimeoutException:
                 print("Timeout waiting for search results. Page may have different structure.")
+                # Continue anyway since we'll check the page content
             
             # Get the page source after it's loaded
             html = self.driver.page_source
@@ -234,17 +286,24 @@ class SearXNGSeleniumClient:
             # Check for error messages or blocks
             if "429" in html and "Too Many Requests" in html:
                 print("Received 429 Too Many Requests in response.")
+                # Take a screenshot for debugging if possible
                 try:
                     screenshot_path = "search_error.png"
                     self.driver.save_screenshot(screenshot_path)
                     print(f"Screenshot saved to {os.path.abspath(screenshot_path)}")
                 except Exception as e:
                     print(f"Failed to save screenshot: {e}")
+                
+                if "security policies" in html:
+                    print("Server security policies are blocking automated access.")
+                    print("Consider using a different SearXNG instance or waiting longer between requests.")
             
+            # Return the BeautifulSoup object regardless, for further analysis
             return BeautifulSoup(html, 'html.parser')
             
         except Exception as e:
             print(f"Error during search: {e}")
+            # Take a screenshot if possible
             try:
                 screenshot_path = "search_error.png"
                 self.driver.save_screenshot(screenshot_path)
@@ -329,142 +388,38 @@ class SearXNGSeleniumClient:
         
         return results
 
-def multi_search(query: str, batch_size: int = 3, max_retries: int = 3) -> List[Dict]:
-    """
-    从多个SearXNG实例中搜索并合并结果
-    
-    Args:
-        query: 搜索关键词
-        batch_size: 每批次并行搜索的实例数量
-        max_retries: 最大重试批次数
-        
-    Returns:
-        合并后的搜索结果列表
-    """
-    def load_instances() -> List[str]:
-        """加载排序后的实例URL列表"""
-        try:
-            # 获取当前脚本所在目录
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(current_dir, "searx_instances_sorted.json")
-            
-            print(f"尝试从以下路径加载实例列表: {json_path}")
-            
-            if not os.path.exists(json_path):
-                print(f"错误: 文件不存在 {json_path}")
-                return []
-                
-            with open(json_path, "r", encoding="utf-8") as f:
-                instances = json.load(f)
-                urls = [instance["url"] for instance in instances]
-                print(f"成功加载 {len(urls)} 个实例URL")
-                return urls
-        except Exception as e:
-            print(f"加载实例列表失败: {e}")
-            return []
-    
-    def search_with_instance(url: str) -> List[Dict]:
-        """使用指定实例进行搜索"""
-        try:
-            client = SearXNGSeleniumClient(base_url=url)
-            soup_results = client.search(query)
-            results = client.parse_results(soup_results)
-            client.close()
-            return results
-        except Exception as e:
-            print(f"实例 {url} 搜索失败: {e}")
-            return []
-        finally:
-            if 'client' in locals():
-                client.close()
-    
-    def merge_results(all_results: List[List[Dict]]) -> List[Dict]:
-        """合并搜索结果并去重"""
-        seen_urls = set()
-        merged = []
-        
-        for results in all_results:
-            for result in results:
-                url = result.get('url')
-                if url and url not in seen_urls:
-                    seen_urls.add(url)
-                    merged.append(result)
-        
-        return merged
-
-    # 加载实例列表
-    instances = load_instances()
-    if not instances:
-        print("未找到可用的搜索实例")
-        return []
-    
-    merged_results = []
-    retry_count = 0
-    
-    while retry_count < max_retries and not merged_results:
-        # 获取当前批次的实例
-        start_idx = retry_count * batch_size
-        current_batch = instances[start_idx:start_idx + batch_size]
-        
-        if not current_batch:
-            print("没有更多可用的实例")
-            break
-        
-        print(f"\n尝试第 {retry_count + 1} 批实例:")
-        for url in current_batch:
-            print(f"- {url}")
-        
-        # 并行搜索
-        batch_results = []
-        with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            future_to_url = {
-                executor.submit(search_with_instance, url): url 
-                for url in current_batch
-            }
-            
-            for future in as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    results = future.result()
-                    if results:
-                        print(f"实例 {url} 返回 {len(results)} 条结果")
-                        batch_results.append(results)
-                    else:
-                        print(f"实例 {url} 未返回结果")
-                except Exception as e:
-                    print(f"实例 {url} 执行失败: {e}")
-        
-        # 合并当前批次结果
-        if batch_results:
-            merged_results = merge_results(batch_results)
-            print(f"\n成功获取 {len(merged_results)} 条去重后的结果")
-            break
-        
-        retry_count += 1
-        print(f"当前批次未获得结果，尝试下一批实例...")
-    
-    if not merged_results:
-        print("\n所有尝试均未获得结果")
-    
-    return merged_results
 
 # Example usage
 if __name__ == "__main__":
     try:
-        # 使用多实例搜索
-        query = "openai最近的新闻"
-        print(f"使用多实例搜索: {query}")
+        # 创建多搜索引擎客户端实例
+        multi_client = MultiSearXClient(max_instances=10)
         
-        results = multi_search(query)
+        # 搜索查询
+        query = "openai 最新的新闻"
+        print(f"使用多个搜索引擎实例搜索: {query}")
+        
+        # 执行并行搜索
+        results = multi_client.multi_search(query)
         
         # 打印结果
-        print(f"\n找到 {len(results)} 条结果:")
-        for i, result in enumerate(results, 1):
-            print(f"\n--- 结果 {i} ---")
-            print(f"标题: {result.get('title', 'N/A')}")
-            print(f"URL: {result.get('url', 'N/A')}")
-            content = result.get('content', 'N/A')
-            print(f"内容: {content[:100]}..." if len(content) > 100 else f"内容: {content}")
+        print(f"\n找到 {len(results)} 个去重后的结果:")
+        
+        if results:
+            for i, result in enumerate(results, 1):
+                print(f"\n--- 结果 {i} ---")
+                print(f"标题: {result.get('title', 'N/A')}")
+                print(f"URL: {result.get('url', 'N/A')}")
+                content = result.get('content', 'N/A')
+                print(f"内容: {content[:100]}..." if len(content) > 100 else f"内容: {content}")
+        else:
+            print("未找到结果。")
     
     except Exception as e:
-        print(f"搜索过程中出错: {e}")
+        print(f"示例运行出错: {e}")
+    
+    finally:
+        # 确保关闭所有浏览器
+        if 'multi_client' in locals():
+            multi_client.close()
+            print("所有浏览器已关闭。")
