@@ -2,6 +2,7 @@ flask[async]==2.2.5
 flask-cors==3.0.10
 langchain-community
 langchain
+openai==1.63.2
 faiss-cpu
 python-dotenv
 httpx[socks]
@@ -10,13 +11,13 @@ pypdf
 unstructured
 python-docx
 markdown
-Werkzeug>=2.2.2
-openai==1.63.2
 crawl4ai==0.5.0.post4
+selenium>=4.18.1
+playwright
+pypinyin
+Werkzeug>=2.2.2
 gunicorn
 requests>=2.31.0
-selenium>=4.18.1
 beautifulsoup4>=4.12.0
 webdriver_manager>=4.0.1
 Flask-APScheduler==1.13.1
-playwright

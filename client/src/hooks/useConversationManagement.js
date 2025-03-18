@@ -35,7 +35,8 @@ export const useConversationManagement = (
         sessionHash: newSessionHash  // 为系统消息添加会话哈希值
       }],
       timestamp: Date.now(),
-      sessionHash: newSessionHash // 添加新的会话哈希值
+      sessionHash: newSessionHash, // 添加新的会话哈希值
+      activeDocuments: [] // 添加空的活动文档列表
     };
     
     // 更新对话列表
@@ -61,7 +62,7 @@ export const useConversationManagement = (
     setCurrentResponse('');
     setReasoningText('');
     setStreaming(false);
-    setActiveDocuments([]);
+    setActiveDocuments([]); // 清空活动文档
     
     // 确保全局映射表存在
     ensureGlobalMapExists();
@@ -84,6 +85,12 @@ export const useConversationManagement = (
 
   // 处理对话点击
   const handleConversationClick = (conv) => {
+    // 保存当前会话的活动文档
+    const currentActiveConv = conversations.find(c => c.active);
+    if (currentActiveConv) {
+      currentActiveConv.activeDocuments = activeDocuments || [];
+    }
+    
     // 更新活动状态
     const updatedConversations = conversations.map(c => ({
       ...c,
@@ -154,8 +161,10 @@ export const useConversationManagement = (
       }
     }
     
-    // 清空当前活动文档
-    setActiveDocuments([]);
+    // 恢复会话的活动文档
+    const docsToRestore = conv.activeDocuments || [];
+    setActiveDocuments(docsToRestore);
+    console.log('恢复会话的活动文档:', docsToRestore);
     
     // 获取会话消息并设置显示消息
     const messages = conv.messages || [{ role: "system", content: "You are a helpful assistant." }];
@@ -290,7 +299,8 @@ export const useConversationManagement = (
           sessionHash: newSessionHash  // 为系统消息添加会话哈希值
         }],
         timestamp: Date.now(),
-        sessionHash: newSessionHash // 添加新的会话哈希值
+        sessionHash: newSessionHash, // 添加新的会话哈希值
+        activeDocuments: [] // 添加空的活动文档列表
       };
       
       setConversations([newConversation]);

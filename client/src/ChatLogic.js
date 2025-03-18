@@ -114,7 +114,15 @@ export const useChatLogic = () => {
   });
   const [conversations, setConversations] = useState(() => {
     const saved = localStorage.getItem('chatHistory');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      // 确保每个会话都有activeDocuments字段
+      const parsedConversations = JSON.parse(saved);
+      return parsedConversations.map(conv => ({
+        ...conv,
+        activeDocuments: conv.activeDocuments || []
+      }));
+    }
+    return [];
   });
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
@@ -131,7 +139,19 @@ export const useChatLogic = () => {
     const saved = localStorage.getItem('embeddingConfigs');
     return saved ? JSON.parse(saved)[0] : null;
   });
-  const [activeDocuments, setActiveDocuments] = useState([]);
+  const [activeDocuments, setActiveDocuments] = useState(() => {
+    // 从当前活动会话中获取活动文档
+    const saved = localStorage.getItem('chatHistory');
+    if (saved) {
+      const parsedConversations = JSON.parse(saved);
+      const activeConv = parsedConversations.find(conv => conv.active);
+      if (activeConv && activeConv.activeDocuments) {
+        console.log('从活动会话中恢复活动文档:', activeConv.activeDocuments);
+        return activeConv.activeDocuments;
+      }
+    }
+    return [];
+  });
   const [sessionHash, setSessionHash] = useState(() => {
     // 尝试从localStorage获取会话哈希值
     const saved = localStorage.getItem('sessionHash');
@@ -338,7 +358,8 @@ export const useChatLogic = () => {
               ...msg,
               reasoning_content: msg.reasoning_content || null  // 确保推理内容被保存
             })),
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            activeDocuments: activeDocuments || [] // 保存活动文档
           };
         }
         return conv;
@@ -570,22 +591,33 @@ export const useChatLogic = () => {
               setDisplayMessages(prev => {
                 const newMessages = [...prev, aiMessage];
                 
-                // 更新本地存储，确保保存推理内容
-                const updatedConversations = conversations.map(conv => {
-                  if (conv.active) {
-                    return {
-                      ...conv,
-                      messages: newMessages.map(msg => ({
-                        ...msg,
-                        reasoning_content: msg.reasoning_content || null  // 确保推理内容被保存
-                      })),
-                      timestamp: Date.now()
-                    };
-                  }
-                  return conv;
-                });
-                localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
-                setConversations(updatedConversations);
+                // 保存到localStorage
+                const activeConversation = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+                  .find(conv => conv.active);
+                
+                if (activeConversation) {
+                  // 更新活动会话的消息
+                  const updatedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+                    .map(conv => {
+                      if (conv.active) {
+                        return {
+                          ...conv,
+                          messages: newMessages.map(msg => ({
+                            id: msg.id,
+                            role: msg.role,
+                            content: msg.content,
+                            timestamp: msg.timestamp,
+                            sessionHash: msg.sessionHash,
+                            reasoning_content: msg.reasoning_content || null,
+                          })),
+                          activeDocuments: activeDocuments || [] // 保存活动文档
+                        };
+                      }
+                      return conv;
+                    });
+                  
+                  localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+                }
                 
                 return newMessages;
               });
@@ -826,7 +858,8 @@ export const useChatLogic = () => {
       active: true,
       messages: [{ role: "system", content: "You are a helpful assistant." }],
       timestamp: Date.now(),
-      sessionHash: newSessionHash // 添加新的会话哈希值
+      sessionHash: newSessionHash, // 添加新的会话哈希值
+      activeDocuments: [] // 添加空的活动文档列表
     };
 
     const updatedConversations = conversations.map(conv => ({
@@ -989,7 +1022,8 @@ export const useChatLogic = () => {
         active: true,
         messages: [{ role: "system", content: "You are a helpful assistant." }],
         timestamp: Date.now(),
-        sessionHash: newSessionHash // 添加新的会话哈希值
+        sessionHash: newSessionHash, // 添加新的会话哈希值
+        activeDocuments: [] // 添加空的活动文档列表
       };
       
       setConversations([newConversation]);
@@ -1789,7 +1823,7 @@ export const useChatLogic = () => {
       }))
     });
 
-    const response = await fetch(`${serverURL}/api/document_chat`, {
+    const response = await fetch(`${serverURL}/api/chat_with_doc`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

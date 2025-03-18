@@ -353,110 +353,119 @@ const ChatArea = ({
   };
 
   // 处理文件上传成功
-  const handleUploadSuccess = (fileInfo) => {
-    console.log('文件上传成功，信息:', fileInfo);
-    
-    // 确保fileInfo是数组
-    const fileInfoArray = Array.isArray(fileInfo) ? fileInfo : [fileInfo];
-    
-    // 保存上传的文件信息，以便后续可以再次打开编辑器
-    setUploadedFileInfo(fileInfoArray);
+  const handleUploadSuccess = (uploadedFiles) => {
+    console.log('文件上传成功:', uploadedFiles);
     
     // 更新活动文档列表
-    if (setActiveDocuments && fileInfoArray.length > 0) {
-      const documents = fileInfoArray.map(info => {
-        if (info && info.processedFile) {
-          return {
-            id: info.processedFile.id,
-            name: info.processedFile.name || (info.originalFile ? info.originalFile.name : '未命名文档')
-          };
-        }
-        return null;
-      }).filter(Boolean);
+    setActiveDocuments(prevDocs => {
+      const newDocs = [...prevDocs, ...uploadedFiles];
       
-      if (documents.length > 0) {
-        setActiveDocuments(documents);
-      }
-    }
-    
-    // 更新全局敏感信息映射表
-    fileInfoArray.forEach(info => {
-      if (info && info.sensitiveMap) {
-        console.log('文件上传成功，更新全局敏感信息映射表');
-        
-        // 获取文件哈希值，如果没有则使用默认值
-        const fileHash = info.fileHash || 'default';
-        console.log(`使用文件哈希值: ${fileHash} 更新全局映射表`);
-        
-        // 获取当前映射表状态
-        const globalMap = ensureGlobalMapExists();
-        console.log('原全局映射表条目数:', Object.keys(globalMap).length);
-        
-        // 将文件的敏感信息映射合并到全局映射表中，使用文件哈希作为键
-        updateGlobalSensitiveInfoMap(info.sensitiveMap, fileHash);
-        
-        console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-        console.log('全局映射表详细内容:');
-        Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-          if (typeof value === 'object') {
-            console.log(`  ${index+1}. ${key} => 包含 ${Object.keys(value).length} 条映射`);
-          } else {
-            console.log(`  ${index+1}. ${key} => ${value}`);
+      // 保存到当前会话
+      const updatedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+        .map(conv => {
+          if (conv.active) {
+            return {
+              ...conv,
+              activeDocuments: newDocs
+            };
           }
+          return conv;
         });
-      }
+      
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      
+      return newDocs;
     });
     
-    // 如果启用了敏感信息保护，显示敏感信息编辑器
-    if (fileInfoArray.length > 0 && sensitiveInfoProtectionEnabled) {
-      setShowSensitiveEditor(true);
-      // 设置正在编辑敏感信息，防止输入框获取焦点
-      setIsEditingSensitiveInfo(true);
-    }
+    // 关闭上传对话框
+    setShowSensitiveEditor(false);
+  };
+
+  // 处理文件删除
+  const handleFileDelete = (docId) => {
+    console.log('删除文件:', docId);
+    
+    // 更新活动文档列表
+    setActiveDocuments(prevDocs => {
+      const newDocs = prevDocs.filter(doc => doc.document_id !== docId);
+      
+      // 保存到当前会话
+      const updatedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+        .map(conv => {
+          if (conv.active) {
+            return {
+              ...conv,
+              activeDocuments: newDocs
+            };
+          }
+          return conv;
+        });
+      
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      
+      return newDocs;
+    });
   };
 
   // 处理敏感信息编辑器保存
-  const handleEditorSave = (newDocument) => {
-    setActiveDocuments(newDocument);
-    setShowSensitiveEditor(false);
-    // 编辑器关闭后，重置编辑状态
-    setIsEditingSensitiveInfo(false);
+  const handleEditorSave = (originalFile, processedFile, sensitiveMap) => {
+    console.log('编辑器保存:', originalFile, processedFile, sensitiveMap);
     
     // 更新全局敏感信息映射表
-    if (newDocument && newDocument.sensitiveMap) {
-      console.log('更新全局敏感信息映射表');
+    if (sensitiveMap && Object.keys(sensitiveMap).length > 0) {
+      const sessionHash = localStorage.getItem('sessionHash');
+      updateGlobalSensitiveInfoMap(sensitiveMap, sessionHash);
       
-      // 获取文件哈希值，如果没有则使用默认值
-      const fileHash = newDocument.fileHash || 'default';
-      console.log(`使用文件哈希值: ${fileHash} 更新全局映射表`);
-      
-      // 获取当前映射表状态
-      const globalMap = ensureGlobalMapExists();
-      console.log('原全局映射表条目数:', Object.keys(globalMap).length);
-      
-      // 将文档的敏感信息映射合并到全局映射表中，使用文件哈希作为键
-      updateGlobalSensitiveInfoMap(newDocument.sensitiveMap, fileHash);
-      
-      console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
-      console.log('全局映射表详细内容:');
-      Object.entries(window.currentSensitiveInfoMap).forEach(([key, value], index) => {
-        if (typeof value === 'object') {
-          console.log(`  ${index+1}. ${key} => 包含 ${Object.keys(value).length} 条映射`);
-        } else {
-          console.log(`  ${index+1}. ${key} => ${value}`);
-        }
-      });
+      try {
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+      } catch (error) {
+        console.error('保存全局映射表到localStorage时出错:', error);
+      }
     }
     
-    // 延迟一段时间后重置交互状态并聚焦到输入框
-    setTimeout(() => {
-      setIsInteractingWithOtherElements(false);
-      // 确保文本输入框获取焦点
-      if (textareaRef.current) {
-        console.log('敏感信息编辑器保存并关闭，聚焦到输入框');
-        textareaRef.current.focus();
+    // 更新活动文档列表
+    setActiveDocuments(prevDocs => {
+      // 查找是否已存在相同ID的文档
+      const existingDocIndex = prevDocs.findIndex(doc => 
+        doc.document_id === originalFile.document_id
+      );
+      
+      let newDocs;
+      if (existingDocIndex >= 0) {
+        // 更新现有文档
+        newDocs = [...prevDocs];
+        newDocs[existingDocIndex] = {
+          ...newDocs[existingDocIndex],
+          ...originalFile,
+          processed_file: processedFile
+        };
+      } else {
+        // 添加新文档
+        newDocs = [...prevDocs, {
+          ...originalFile,
+          processed_file: processedFile
+        }];
       }
-    }, 300);
+      
+      // 保存到当前会话
+      const updatedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+        .map(conv => {
+          if (conv.active) {
+            return {
+              ...conv,
+              activeDocuments: newDocs
+            };
+          }
+          return conv;
+        });
+      
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      
+      return newDocs;
+    });
+    
+    // 关闭编辑器
+    setShowSensitiveEditor(false);
   };
 
   // 处理敏感信息编辑器关闭

@@ -19,104 +19,25 @@ from system_prompts import search_answer_zh_template, search_answer_en_template
 from datetime import datetime
 from flask_apscheduler import APScheduler  # 添加APScheduler导入
 from searx_instances import SearxSpaceParser  # 添加SearxSpaceParser导入
+from pypinyin import lazy_pinyin  # 添加pypinyin导入
 
-# 配置日志
-logger = logging.getLogger(__name__)
-
-# 创建自定义格式化器
-class CustomFormatter(Formatter):
-    def format(self, record):
-        # 保存原始消息
-        original_msg = record.msg
-        separator = record.__dict__.get('separator', '')
-        
-        # 如果是错误日志，添加堆栈信息
-        if record.levelno >= logging.ERROR:
-            tb = traceback.extract_stack()
-            # 获取调用日志的文件名和行号
-            filename, line_no, func_name, _ = tb[-2]
-            location_info = f"[{os.path.basename(filename)}:{line_no}] "
-        else:
-            location_info = ""
-        
-        # 设置基本格式
-        record.msg = f"{location_info}{original_msg}\n{separator}" if separator else f"{location_info}{original_msg}"
-        
-        # 调用父类的 format 方法
-        return super().format(record)
-
-# 创建处理器并设置格式化器
-handler = StreamHandler()
-handler.setFormatter(CustomFormatter(
-    fmt='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-))
-
-# 配置根日志记录器
-root_logger = logging.getLogger()
-# 移除所有现有的处理器
-for h in root_logger.handlers[:]:
-    root_logger.removeHandler(h)
-root_logger.addHandler(handler)
-root_logger.setLevel(logging.INFO)
-
-# 配置应用日志记录器
-logger.setLevel(logging.INFO)
-
-# 自定义日志格式
-def log_separator(length=80):
-    return "-" * length
-
-class CustomLogger:
-    @staticmethod
-    def request(method, path, data=None):
-        separator = f"""请求详情:
-方法: {method}
-路径: {path}
-数据: {json.dumps(data, ensure_ascii=False, indent=2) if data else 'None'}
-{log_separator()}"""
-        
-        logger.info(
-            "收到请求",
-            extra={'separator': separator}
-        )
-
-    @staticmethod
-    def chat_completion(query, docs_count, context):
-        separator = f"""查询详情:
-用户问题: {query}
-找到文档数: {docs_count}
-
-相关文档内容:
-{context}
-{log_separator()}"""
-        
-        logger.info(
-            "处理聊天请求",
-            extra={'separator': separator}
-        )
-
-    @staticmethod
-    def response_complete(query, full_response):
-        separator = f"""响应详情:
-用户问题: {query}
-完整响应:
-{full_response}
-{log_separator()}"""
-        
-        logger.info(
-            "生成响应完成",
-            extra={'separator': separator}
-        )
+# 导入自定义模块
+from utils.logger_utils import setup_logger, CustomLogger
+from utils.file_utils import ALLOWED_EXTENSIONS
+from routes.upload_routes import register_upload_routes
+from routes.chat_routes import register_chat_routes
+from routes.doc_chat_routes import register_doc_chat_routes
 
 # 加载环境变量
 load_dotenv()
-if os.getenv('ARK_API_KEY'):
-    logger.info("ARK_API_KEY 已配置")
-else:
-    logger.warning("ARK_API_KEY 未配置")
+
+# 配置日志
+logger = setup_logger()
+
+# 创建应用
 app = Flask(__name__)
-# 配置 CORS，明确指定允许的方法和头部
+
+# 配置 CORS
 CORS(app, 
     resources={
         r"/*": {
@@ -145,7 +66,6 @@ app.wsgi_app = ProxyFix(
 
 # 配置文件上传
 UPLOAD_FOLDER = './documents'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # 确保上传目录存在
@@ -162,96 +82,64 @@ def allowed_file(filename):
 # 全局变量
 doc_store = None
 
+def init_doc_store():
+    """初始化全局DocumentStore实例"""
+    global doc_store
+    api_key = os.getenv('ARK_API_KEY', '')
+    base_url = os.getenv('ARK_BASE_URL', '')
+    model_name = os.getenv('ARK_EMBEDDING_MODEL', '')
+    
+    if api_key:
+        logger.info(f"ARK_API_KEY 已配置，使用嵌入模型: {model_name}")
+        doc_store = DocumentStore(
+            api_key=api_key,
+            base_url=base_url,
+            model_name=model_name
+        )
+    else:
+        logger.warning("ARK_API_KEY 未配置")
+
 def update_doc_store(api_key, base_url, model_name):
     """更新全局DocumentStore实例的配置"""
     global doc_store
+    logger.info(f"更新DocumentStore配置，使用嵌入模型: {model_name}")
     doc_store = DocumentStore(
         api_key=api_key,
         base_url=base_url,
         model_name=model_name
     )
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    logger.info("开始处理文件上传请求")
-    if 'documents' not in request.files:
-        logger.error("请求中未包含文件")
-        return jsonify({'error': 'No file part'}), 400
+# 注册路由
+def register_routes():
+    # 注册上传相关路由
+    register_upload_routes(app, doc_store, UPLOAD_FOLDER)
     
-    # 获取embedding相关参数
-    embedding_base_url = request.form.get('embedding_base_url', '默认的embedding_base_url')
-    embedding_api_key = request.form.get('embedding_api_key', '默认的embedding_api_key') 
-    embedding_model_name = request.form.get('embedding_model_name', '默认的embedding_model_name')
-    sensitive_info_protected = request.form.get('sensitive_info_protected', 'false') == 'true'
-    logger.info(f"接收到的embedding配置 - model: {embedding_model_name}, base_url: {embedding_base_url}")
-    logger.info(f"敏感信息保护: {'启用' if sensitive_info_protected else '禁用'}")
-
-    # 更新全局DocumentStore实例
-    try:
-        update_doc_store(
-            api_key=embedding_api_key,
-            base_url=embedding_base_url,
-            model_name=embedding_model_name
-        )
-        logger.info("DocumentStore实例更新成功")
-    except Exception as e:
-        logger.error(f"更新DocumentStore实例失败: {str(e)}")
-        return jsonify({'error': '配置更新失败'}), 500
+    # 注册聊天相关路由
+    register_chat_routes(app)
     
-    file = request.files['documents']
-    if file.filename == '':
-        logger.error("未选择文件")
-        return jsonify({'error': 'No selected file'}), 400
+    # 注册文档聊天相关路由
+    register_doc_chat_routes(app, doc_store)
     
-    if file and allowed_file(file.filename):
+    # 测试端点
+    @app.route('/api/test')
+    def test():
+        """测试端点"""
         try:
-            filename = secure_filename(file.filename)
-            # 检查文件名是否包含_masked后缀，这表明它是经过掩码处理的
-            is_masked_file = '_masked.' in filename
-            logger.info(f"接收到的文件: {filename}, 是否为掩码处理后的文件: {is_masked_file}")
-            
-            # 读取文件内容并检查
-            file_content = file.read().decode('utf-8', errors='ignore')
-            file_size = len(file_content)
-            content_preview = file_content[:200] + '...' if len(file_content) > 200 else file_content
-            logger.info(f"文件内容预览: {content_preview}")
-            
-            # 检查是否包含手机号码
-            phone_pattern = re.compile(r'\b1\d{10}\b')
-            phone_matches = phone_pattern.findall(file_content)
-            if phone_matches:
-                logger.warning(f"文件中包含未掩码的手机号码: {phone_matches[:3]}")
-                if sensitive_info_protected:
-                    logger.error("警告：敏感信息保护已启用，但文件中仍包含未掩码的手机号码")
-            
-            # 重置文件指针
-            file.seek(0)
-            
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            logger.info(f"准备保存文件: {filename}, 大小: {file_size} bytes")
-            file.save(file_path)
-            logger.info(f"文件已保存到: {file_path}")
-            
-            # 使用全局doc_store处理文件
-            logger.info("开始处理文件...")
-            result = doc_store.process_single_file(file_path)
-            if result['success']:
-                logger.info(f"文件处理成功, document_id: {result['document_id']}")
-                return jsonify({
-                    'message': '文件上传并处理成功',
-                    'document_id': result['document_id']
-                })
-            else:
-                logger.error("文件处理失败")
-                return jsonify({'error': '文件处理失败'}), 500
-            
+            return jsonify({
+                'status': 'ok',
+                'message': 'Flask 服务器正在运行',
+                'version': '1.0.0',
+                'env': os.getenv('NODE_ENV', 'development'),
+                'ark_api': '已配置' if os.getenv('ARK_API_KEY') else '未配置'
+            })
         except Exception as e:
-            logger.error(f"文件上传处理过程出错: {str(e)}\n{traceback.format_exc()}")
-            return jsonify({'error': str(e)}), 500
-    else:
-        logger.error(f"不支持的文件类型: {file.filename}")
-        return jsonify({'error': '不支持的文件类型'}), 400
+            logger.error(f"测试端点错误: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 500
 
+# 请求前处理
 @app.before_request
 def log_request_info():
     # 记录请求信息，包括客户端 IP
@@ -260,301 +148,6 @@ def log_request_info():
     if request.path != '/api/test':  # 忽略测试端点的日志
         logger.info(f"收到请求: {request.method} {request.path}")
 
-@app.route('/api/chat', methods=['POST', 'OPTIONS'])
-def chat():
-    # 定义响应头
-    headers = {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no'  # 禁用 Nginx 缓冲
-    }
-
-    # 处理 OPTIONS 预检请求
-    if request.method == 'OPTIONS':
-        logger.debug("处理 OPTIONS 请求")
-        return ('', 204, headers)
-
-    try:
-        data = request.json
-        logger.info(f"收到的请求数据: {json.dumps(data, ensure_ascii=False)}")
-        
-        if not data:
-            raise ValueError("请求体为空")
-        
-        if 'messages' not in data:
-            raise ValueError("缺少必需的 'messages' 字段")
-        
-        messages = data['messages']
-        if not isinstance(messages, list):
-            raise ValueError("'messages' 必须是一个数组")
-        
-        if not messages:
-            raise ValueError("'messages' 数组不能为空")
-
-        base_url = data.get('base_url', '默认的base_url')
-        api_key = data.get('api_key', '默认的api_key')
-        model_name = data.get('model_name', '默认的model_name')
-        is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
-        is_web_search = data.get('web_search', False)  # 获取联网搜索标志
-
-        logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}, 联网搜索: {'开启' if is_web_search else '关闭'}")
-
-        # 如果启用了联网搜索，获取web搜索结果
-        if is_web_search:
-            cur_date = datetime.now().strftime("%Y-%m-%d")
-            user_query = messages[-1]['content']
-            # 使用事件循环运行异步函数
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            web_search_results, search_results_str, search_result_urls = loop.run_until_complete(get_web_kg(user_query))
-            loop.close()
-            
-            # 将web搜索结果添加到用户消息中
-            if is_chinese(user_query):
-                web_context = search_answer_zh_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
-            else:
-                web_context = search_answer_en_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
-
-            messages[-1]['content'] = web_context
-            logger.info(f"添加了联网搜索结果: {web_context}")
-            logger.info(f"添加了联网搜索结果urls: {search_result_urls}")
-        #print(messages)
-        if is_deep_research:
-            # 使用 JinaChatAPI 进行深度研究
-            chat = JinaChatAPI()
-            response = chat.stream_chat(messages)
-        else:
-            # 使用 OpenAI API 进行普通对话
-            client = OpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                stream=True
-            )
-
-        def generate():
-            full_response = []
-            try:
-                #print(response)
-                for chunk in response:
-                    logger.debug("收到 chunk: %s", chunk)
-                    if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                        if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                            content = chunk.choices[0].delta.reasoning_content
-                            yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
-                            full_response.append(content)
-                        elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                            content = chunk.choices[0].delta.content
-                            yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n".encode('utf-8')
-                            full_response.append(content)
-                    else:
-                        logger.error("收到 chunk 中没有 choices 字段")
-                if is_web_search:
-                    yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\n\n相关网页链接：{search_result_urls}\n'}}]})}\n\n".encode('utf-8')
-
-                yield b"data: [DONE]\n\n"
-                CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
-            except Exception as e:
-                logger.error("生成响应流时出错: %s", str(e))
-                yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
-                yield b"data: [DONE]\n\n"
-
-        return Response(
-            stream_with_context(generate()),
-            mimetype='text/event-stream',
-            headers=headers,
-            direct_passthrough=True
-        )
-    except Exception as e:
-        error_msg = f"处理请求时出错: {str(e)}"
-        logger.error(error_msg)
-        return jsonify({'error': error_msg}), 500, headers
-
-@app.route('/api/chat_with_doc', methods=['POST', 'OPTIONS'])
-def chat_with_doc():
-    headers = {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no'  # 禁用 Nginx 缓冲
-    }
-
-    # 处理 OPTIONS 预检请求
-    if request.method == 'OPTIONS':
-        logger.debug("处理 OPTIONS 请求")
-        return ('', 204, headers)
-
-    try:
-        data = request.json
-        CustomLogger.request(request.method, request.path, data)
-        
-        # 检查必要参数
-        required_params = ['messages', 'base_url', 'api_key', 'model_name', 
-                         'embedding_base_url', 'embedding_api_key', 'embedding_model_name']
-        for param in required_params:
-            if not data.get(param):
-                raise ValueError(f'Missing required parameter: {param}')
-        
-        messages = data['messages']
-        base_url = data['base_url']
-        api_key = data['api_key']
-        model_name = data['model_name']
-        embedding_base_url = data['embedding_base_url']
-        embedding_api_key = data['embedding_api_key']
-        embedding_model_name = data['embedding_model_name']
-        document_ids = data.get('document_ids', [])  # 获取document_ids参数作为列表
-        # 兼容旧版本，如果提供了单个document_id，将其添加到document_ids列表中
-        if data.get('document_id') and data.get('document_id') not in document_ids:
-            document_ids.append(data.get('document_id'))
-        
-        is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
-        is_web_search = data.get('web_search', False)  # 获取联网搜索标志
-        
-        # 打印调试信息
-        logger.info("收到的参数:")
-        logger.info(f"base_url: {base_url}")
-        logger.info(f"api_key: {api_key[:5]}***") # 只显示前5位
-        logger.info(f"model_name: {model_name}")
-        logger.info(f"embedding_base_url: {embedding_base_url}")
-        logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
-        logger.info(f"embedding_model_name: {embedding_model_name}")
-        logger.info(f"document_ids: {document_ids}")
-        logger.info(f"消息数量: {len(messages)}")
-        logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
-        logger.info(f"联网搜索: {'开启' if is_web_search else '关闭'}")
-        
-        # 如果启用了联网搜索，获取web搜索结果
-        if is_web_search:
-            cur_date = datetime.now().strftime("%Y-%m-%d")
-            user_query = messages[-1]['content']
-            # 使用事件循环运行异步函数
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            web_search_results, search_results_str, search_result_urls_str = loop.run_until_complete(get_web_kg(user_query))
-            loop.close()
-            
-            # 将web搜索结果添加到用户消息中
-            if is_chinese(user_query):
-                web_context = search_answer_zh_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
-            else:
-                web_context = search_answer_en_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
-            
-            messages[-1]['content'] = web_context
-            logger.info(f"添加了联网搜索结果: {web_context}")
-
-        # 检查doc_store是否为None，如果是则重新初始化
-        global doc_store
-        if doc_store is None:
-            logger.info("doc_store为空，重新初始化...")
-            update_doc_store(
-                api_key=embedding_api_key,
-                base_url=embedding_base_url,
-                model_name=embedding_model_name
-            )
-        
-        # 获取用户最新的问题
-        user_query = messages[-1]['content']
-        logger.info(f"用户问题: {user_query}")
-        
-        # 获取相关文档内容
-        context = ""
-        if document_ids:
-            # 如果提供了文档ID列表，则在这些文档中搜索
-            logger.info(f"在指定的 {len(document_ids)} 个文档中搜索相关内容")
-            for doc_id in document_ids:
-                logger.info(f"搜索文档: {doc_id}")
-                try:
-                    # 在每个文档中搜索相关内容
-                    docs = doc_store.search(user_query, k=5, document_id=doc_id)
-                    if docs:
-                        # 将每个文档的搜索结果添加到上下文中
-                        doc_context = "\n\n".join([doc.page_content for doc in docs])
-                        context += f"\n\n文档 {doc_id} 的相关内容:\n{doc_context}"
-                        logger.info(f"在文档 {doc_id} 中找到 {len(docs)} 个相关片段")
-                    else:
-                        logger.warning(f"在文档 {doc_id} 中未找到相关内容")
-                except Exception as e:
-                    logger.error(f"搜索文档 {doc_id} 时出错: {str(e)}")
-        else:
-            # 如果没有提供文档ID，则在所有文档中搜索
-            logger.info("在所有文档中搜索相关内容")
-            docs = doc_store.search(user_query, k=5)
-            context = "\n\n".join([doc.page_content for doc in docs])
-            logger.info(f"找到 {len(docs)} 个相关片段")
-        
-        # 如果没有找到相关内容，记录警告
-        if not context.strip():
-            logger.warning("未找到相关文档内容")
-            context = "未找到相关文档内容。"
-        
-        # 记录聊天完成信息
-        CustomLogger.chat_completion(user_query, len(context.split("\n")), context)
-        
-        # 构建系统消息
-        system_message = {
-            "role": "system",
-            "content": f"""你是一个智能助手，可以回答用户关于文档的问题。
-请基于以下文档内容回答用户的问题。如果文档内容中没有相关信息，请诚实地告诉用户你不知道，不要编造答案。
-
-文档内容:
-{context}
-
-请注意:
-1. 回答要简洁明了，直接基于文档内容回答问题
-2. 如果文档内容不足以回答问题，请明确告知用户
-3. 不要在回答中包含"根据文档内容"、"文档中提到"等词语
-4. 如果用户问题与文档无关，请礼貌地将话题引导回文档内容"""
-        }
-        
-        # 构建请求消息
-        request_messages = [system_message]
-        for msg in messages[1:]:  # 跳过原始系统消息
-            request_messages.append(msg)
-        
-        # 创建客户端
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-        
-        # 发送请求
-        logger.info(f"发送请求到模型: {model_name}")
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[m for m in request_messages],
-            stream=True,
-            temperature=0.7,
-        )
-        
-        # 返回流式响应
-        @stream_with_context
-        def generate():
-            full_response = ""
-            for chunk in response:
-                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    full_response += content
-                    yield f"data: {json.dumps({'content': content, 'done': False})}\n\n"
-            
-            # 记录完整响应
-            CustomLogger.response_complete(user_query, full_response)
-            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-        
-        return Response(
-            generate(),
-            mimetype='text/event-stream',
-            headers=headers,
-            direct_passthrough=True
-        )
-    except Exception as e:
-        error_msg = f"处理请求时出错: {str(e)}"
-        logger.error(error_msg)
-        return jsonify({'error': error_msg}), 500, headers
-
 @app.errorhandler(Exception)
 def handle_error(error):
     print(f"错误: {str(error)}")
@@ -562,35 +155,6 @@ def handle_error(error):
         "error": str(error),
         "type": type(error).__name__
     }), getattr(error, 'code', 500)
-
-@app.route('/api/test')
-def test():
-    """测试端点"""
-    try:
-        return jsonify({
-            'status': 'ok',
-            'message': 'Flask 服务器正在运行',
-            'version': '1.0.0',
-            'env': os.getenv('NODE_ENV', 'development'),
-            'ark_api': '已配置' if os.getenv('ARK_API_KEY') else '未配置'
-        })
-    except Exception as e:
-        logger.error(f"测试端点错误: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-def get_local_ip():
-    """获取本机局域网 IP 地址"""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
 
 @app.after_request
 def after_request(response):
@@ -631,11 +195,35 @@ def update_searx_instances():
 def scheduled_update_searx_instances():
     update_searx_instances()
 
-# 启动调度器
-scheduler.start()
+# 获取本机局域网 IP 地址
+def get_local_ip():
+    """获取本机局域网 IP 地址"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
+# 应用初始化
+def init_app():
+    # 初始化DocumentStore
+    init_doc_store()
+    
+    # 注册路由
+    register_routes()
+    
+    # 启动调度器
+    scheduler.start()
+
+# 主函数
 if __name__ == '__main__':
-    print(os.environ.get('PORT'))
+    # 初始化应用
+    init_app()
+    
+    # 启动服务器
     port = int(os.environ.get('PORT', 5001))
     app.run(
         host='0.0.0.0',
