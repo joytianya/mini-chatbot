@@ -309,7 +309,7 @@ const MessageBubble = ({
                 {/* 重试按钮 - 仅对 AI 消息显示 */}
                 {!isUser && onRetry && (
                   <button
-                    onClick={() => onRetry(isWebSearch)}  // 传递联网搜索状态
+                    onClick={() => onRetry()}  // 传递联网搜索状态
                     style={{
                       border: 'none',
                       background: 'none',
