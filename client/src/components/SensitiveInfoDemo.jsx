@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { maskSensitiveInfo, unmaskSensitiveInfo, getSensitiveInfoMap, clearSensitiveInfoMap } from '../utils/SensitiveInfoMasker';
+import { debounce } from 'lodash';
 
 const SensitiveInfoDemo = ({ darkMode }) => {
   const [originalText, setOriginalText] = useState(
@@ -48,10 +49,26 @@ MS Office-熟练    产品经理-熟练    游戏策划-熟练    文案策划-�
     setSensitiveMap(getSensitiveInfoMap());
   };
 
-  const handleUnmask = () => {
-    const unmasked = unmaskSensitiveInfo(maskedText);
+  const handleUnmask = useCallback(() => {
+    if (!maskedText) {
+      console.log('无需反映射：掩码文本为空');
+      return;
+    }
+    console.log('执行反映射操作，掩码文本长度:', maskedText.length);
+    console.log('当前映射表大小:', Object.keys(sensitiveMap).length);
+    
+    const unmasked = unmaskSensitiveInfo(maskedText, sensitiveMap);
+    console.log('反映射完成，结果长度:', unmasked.length);
+    
     setOriginalText(unmasked);
-  };
+    setMaskedText('');
+  }, [maskedText, sensitiveMap]);
+
+  // 使用防抖包装handleUnmask函数
+  const debouncedHandleUnmask = useMemo(
+    () => debounce(handleUnmask, 300),
+    [maskedText, sensitiveMap, handleUnmask]
+  );
 
   return (
     <div style={{
@@ -201,4 +218,4 @@ MS Office-熟练    产品经理-熟练    游戏策划-熟练    文案策划-�
   );
 };
 
-export default SensitiveInfoDemo; 
+export default SensitiveInfoDemo;

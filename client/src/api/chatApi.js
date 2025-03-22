@@ -17,8 +17,25 @@ export const sendChatRequest = async (message, requestMessages, currentTurns, se
     ensureGlobalMapExists();
     console.log('保持全局敏感信息映射表，当前条目数:', Object.keys(window.currentSensitiveInfoMap || {}).length);
     
+    // 保存原始消息内容
+    const originalMessage = message;
+    
     // 掩码处理消息
     processedMessage = maskSensitiveInfo(message);
+    
+    // 如果消息被掩码处理了，保存原始内容
+    if (processedMessage !== message) {
+      requestMessages.push({
+        role: 'user',
+        content: processedMessage,
+        originalContent: originalMessage
+      });
+    } else {
+      requestMessages.push({
+        role: 'user',
+        content: message
+      });
+    }
     
     // 获取并保存当前查询的敏感信息映射
     const queryMap = getSensitiveInfoMap();
@@ -28,6 +45,22 @@ export const sendChatRequest = async (message, requestMessages, currentTurns, se
       // 将新的敏感信息映射合并到全局映射表中
       updateGlobalSensitiveInfoMap(queryMap);
       console.log('更新后全局映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
+      
+      // 保存查询映射到localStorage
+      const queryMappings = JSON.parse(localStorage.getItem('querySensitiveMappings') || '{}');
+      const queryId = Date.now().toString();
+      queryMappings[queryId] = queryMap;
+      localStorage.setItem('querySensitiveMappings', JSON.stringify(queryMappings));
+      
+      // 将当前查询ID与所有文档ID关联
+      const docQueryMap = JSON.parse(localStorage.getItem('documentQueryMap') || '{}');
+      docIds.forEach(docId => {
+        if (!docQueryMap[docId]) {
+          docQueryMap[docId] = [];
+        }
+        docQueryMap[docId].push(queryId);
+      });
+      localStorage.setItem('documentQueryMap', JSON.stringify(docQueryMap));
     }
   }
 
@@ -104,8 +137,25 @@ export const sendDocumentChatRequest = async (message, documentIds, requestMessa
     ensureGlobalMapExists();
     console.log('保持全局敏感信息映射表，当前条目数:', Object.keys(window.currentSensitiveInfoMap || {}).length);
     
+    // 保存原始消息内容
+    const originalMessage = message;
+    
     // 掩码处理消息
     processedMessage = maskSensitiveInfo(message);
+    
+    // 如果消息被掩码处理了，保存原始内容
+    if (processedMessage !== message) {
+      requestMessages.push({
+        role: 'user',
+        content: processedMessage,
+        originalContent: originalMessage
+      });
+    } else {
+      requestMessages.push({
+        role: 'user',
+        content: message
+      });
+    }
     
     // 获取并保存当前查询的敏感信息映射
     const queryMap = getSensitiveInfoMap();
@@ -132,6 +182,11 @@ export const sendDocumentChatRequest = async (message, documentIds, requestMessa
       });
       localStorage.setItem('documentQueryMap', JSON.stringify(docQueryMap));
     }
+  } else {
+    requestMessages.push({
+      role: 'user',
+      content: message
+    });
   }
   
   // 处理历史消息中的敏感信息

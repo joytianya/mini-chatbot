@@ -473,7 +473,11 @@ export const maskSensitiveInfo = (text, sessionHash) => {
  * @returns {string} 反映射后的文本
  */
 export const unmaskSensitiveInfo = (text, sensitiveInfoMap = {}, sessionHash) => {
-  console.log('调用 unmaskSensitiveInfo 函数');
+  console.log('调用 unmaskSensitiveInfo 函数', {
+    textLength: text ? text.length : 0,
+    mapSize: Object.keys(sensitiveInfoMap).length,
+    sessionHash
+  });
   
   if (!text) {
     console.log('文本为空，无需反映射');
@@ -856,4 +860,4 @@ export const processSensitiveFile = async (file) => {
       reject(new Error(`不支持处理 ${file.type || '未知'} 类型的文件。只能处理文本类型的文件和PDF文件。`));
     }
   });
-}; 
+};

@@ -30,38 +30,46 @@ const SensitiveMessageWrapper = ({ message, isHighlighted, sensitiveInfoProtecti
       if (contentHasMasks) {
         // 如果要显示原始掩码内容
         if (showOriginal) {
-          return message.content;
+          return message.originalContent || message.content;
         }
         
-        // 否则尝试反映射
+        // 如果已经有原始内容，直接返回
+        if (message.originalContent) {
+          return message.originalContent;
+        }
         
-        // 首先尝试使用消息自带的映射表
+        // 使用缓存的反映射结果
+        if (message.unmappedContent) {
+          return message.unmappedContent;
+        }
+        
+        // 尝试反映射，优先使用消息自带的映射表
+        let result = message.content;
         if (message.sensitiveMap && Object.keys(message.sensitiveMap).length > 0) {
-          // 直接使用unmaskSensitiveInfo函数，它会自动尝试从所有文档的映射表中查找缺失的映射
-          const result = unmaskSensitiveInfo(message.content, message.sensitiveMap);
-          return result;
-        } 
-        // 如果消息没有自带映射表，但有会话哈希值，尝试使用会话映射表
-        else if (sessionHash && window.currentSensitiveInfoMap && window.currentSensitiveInfoMap[sessionHash]) {
-          const sessionMap = window.currentSensitiveInfoMap[sessionHash];
-          
-          // 使用会话映射表进行反映射
-          const result = unmaskSensitiveInfo(message.content, sessionMap);
-          return result;
+          result = unmaskSensitiveInfo(message.content, message.sensitiveMap, sessionHash);
         }
-        // 如果消息没有自带映射表，也没有会话映射表，直接使用unmaskSensitiveInfo函数
-        else {
-          // 直接使用unmaskSensitiveInfo函数，它会自动尝试从所有文档的映射表中查找匹配的映射
-          const result = unmaskSensitiveInfo(message.content);
-          return result;
+        
+        // 如果消息自带映射表未能反映射，尝试使用会话映射表
+        if (result === message.content && sessionHash && window.currentSensitiveInfoMap && window.currentSensitiveInfoMap[sessionHash]) {
+          result = unmaskSensitiveInfo(message.content, window.currentSensitiveInfoMap[sessionHash], sessionHash);
         }
-      } else {
-        return message.content;
+        
+        // 如果会话映射表未能反映射，尝试使用全局映射表
+        if (result === message.content) {
+          result = unmaskSensitiveInfo(message.content, {}, sessionHash);
+        }
+        
+        // 缓存反映射结果
+        message.unmappedContent = result;
+        return result;
       }
+      
+      // 如果没有掩码标识符，返回原始内容
+      return message.originalContent || message.content;
     }
     
-    // 默认情况下，直接返回消息内容
-    return message.content;
+    // 默认情况下，返回原始内容或消息内容
+    return message.originalContent || message.content;
   };
   
   // 获取处理后的消息对象

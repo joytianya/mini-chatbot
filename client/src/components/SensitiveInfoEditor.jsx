@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { maskSensitiveInfo, unmaskSensitiveInfo, getSensitiveInfoMap, clearSensitiveInfoMap } from '../utils/SensitiveInfoMasker';
+import { toast } from 'react-toastify';
 import { serverURL } from '../Config';
 
 const SensitiveInfoEditor = ({ 
@@ -23,263 +24,202 @@ const SensitiveInfoEditor = ({
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState(null);
   
+  // 使用 useRef 标记组件是否已经初始化过
+  const hasInitialized = useRef(false);
+  
   // 使用 useRef 来存储回调函数，避免不必要的重新渲染
   const callbacks = useRef({ onFocus, onBlur }).current;
   
-  // 使用 useRef 来跟踪组件是否已经加载过文件
-  const hasLoadedRef = useRef(false);
-  
-  // 文件加载逻辑
-  useEffect(() => {
-    // 如果已经加载过，且没有新的文件，则跳过
-    if (hasLoadedRef.current && !originalFile && !processedFile) {
-      return;
+  // 读取文件内容为文本
+  const readFileContent = async (file) => {
+    if (!file) {
+      return null;
     }
     
-    const loadFileContents = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      console.log('开始加载文件内容...', {
-        hasOriginalFile: !!originalFile,
-        originalFileName: originalFile?.name,
-        hasProcessedFile: !!processedFile,
-        processedFileName: processedFile?.name,
-        hasSensitiveMap: !!sensitiveMap,
-        sensitiveMapSize: sensitiveMap ? Object.keys(sensitiveMap).length : 0,
-        originalFileType: originalFile ? typeof originalFile : 'undefined'
+    // 如果是字符串，直接返回
+    if (typeof file === 'string') {
+      return file;
+    }
+    
+    // 如果是包含content属性的对象
+    if (file.content) {
+      return file.content;
+    }
+    
+    // 如果是File对象
+    if (file instanceof File) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('读取文件失败'));
+        reader.readAsText(file);
       });
+    }
+    
+    return null;
+  };
+  
+  // 初始化编辑器内容 - 只在组件挂载时执行一次
+  useEffect(() => {
+    // 防止重复初始化
+    if (hasInitialized.current) return;
+    
+    const initializeEditor = async () => {
+      setIsLoading(true);
       
       try {
-        // 处理直接从上传回调传递的文件信息
-        if (!originalFile && !processedFile && sensitiveMap) {
-          console.log('检测到只有敏感信息映射，尝试从localStorage加载文件内容');
-          
-          // 显示敏感信息映射
-          setCurrentSensitiveMap(sensitiveMap);
-          
-          // 如果没有文件但有敏感信息映射，可以显示映射内容
-          setOriginalText('原始文件内容不可用');
-          setMaskedText('掩码后文件内容不可用');
-          setEditedText('掩码后文件内容不可用');
-          return;
-        }
-        
-        // 如果没有提供任何文件，显示空编辑器
-        if (!originalFile && !processedFile) {
-          console.log('没有提供任何文件，显示空编辑器');
-          setOriginalText('');
-          setMaskedText('');
-          setEditedText('');
-          setCurrentSensitiveMap({});
-          return;
-        }
-        
-        // 处理文件信息
-        let fileInfo = null;
-        
-        // 检查原始文件的格式
-        if (Array.isArray(originalFile)) {
-          console.log('originalFile 是数组格式');
-          if (originalFile.length > 0) {
-            fileInfo = { 
-              originalFile: originalFile[0],
-              processedFile,
-              sensitiveMap
-            };
-          }
-        } else if (originalFile && originalFile instanceof File) {
-          console.log('originalFile 是 File 对象');
-          fileInfo = { 
-            originalFile,
-            processedFile,
-            sensitiveMap
-          };
-        } else if (originalFile && typeof originalFile === 'object') {
-          console.log('originalFile 是对象格式');
-          if (originalFile.originalFile) {
-            fileInfo = originalFile;
-          } else {
-            fileInfo = { originalFile, processedFile, sensitiveMap };
-          }
-        }
-
-        console.log('解析后的文件信息:', {
-          hasFileInfo: !!fileInfo,
-          originalFile: fileInfo?.originalFile?.name,
-          processedFile: fileInfo?.processedFile?.name,
-          sensitiveMapSize: fileInfo?.sensitiveMap ? Object.keys(fileInfo.sensitiveMap).length : 0
+        console.log('初始化敏感信息编辑器...', {
+          hasOriginalFile: !!originalFile,
+          hasProcessedFile: !!processedFile,
+          hasSensitiveMap: !!sensitiveMap && Object.keys(sensitiveMap).length > 0,
+          originalFileType: originalFile ? typeof originalFile : 'null',
+          processedFileType: processedFile ? typeof processedFile : 'null'
         });
-
-        // 验证文件信息
-        if (!fileInfo) {
-          setError('无法解析文件信息，请检查文件格式');
-          return;
-        }
-
-        // 如果没有原始文件，但有处理后的文件和敏感信息映射
-        if ((!fileInfo.originalFile || !(fileInfo.originalFile instanceof File)) && 
-            fileInfo.processedFile && fileInfo.sensitiveMap) {
-          console.log('没有原始文件，但有处理后文件和敏感信息映射');
-          
-          // 读取处理后的文件内容
-          let maskedContent = '';
-          if (fileInfo.processedFile instanceof File) {
-            maskedContent = await readFileAsText(fileInfo.processedFile);
-          } else if (typeof fileInfo.processedFile === 'string') {
-            maskedContent = fileInfo.processedFile;
-          }
-          
-          setMaskedText(maskedContent);
-          setEditedText(maskedContent);
-          
-          // 尝试使用敏感信息映射还原原始内容
-          try {
-            const originalContent = unmaskSensitiveInfo(maskedContent, fileInfo.sensitiveMap);
-            setOriginalText(originalContent);
-          } catch (error) {
-            console.error('还原原始内容时出错:', error);
-            setOriginalText('无法还原原始内容');
-          }
-          
-          // 设置敏感信息映射
-          setCurrentSensitiveMap(fileInfo.sensitiveMap);
-          return;
-        }
-
-        if (!fileInfo.originalFile || !(fileInfo.originalFile instanceof File)) {
-          setError('原始文件格式无效或未提供');
-          return;
-        }
-
-        // 读取原始文件内容
-        const originalContent = await readFileAsText(fileInfo.originalFile);
-        console.log('原始文件内容已加载:', {
-          fileName: fileInfo.originalFile.name,
-          length: originalContent.length,
-          preview: originalContent.substring(0, 100)
-        });
-        setOriginalText(originalContent);
-
-        // 读取或生成掩码后的文件内容
-        let maskedContent;
-        if (fileInfo.processedFile && fileInfo.processedFile instanceof File) {
-          maskedContent = await readFileAsText(fileInfo.processedFile);
-          console.log('使用现有的掩码文件');
-        } else {
-          console.log('生成新的掩码内容');
-          clearSensitiveInfoMap();
-          maskedContent = maskSensitiveInfo(originalContent);
-          const newMap = getSensitiveInfoMap();
-          console.log('生成的敏感信息映射:', {
-            mapSize: Object.keys(newMap).length
+        
+        // 获取原始文件内容
+        if (originalFile) {
+          const content = await readFileContent(originalFile);
+          console.log('读取原始文件结果:', {
+            success: !!content,
+            contentLength: content ? content.length : 0,
+            contentPreview: content ? content.substring(0, 100) : null
           });
-          setCurrentSensitiveMap(newMap);
+          if (content) {
+            setOriginalText(content);
+            console.log('原始文件内容已设置');
+          } else {
+            console.warn('无法获取原始文件内容');
+            setOriginalText('无法获取原始文件内容');
+          }
+        } else {
+          console.log('未提供原始文件');
+          setOriginalText('未提供原始文件');
         }
-
-        setMaskedText(maskedContent);
-        setEditedText(maskedContent);
-
+        
+        // 获取处理后文件内容
+        if (processedFile) {
+          const content = await readFileContent(processedFile);
+          console.log('读取掩码文件结果:', {
+            success: !!content,
+            contentLength: content ? content.length : 0,
+            contentPreview: content ? content.substring(0, 100) : null
+          });
+          if (content) {
+            setMaskedText(content);
+            console.log('掩码文件内容已设置');
+          } else {
+            console.warn('无法获取掩码文件内容');
+            setMaskedText('无法获取掩码文件内容');
+          }
+        } else {
+          // 如果没有掩码后文件但有原始文本，生成掩码
+          if (originalText) {
+            console.log('生成掩码文本...');
+            const masked = maskSensitiveInfo(originalText);
+            setMaskedText(masked);
+            console.log('掩码文本已生成，长度:', masked.length);
+            // 更新敏感信息映射
+            const newMap = getSensitiveInfoMap();
+            console.log('更新敏感信息映射:', {
+              mapSize: Object.keys(newMap).length,
+              sampleKeys: Object.keys(newMap).slice(0, 3)
+            });
+            setCurrentSensitiveMap({...sensitiveMap, ...newMap});
+          } else {
+            console.log('无原始文本，无法生成掩码');
+            setMaskedText('未提供掩码文件');
+          }
+        }
+        
         // 设置敏感信息映射
-        if (fileInfo.sensitiveMap && Object.keys(fileInfo.sensitiveMap).length > 0) {
-          console.log('使用提供的敏感信息映射');
-          setCurrentSensitiveMap(fileInfo.sensitiveMap);
+        if (sensitiveMap && Object.keys(sensitiveMap).length > 0) {
+          setCurrentSensitiveMap(sensitiveMap);
+          console.log('使用提供的敏感信息映射:', {
+            mapSize: Object.keys(sensitiveMap).length,
+            sampleKeys: Object.keys(sensitiveMap).slice(0, 3)
+          });
         }
-
-      } catch (error) {
-        console.error('加载文件内容时出错:', {
-          error: error.message,
-          stack: error.stack,
-          originalFile: originalFile ? {
-            type: typeof originalFile,
-            isArray: Array.isArray(originalFile),
-            isFile: originalFile instanceof File,
-            name: originalFile?.name
-          } : 'undefined'
+      } catch (err) {
+        console.error('初始化编辑器时出错:', err);
+        console.error('错误详情:', {
+          message: err.message,
+          stack: err.stack
         });
-        setError(error.message);
+        setError('初始化编辑器时出错: ' + err.message);
       } finally {
         setIsLoading(false);
-        hasLoadedRef.current = true;
+        hasInitialized.current = true;
+        console.log('编辑器初始化完成');
+        
+        // 通知父组件编辑器已获取焦点
+        onFocus();
       }
     };
     
-    loadFileContents();
-  }, [originalFile, processedFile, sensitiveMap]); // 添加 sensitiveMap 作为依赖项
-
-  // 分离焦点管理逻辑到单独的 useEffect
-  useEffect(() => {
-    if (!hasLoadedRef.current) {
-      console.log('编辑器已挂载，调用 onFocus');
-      setIsEditing(true);
-      callbacks.onFocus();
-      
-      return () => {
-        console.log('编辑器即将卸载，调用 onBlur');
-        setIsEditing(false);
-        callbacks.onBlur();
-      };
-    }
-  }, []); // 空依赖数组，只在挂载和卸载时执行
+    initializeEditor();
+    
+    // 组件卸载时通知父组件
+    return () => {
+      onBlur();
+    };
+  }, []); // 只在组件挂载时执行一次
 
   // 处理文本区域获取焦点
-  const handleTextareaFocus = useCallback((e) => {
+  const handleTextareaFocus = (e) => {
     e.stopPropagation();
     setIsEditing(true);
+    console.log('文本区域获取焦点', {
+      isEditing: true,
+      originalTextLength: originalText.length,
+      maskedTextLength: maskedText.length,
+      currentSensitiveMapSize: Object.keys(currentSensitiveMap).length
+    });
     callbacks.onFocus();
     e.target.focus();
-  }, []);
+  };
 
   // 处理文本区域失去焦点
-  const handleTextareaBlur = useCallback((e) => {
+  const handleTextareaBlur = (e) => {
     e.stopPropagation();
     const activeElement = document.activeElement;
     const editorElement = document.getElementById('sensitive-info-editor');
     
+    console.log('文本区域失去焦点', {
+      activeElement: activeElement?.id || 'unknown',
+      editorContainsFocus: editorElement?.contains(activeElement),
+      isEditing
+    });
+    
     if (editorElement && !editorElement.contains(activeElement)) {
-      console.log('文本区域失去焦点，焦点移出编辑器');
+      console.log('焦点移出编辑器');
       setIsEditing(false);
       callbacks.onBlur();
     } else {
-      console.log('文本区域失去焦点，但焦点仍在编辑器内');
+      console.log('焦点仍在编辑器内');
     }
-  }, []);
+  };
 
   // 处理编辑器区域点击
-  const handleEditorMouseDown = useCallback((e) => {
+  const handleEditorMouseDown = (e) => {
     e.stopPropagation();
+    console.log('编辑器区域被点击', {
+      isEditing,
+      target: e.target.id || e.target.className || 'unknown'
+    });
     if (!isEditing) {
-      console.log('编辑器区域被点击，设置编辑状态');
       setIsEditing(true);
       callbacks.onFocus();
     }
-  }, [isEditing]);
+  };
 
   // 处理编辑器获取焦点
-  const handleEditorFocus = useCallback((e) => {
+  const handleEditorFocus = (e) => {
     e.stopPropagation();
     if (!isEditing) {
       console.log('编辑器获取焦点');
       setIsEditing(true);
       callbacks.onFocus();
     }
-  }, [isEditing]);
-
-  // 读取文件内容为文本
-  const readFileAsText = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        console.log(`文件 ${file.name} 读取成功，内容长度: ${event.target.result.length}`);
-        resolve(event.target.result);
-      };
-      reader.onerror = (error) => {
-        console.error(`文件 ${file.name} 读取失败:`, error);
-        reject(error);
-      };
-      console.log(`开始读取文件 ${file.name}...`);
-      reader.readAsText(file);
-    });
   };
 
   // 重新掩码处理
@@ -294,7 +234,7 @@ const SensitiveInfoEditor = ({
   // 恢复原始掩码文本
   const handleRestore = () => {
     if (processedFile) {
-      readFileAsText(processedFile).then(content => {
+      readFileContent(processedFile).then(content => {
         setMaskedText(content);
         setEditedText(content);
       });
@@ -303,133 +243,78 @@ const SensitiveInfoEditor = ({
 
   // 保存修改后的掩码文本
   const handleSave = async () => {
-    if (!maskedText) {
-      console.error('错误：没有要保存的掩码文本');
+    if (!onSave) {
+      console.warn('未提供保存回调函数');
       return;
     }
     
     setIsSaving(true);
-    console.log('开始保存掩码文本...');
+    console.log('开始保存编辑内容', {
+      originalTextLength: originalText.length,
+      maskedTextLength: maskedText.length,
+      editedTextLength: editedText.length,
+      userEditsCount: Object.keys(userEdits).length,
+      sensitiveMapSize: Object.keys(currentSensitiveMap).length
+    });
     
     try {
-      // 创建新的文件名，添加时间戳
-      const timestamp = new Date().getTime();
-      const fileNameParts = processedFile.name.split('.');
-      const extension = fileNameParts.pop();
-      const baseName = fileNameParts.join('.');
-      const newFileName = `${baseName}_${timestamp}.${extension}`;
+      // 准备保存的数据
+      const saveData = {
+        originalText,
+        maskedText: editedText || maskedText,
+        sensitiveMap: currentSensitiveMap,
+        userEdits
+      };
       
-      console.log('准备保存文件:', {
-        originalName: processedFile.name,
-        newFileName: newFileName,
-        contentLength: maskedText.length
+      console.log('准备保存的数据:', {
+        hasOriginalText: !!saveData.originalText,
+        hasMaskedText: !!saveData.maskedText,
+        sensitiveMapSize: Object.keys(saveData.sensitiveMap).length,
+        userEditsSize: Object.keys(saveData.userEdits).length
       });
       
-      // 创建新的文件对象
-      const blob = new Blob([maskedText], { type: processedFile.type });
-      const newFile = new File([blob], newFileName, { type: processedFile.type });
-      
-      // 创建FormData对象
-      const formData = new FormData();
-      formData.append('documents', newFile);
-      formData.append('sensitive_info_protected', 'true');
-      
-      // 从localStorage获取embedding配置
-      const savedEmbeddingConfigs = localStorage.getItem('embeddingConfigs');
-      const embeddingConfigs = savedEmbeddingConfigs ? JSON.parse(savedEmbeddingConfigs) : [];
-      const embeddingConfig = embeddingConfigs[0];
-      
-      if (embeddingConfig) {
-        console.log('添加embedding配置:', {
-          base_url: embeddingConfig.embedding_base_url ? '已设置' : '未设置',
-          api_key: embeddingConfig.embedding_api_key ? '已设置' : '未设置',
-          model_name: embeddingConfig.embedding_model_name
-        });
-        
-        formData.append('embedding_base_url', embeddingConfig.embedding_base_url || '');
-        formData.append('embedding_api_key', embeddingConfig.embedding_api_key || '');
-        formData.append('embedding_model_name', embeddingConfig.embedding_model_name || '');
-      } else {
-        console.warn('警告：未找到embedding配置');
-      }
-      
-      // 发送请求
-      console.log('发送上传请求...');
-      const response = await fetch(`${serverURL}/upload`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-        mode: 'cors'
+      // 调用保存回调
+      await onSave(saveData);
+      console.log('保存成功');
+      toast.success('保存成功');
+    } catch (err) {
+      console.error('保存失败:', err);
+      console.error('错误详情:', {
+        message: err.message,
+        stack: err.stack
       });
-      
-      const result = await response.json();
-      
-      if (result.document_id) {
-        console.log('文件上传成功:', {
-          document_id: result.document_id,
-          fileName: newFileName
-        });
-        
-        // 保存敏感信息映射到localStorage
-        if (Object.keys(currentSensitiveMap).length > 0) {
-          const mapKey = `sensitiveMap_${newFileName}`;
-          localStorage.setItem(mapKey, JSON.stringify(currentSensitiveMap));
-          console.log('已保存敏感信息映射:', {
-            key: mapKey,
-            mapSize: Object.keys(currentSensitiveMap).length
-          });
-          
-          // 更新全局敏感信息映射表
-          console.log('更新全局敏感信息映射表...');
-          if (typeof window.currentSensitiveInfoMap === 'undefined') {
-            window.currentSensitiveInfoMap = {};
-          }
-          
-          const oldSize = Object.keys(window.currentSensitiveInfoMap).length;
-          window.currentSensitiveInfoMap = {
-            ...window.currentSensitiveInfoMap,
-            ...currentSensitiveMap
-          };
-          const newSize = Object.keys(window.currentSensitiveInfoMap).length;
-          
-          console.log('全局映射表更新完成:', {
-            oldSize,
-            newSize,
-            added: newSize - oldSize
-          });
-          
-          // 保存到localStorage
-          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        }
-        
-        // 调用回调函数，返回文档信息
-        if (onSave) {
-          // 创建与 ChatArea 组件期望的格式一致的文档信息
-          const documentInfo = {
-            id: result.document_id,
-            name: newFileName,
-            sensitiveMap: currentSensitiveMap,
-            type: processedFile.type,
-            size: maskedText.length,
-            // 添加原始文件和处理后文件信息，以便后续编辑
-            originalFile: originalFile,
-            processedFile: newFile,
-            fileHash: result.document_id // 使用文档ID作为文件哈希
-          };
-          
-          console.log('调用保存回调，返回文档信息:', documentInfo);
-          onSave(documentInfo);
-        }
-        
-        alert(`文件已成功保存！\n\n文档ID: ${result.document_id}\n文件名: ${newFileName}`);
-      } else {
-        throw new Error(result.error || '保存失败，未返回文档ID');
-      }
-    } catch (error) {
-      console.error('保存文件时出错:', error);
-      alert(`保存失败: ${error.message}`);
+      toast.error('保存失败: ' + err.message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // 处理文本更新
+  const handleTextUpdate = (text) => {
+    console.log('文本更新', {
+      textLength: text.length,
+      currentMaskedTextLength: maskedText.length,
+      isDifferent: text !== maskedText
+    });
+    
+    if (text !== maskedText) {
+      setEditedText(text);
+      // 更新用户编辑记录
+      const edits = {};
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] !== maskedText[i]) {
+          edits[i] = text[i];
+        }
+      }
+      console.log('检测到文本变化', {
+        editsCount: Object.keys(edits).length,
+        sampleEdits: Object.entries(edits).slice(0, 3)
+      });
+      setUserEdits(edits);
+    } else {
+      console.log('文本未发生变化');
+      setEditedText('');
+      setUserEdits({});
     }
   };
 
@@ -437,11 +322,18 @@ const SensitiveInfoEditor = ({
   if (error) {
     return (
       <div style={{
-        padding: '20px',
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '90%',
+        maxWidth: '1200px',
         backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        color: '#ff4444'
+        padding: '20px',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        color: '#ff4444',
+        zIndex: 1000
       }}>
         <h3>加载错误</h3>
         <p>{error}</p>
@@ -452,7 +344,7 @@ const SensitiveInfoEditor = ({
             backgroundColor: darkMode ? '#444' : '#f0f0f0',
             color: darkMode ? '#fff' : '#333',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '6px',
             cursor: 'pointer'
           }}
         >
@@ -463,246 +355,256 @@ const SensitiveInfoEditor = ({
   }
 
   return (
-    <div 
-      id="sensitive-info-editor"
-      style={{
-        padding: '20px',
-        backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-        borderRadius: '8px',
-        marginBottom: '20px'
-      }}
-      // 使用mousedown事件，阻止事件冒泡
-      onMouseDown={handleEditorMouseDown}
-      // 添加点击事件处理
-      onClick={(e) => {
-        // 阻止事件冒泡
-        e.stopPropagation();
-      }}
-      // 添加焦点事件处理
-      onFocus={handleEditorFocus}
-    >
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+    <div style={{
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '90%',
+      maxWidth: '1200px',
+      height: '80vh',
+      backgroundColor: darkMode ? '#1a1a1a' : '#fff',
+      borderRadius: '12px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '20px'
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '15px'
+        marginBottom: '20px'
       }}>
-        <h2 style={{ 
-          color: darkMode ? '#fff' : '#333',
-          margin: 0
-        }}>敏感信息编辑</h2>
-        
+        <h2 style={{
+          margin: 0,
+          color: darkMode ? '#e0e0e0' : '#333'
+        }}>
+          敏感信息编辑器
+        </h2>
         <button
-          onClick={(e) => {
-            // 阻止事件冒泡
-            e.stopPropagation();
-            setIsEditing(false);
-            if (onBlur) onBlur();
-            onClose();
-          }}
+          onClick={onClose}
           style={{
-            padding: '5px 10px',
-            backgroundColor: darkMode ? '#444' : '#f0f0f0',
-            color: darkMode ? '#fff' : '#333',
+            background: 'none',
             border: 'none',
-            borderRadius: '4px',
+            color: darkMode ? '#e0e0e0' : '#666',
+            cursor: 'pointer',
+            fontSize: '24px'
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: darkMode ? '#e0e0e0' : '#333'
+        }}>
+          <div style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <div>正在加载文件内容...</div>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              border: '5px solid #f3f3f3',
+              borderTop: '5px solid #3498db',
+              borderRadius: '50%',
+              animation: 'spin 2s linear infinite'
+            }}></div>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          gap: '20px',
+          flex: 1,
+          overflow: 'hidden'
+        }}>
+          {/* 左侧：原始文本 */}
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <h3 style={{
+              margin: 0,
+              color: darkMode ? '#e0e0e0' : '#333'
+            }}>
+              原始文本
+            </h3>
+            <pre style={{
+              flex: 1,
+              margin: 0,
+              padding: '12px',
+              backgroundColor: darkMode ? '#2d2d2d' : '#f5f5f5',
+              borderRadius: '8px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              color: darkMode ? '#e0e0e0' : '#333',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.5'
+            }}>
+              {originalText || '原始文件内容不可用'}
+            </pre>
+          </div>
+
+          {/* 右侧：掩码后文本 */}
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <h3 style={{
+              margin: 0,
+              color: darkMode ? '#e0e0e0' : '#333'
+            }}>
+              掩码后文本
+            </h3>
+            <pre style={{
+              flex: 1,
+              margin: 0,
+              padding: '12px',
+              backgroundColor: darkMode ? '#2d2d2d' : '#f5f5f5',
+              borderRadius: '8px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              color: darkMode ? '#e0e0e0' : '#333',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.5'
+            }}>
+              {maskedText || '掩码后文件内容不可用'}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {/* 底部按钮区域 */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '12px',
+        marginTop: '20px'
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            padding: '8px 16px',
+            border: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
+            borderRadius: '6px',
+            backgroundColor: darkMode ? '#2d2d2d' : '#fff',
+            color: darkMode ? '#e0e0e0' : '#666',
             cursor: 'pointer'
           }}
         >
           关闭
         </button>
+        <button
+          onClick={handleSave}
+          style={{
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            backgroundColor: '#1976d2',
+            color: '#fff',
+            cursor: 'pointer'
+          }}
+        >
+          保存
+        </button>
       </div>
-      
-      {isLoading ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '20px',
-          color: darkMode ? '#fff' : '#333'
-        }}>
-          正在加载文件内容...
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ color: darkMode ? '#fff' : '#333' }}>原始文本</h3>
-              <textarea
-                value={originalText}
-                onChange={(e) => setOriginalText(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '300px',
-                  padding: '10px',
-                  borderRadius: '4px',
-                  border: `1px solid ${darkMode ? '#444' : '#ddd'}`,
-                  backgroundColor: darkMode ? '#3d3d3d' : '#f9f9f9',
-                  color: darkMode ? '#fff' : '#333',
-                  resize: 'none',
-                  fontFamily: 'monospace'
-                }}
-                readOnly
-                onFocus={handleTextareaFocus}
-                onBlur={handleTextareaBlur}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            
-            <div style={{ flex: 1 }}>
-              <h3 style={{ color: darkMode ? '#fff' : '#333' }}>掩码后文本</h3>
-              <textarea
-                value={maskedText}
-                onChange={(e) => setMaskedText(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '300px',
-                  padding: '10px',
-                  borderRadius: '4px',
-                  border: `1px solid ${darkMode ? '#444' : '#ddd'}`,
-                  backgroundColor: darkMode ? '#3d3d3d' : '#f9f9f9',
-                  color: darkMode ? '#fff' : '#333',
-                  resize: 'none',
-                  fontFamily: 'monospace'
-                }}
-                onFocus={handleTextareaFocus}
-                onBlur={handleTextareaBlur}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <button
-              onClick={(e) => {
-                // 阻止事件冒泡
-                e.stopPropagation();
-                handleRemask();
-              }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#1976d2',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              重新掩码
-            </button>
-            
-            <button
-              onClick={(e) => {
-                // 阻止事件冒泡
-                e.stopPropagation();
-                handleRestore();
-              }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: darkMode ? '#444' : '#f0f0f0',
-                color: darkMode ? '#fff' : '#333',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              恢复原始掩码
-            </button>
-            
-            <button
-              onClick={(e) => {
-                // 阻止事件冒泡
-                e.stopPropagation();
-                setShowMap(!showMap);
-              }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: darkMode ? '#444' : '#f0f0f0',
-                color: darkMode ? '#fff' : '#333',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              {showMap ? '隐藏敏感信息映射' : '显示敏感信息映射'}
-            </button>
-            
-            <button
-              onClick={(e) => {
-                // 阻止事件冒泡
-                e.stopPropagation();
-                handleSave();
-              }}
-              disabled={isSaving}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: isSaving ? '#999' : '#4CAF50',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isSaving ? 'not-allowed' : 'pointer',
-                marginLeft: 'auto'
-              }}
-            >
-              {isSaving ? '保存中...' : '保存修改'}
-            </button>
-          </div>
-          
-          {showMap && (
-            <div style={{
-              marginTop: '20px',
-              padding: '15px',
-              backgroundColor: darkMode ? '#3d3d3d' : '#f9f9f9',
-              borderRadius: '4px',
-              border: `1px solid ${darkMode ? '#444' : '#ddd'}`,
-            }}>
-              <h3 style={{ color: darkMode ? '#fff' : '#333', marginTop: 0 }}>敏感信息映射</h3>
-              <div style={{
-                maxHeight: '200px',
-                overflowY: 'auto',
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                color: darkMode ? '#fff' : '#333'
-              }}>
-                {Object.keys(currentSensitiveMap).length > 0 ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ 
-                          textAlign: 'left', 
-                          padding: '8px', 
-                          borderBottom: `1px solid ${darkMode ? '#555' : '#ddd'}` 
-                        }}>掩码ID</th>
-                        <th style={{ 
-                          textAlign: 'left', 
-                          padding: '8px', 
-                          borderBottom: `1px solid ${darkMode ? '#555' : '#ddd'}` 
-                        }}>原始值</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(currentSensitiveMap).map(([key, value], index) => (
-                        <tr key={index}>
-                          <td style={{ 
-                            padding: '8px', 
-                            borderBottom: `1px solid ${darkMode ? '#444' : '#eee'}` 
-                          }}>{key}</td>
-                          <td style={{ 
-                            padding: '8px', 
-                            borderBottom: `1px solid ${darkMode ? '#444' : '#eee'}` 
-                          }}>{value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p>没有检测到敏感信息</p>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 };
 
-export default SensitiveInfoEditor; 
+export default SensitiveInfoEditor;
+
+
+  // 处理文件上传
+  const handleFileUpload = async (file) => {
+    console.log('开始处理文件上传', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    });
+    
+    try {
+      const formData = new FormData();
+      formData.append('documents', file);
+      
+      console.log('准备发送文件到服务器');
+      const response = await fetch(`${serverURL}/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('文件上传失败', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`上传失败: ${errorData.error || response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('文件上传成功', {
+        result,
+        documentId: result.document_id
+      });
+      
+      // 读取上传的文件内容
+      const fileContent = await readFileContent(file);
+      console.log('读取上传文件内容', {
+        success: !!fileContent,
+        contentLength: fileContent ? fileContent.length : 0,
+        contentPreview: fileContent ? fileContent.substring(0, 100) : null
+      });
+      
+      if (fileContent) {
+        setOriginalText(fileContent);
+        // 生成掩码文本
+        const masked = maskSensitiveInfo(fileContent);
+        setMaskedText(masked);
+        // 更新敏感信息映射
+        const newMap = getSensitiveInfoMap();
+        setCurrentSensitiveMap(newMap);
+        
+        console.log('文件处理完成', {
+          originalLength: fileContent.length,
+          maskedLength: masked.length,
+          sensitiveMapSize: Object.keys(newMap).length
+        });
+      }
+      
+      return result;
+    } catch (err) {
+      console.error('文件上传处理出错:', err);
+      console.error('错误详情:', {
+        message: err.message,
+        stack: err.stack
+      });
+      throw err;
+    }
+  };

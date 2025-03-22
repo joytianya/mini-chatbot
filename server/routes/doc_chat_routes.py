@@ -46,8 +46,8 @@ def register_doc_chat_routes(app, doc_store):
             embedding_base_url = data['embedding_base_url']
             embedding_api_key = data['embedding_api_key']
             embedding_model_name = data['embedding_model_name']
-            document_ids = data.get('document_ids', [])  # 获取document_ids参数作为列表
-            # 兼容旧版本，如果提供了单个document_id，将其添加到document_ids列表中
+            document_ids = [doc_id for doc_id in data.get('document_ids', []) if doc_id]  # 过滤掉None和空值
+            # 兼容旧版本，如果提供了单个document_id且有效，将其添加到document_ids列表中
             if data.get('document_id') and data.get('document_id') not in document_ids:
                 document_ids.append(data.get('document_id'))
             
@@ -210,4 +210,4 @@ def register_doc_chat_routes(app, doc_store):
         except Exception as e:
             error_msg = f"处理请求时出错: {str(e)}"
             logger.error(error_msg)
-            return jsonify({'error': error_msg}), 500, headers 
+            return jsonify({'error': error_msg}), 500, headers

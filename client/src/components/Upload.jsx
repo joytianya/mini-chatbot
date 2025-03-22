@@ -3,7 +3,7 @@ import { serverURL } from '../Config';
 import { toast } from 'react-toastify';
 import './Upload.css'; // 引入CSS文件
 
-export const Upload = ({ darkMode, onUploadSuccess, sensitiveInfoProtectionEnabled, handleFileUpload, setUploadedFileInfo, handleUploadSuccess }) => {
+export const Upload = ({ darkMode, onUploadSuccess, sensitiveInfoProtectionEnabled, handleFileUpload, setUploadedFileInfo, handleUploadSuccess, setInput }) => {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
@@ -30,6 +30,10 @@ export const Upload = ({ darkMode, onUploadSuccess, sensitiveInfoProtectionEnabl
     for (const file of files) {
       const result = await processFile(file);
       if (result) {
+        // 如果文件处理成功，将文件内容添加到结果中
+        if (result.processedFile && result.processedFile.content) {
+          setInput(result.processedFile.content);
+        }
         processedResults.push(result);
       }
     }
@@ -62,7 +66,13 @@ export const Upload = ({ darkMode, onUploadSuccess, sensitiveInfoProtectionEnabl
       
       // 如果有设置上传文件信息的回调，调用它
       if (setUploadedFileInfo) {
-        setUploadedFileInfo(processedResults);
+        // 确保只传递第一个文件的信息
+        const firstResult = processedResults[0];
+        setUploadedFileInfo({
+          originalFile: firstResult.originalFile,
+          processedFile: firstResult.processedFile,
+          sensitiveMap: firstResult.sensitiveMap || {}
+        });
       }
       
       // 如果有上传成功的回调，调用它

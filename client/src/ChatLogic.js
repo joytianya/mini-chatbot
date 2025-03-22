@@ -1058,126 +1058,45 @@ export const useChatLogic = () => {
 
   // 处理复制
   const handleCopy = async (text) => {
-    if (!text) return;
-    
     try {
-      // 检查是否需要对文本进行反映射处理
       let processedText = text;
       
-      // 查找对应的消息
-      const message = displayMessages.find(msg => msg.content === text);
-      
-      // 如果找到消息且有敏感信息映射，进行反映射
-      if (message && sensitiveInfoProtectionEnabled) {
-        // 如果是用户消息且有原始内容，使用原始内容
-        if (message.role === 'user' && message.originalContent) {
+      // 如果启用了敏感信息保护，尝试获取原始内容
+      if (sensitiveInfoProtectionEnabled) {
+        // 首先检查是否有原始内容
+        if (message.originalContent) {
           processedText = message.originalContent;
         }
-        // 如果是AI消息且有敏感信息映射，进行反映射
-        else if (message.role === 'assistant') {
-          // 如果已经有反映射后的内容，直接使用
-          if (message.originalContent) {
-            processedText = message.originalContent;
-          } 
-          // 如果有敏感信息映射，使用映射进行反映射
-          else if (message.sensitiveMap && Object.keys(message.sensitiveMap).length > 0) {
-            processedText = unmaskSensitiveInfo(message.content, message.sensitiveMap);
-          }
-          // 如果没有映射但内容中包含掩码标识符，尝试使用全局映射表
-          else {
-            // 检查内容中是否包含掩码标识符
-            const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
-            const contentHasMasks = message.content && possibleMaskPatterns.some(pattern => pattern.test(message.content));
+        // 如果有敏感信息映射，使用映射进行反映射
+        else if (message.sensitiveMap && Object.keys(message.sensitiveMap).length > 0) {
+          processedText = unmaskSensitiveInfo(message.content, message.sensitiveMap, sessionHash);
+        }
+        // 如果没有映射但内容中包含掩码标识符，尝试使用全局映射表
+        else {
+          // 检查内容中是否包含掩码标识符
+          const possibleMaskPatterns = [/\[\[PHONE_\d+\]\]/, /\[\[EMAIL_\d+\]\]/, /\[\[ID_\d+\]\]/, /\[\[CARD_\d+\]\]/, /\[\[ADDR_\d+\]\]/, /\[\[NAME_\d+\]\]/];
+          const contentHasMasks = message.content && possibleMaskPatterns.some(pattern => pattern.test(message.content));
+          
+          if (contentHasMasks) {
+            console.log('内容中包含掩码标识符，但消息没有映射信息');
             
-            if (contentHasMasks) {
-              console.log('内容中包含掩码标识符，但消息没有映射信息');
-              
-              // 检查全局映射表是否可用
-              if (window.currentSensitiveInfoMap && Object.keys(window.currentSensitiveInfoMap).length > 0) {
-                console.log('使用全局映射表进行反映射');
-                processedText = unmaskSensitiveInfo(message.content, window.currentSensitiveInfoMap);
-              }
+            // 检查全局映射表是否可用
+            if (window.currentSensitiveInfoMap && Object.keys(window.currentSensitiveInfoMap).length > 0) {
+              console.log('使用全局映射表进行反映射');
+              processedText = unmaskSensitiveInfo(message.content, window.currentSensitiveInfoMap, sessionHash);
             }
           }
         }
       }
       
-      // 首先尝试使用 clipboard API
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(processedText);
-        console.log('复制成功(clipboard API):', processedText);
-        
-        // 显示复制成功提示
-        const toast = document.createElement('div');
-        toast.textContent = '已复制到剪贴板';
-        toast.style.position = 'fixed';
-        toast.style.bottom = '20px';
-        toast.style.left = '50%';
-        toast.style.transform = 'translateX(-50%)';
-        toast.style.padding = '8px 16px';
-        toast.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        toast.style.color = 'white';
-        toast.style.borderRadius = '4px';
-        toast.style.zIndex = '1000';
-        document.body.appendChild(toast);
-        
-        // 2秒后移除提示
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 2000);
-        
-        return;
-      }
+      await navigator.clipboard.writeText(processedText);
+      console.log('文本已复制到剪贴板');
       
-      // 备用方案：使用传统的 execCommand
-      const textArea = document.createElement('textarea');
-      textArea.value = processedText;
-      
-      // 防止滚动
-      textArea.style.position = 'fixed';
-      textArea.style.top = '0';
-      textArea.style.left = '0';
-      textArea.style.opacity = '0';
-      
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      
-      try {
-        document.execCommand('copy');
-        console.log('复制成功(execCommand):', processedText);
-        
-        // 显示复制成功提示
-        const toast = document.createElement('div');
-        toast.textContent = '已复制到剪贴板';
-        toast.style.position = 'fixed';
-        toast.style.bottom = '20px';
-        toast.style.left = '50%';
-        toast.style.transform = 'translateX(-50%)';
-        toast.style.padding = '8px 16px';
-        toast.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        toast.style.color = 'white';
-        toast.style.borderRadius = '4px';
-        toast.style.zIndex = '1000';
-        document.body.appendChild(toast);
-        
-        // 2秒后移除提示
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 2000);
-      } catch (err) {
-        console.error('execCommand 复制失败:', err);
-        
-        // 最后的备用方案：提示用户手动复制
-        window.prompt('请手动复制以下文本:', processedText);
-      }
-      
-      document.body.removeChild(textArea);
-    } catch (err) {
-      console.error('复制失败:', err);
-      
-      // 最后的备用方案：提示用户手动复制
-      window.prompt('请手动复制以下文本:', text);
+      // 显示成功提示
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('复制文本时出错:', error);
     }
   };
 

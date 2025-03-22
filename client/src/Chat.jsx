@@ -104,6 +104,8 @@ function Chat() {
     // 如果有配置，自动选择第一个模型
     if (configs.length > 0 && configs[0].model_name) {
       setSelectedModel(configs[0].model_name);
+      // 确保选择的模型被正确保存到本地存储
+      localStorage.setItem('selectedModel', configs[0].model_name);
     }
     
     // 更新可用模型列表
@@ -114,6 +116,13 @@ function Chat() {
     setAvailableModels(updatedModels);
     localStorage.setItem('availableModels', JSON.stringify(updatedModels));
   };
+
+  // 添加一个调试日志，检查文件上传和模型选择状态
+  useEffect(() => {
+    console.log("当前选择的模型:", selectedModel);
+    console.log("可用模型列表:", availableModels);
+    console.log("活动文档:", activeDocuments);
+  }, [selectedModel, availableModels, activeDocuments]);
 
   // 渲染主界面
   return (
@@ -236,4 +245,4 @@ const ModelSelector = ({ models, selectedModel, onModelChange, disabled }) => {
       ))}
     </select>
   );
-}; 
+};
