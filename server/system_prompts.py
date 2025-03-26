@@ -1,3 +1,27 @@
+doc_answer_zh_template = \
+'''# 以下内容是基于用户发送的消息的文档结果:
+{search_results}
+请注意:
+1. 回答要简洁明了，直接基于文档内容回答问题
+2. 如果文档内容不足以回答问题，请明确告知用户
+3. 不要在回答中包含"根据文档内容"、"文档中提到"等词语
+4. 如果用户问题与文档无关，请礼貌地将话题引导回文档内容
+
+# 用户消息为：
+{question}'''
+
+doc_answer_en_template = \
+'''# The following contents are the document results related to the user's message:
+{search_results}
+Please note:
+1. The answer should be concise and directly based on the document content.
+2. If the document content is not sufficient to answer the question, please clearly inform the user.
+3. Do not include the words "based on the document content" or "document content mentioned" in the answer.
+4. If the user's question is unrelated to the document, please politely guide the conversation back to the document content.
+
+# The user's message is:
+{question}'''
+
 search_answer_zh_template = \
 '''# 以下内容是基于用户发送的消息的搜索结果:
 {search_results}

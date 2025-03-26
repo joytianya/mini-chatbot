@@ -12,6 +12,61 @@ from system_prompts import search_answer_zh_template, search_answer_en_template
 
 logger = logging.getLogger(__name__)
 
+def get_search_intent(query: str, client: OpenAI, model_name: str) -> str:
+    """
+    使用大模型分析用户query背后的搜索意图
+    
+    Args:
+        query: 用户的原始查询
+    
+    Returns:
+        str: 优化后的搜索查询语句
+    """
+    try:
+        
+        # 构建提示词
+        if is_chinese(query):
+            prompt = f"""请分析用户的问题"{query}"背后的真实搜索意图,生成1-2个用于搜索引擎的关键词组合。
+要求:
+1. 提取核心概念和关键词
+2. 考虑问题的上下文和潜在目的
+3. 返回最相关的搜索词组合
+4. 只返回搜索词,不要其他解释
+
+示例:
+用户问题:"OpenAI最近有什么新进展"
+搜索词:"GPT-4 最新进展 OpenAI新产品发布"
+"""
+        else:
+            prompt = f"""Analyze the user's question "{query}" and generate 1-2 keyword combinations for search engines.
+Requirements:
+1. Extract core concepts and keywords
+2. Consider context and potential purpose
+3. Return most relevant search terms
+4. Return only search terms, no explanation
+
+Example:
+Question: "What's new with OpenAI?"
+Search terms: "GPT-4 latest developments OpenAI new product releases"
+"""
+
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "你是一个搜索意图分析专家"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        
+        search_intent = response.choices[0].message.content.strip()
+        logger.info(f"原始查询: {query} -> 搜索意图: {search_intent}")
+        return search_intent
+        
+    except Exception as e:
+        logger.error(f"获取搜索意图失败: {str(e)}")
+        return query  # 如果失败则返回原始查询
+
 def register_chat_routes(app):
     """注册聊天相关路由"""
     
@@ -54,16 +109,25 @@ def register_chat_routes(app):
             is_web_search = data.get('web_search', False)  # 获取联网搜索标志
 
             logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}, 联网搜索: {'开启' if is_web_search else '关闭'}")
+            if api_key and base_url:
+                client = OpenAI(
+                    api_key=api_key,
+                    base_url=base_url
+                )
+            else:
+                client = None
 
             # 如果启用了联网搜索，获取web搜索结果
             search_result_urls_str = ""
-            if is_web_search:
+            if is_web_search and client:
                 cur_date = datetime.now().strftime("%Y-%m-%d")
                 user_query = messages[-1]['content']
+
+                expanded_query = get_search_intent(user_query, client, model_name)
                 # 使用事件循环运行异步函数
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                web_search_results, search_results_str, search_result_urls_str = loop.run_until_complete(get_web_kg(user_query))
+                web_search_results, search_results_str, search_result_urls_str = loop.run_until_complete(get_web_kg(expanded_query))
                 loop.close()
                 
                 # 将web搜索结果添加到用户消息中
@@ -82,16 +146,14 @@ def register_chat_routes(app):
                 chat = JinaChatAPI()
                 response = chat.stream_chat(messages)
             else:
-                # 使用 OpenAI API 进行普通对话
-                client = OpenAI(
-                    api_key=api_key,
-                    base_url=base_url
-                )
-                response = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    stream=True
-                )
+                if client:
+                    response = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        stream=True
+                    )
+                else:
+                    response = None
 
             # 生成流式响应
             def generate():
@@ -103,6 +165,10 @@ def register_chat_routes(app):
                             if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                                 content = chunk.choices[0].delta.reasoning_content
                                 yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
+                                full_response.append(content)
+                            elif hasattr(chunk.choices[0].delta, 'reasoning') and chunk.choices[0].delta.reasoning:
+                                content = chunk.choices[0].delta.reasoning
+                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning}}]})}\n\n".encode('utf-8')
                                 full_response.append(content)
                             elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
                                 content = chunk.choices[0].delta.content

@@ -98,11 +98,12 @@ async def crawl_single_page_jina(url):
     except Exception as e:
         print(f"爬取页面失败: {url}, 错误: {str(e)}")
         return {'url': url, 'content': ''}
-# 
+    
+multi_client = MultiSearXClient()
 # 主函数：搜索+抓取网页内容
-async def get_web_kg(query, num_results=3):
+async def get_web_kg(query, num_results=3, offset=0):
     try:
-        multi_client = MultiSearXClient()
+        
         #search_results = search_with_searxng(query)
         search_results = multi_client.multi_search(query)
 
@@ -146,8 +147,8 @@ async def get_web_kg(query, num_results=3):
     search_result_urls = []
     for idx, item in enumerate(combined_results):
         try:
-            search_results.append(f"[webpage {idx+1} begin]第{idx+1}个网站资料：\\n网站url: {item['url']} \\n标题：{item['title']} \\n摘要：{item['summary']}\\n正文：{item['content']}\\n[webpage {idx+1} end]")
-            search_result_urls.append(f"\n\n[citation:{idx+1}] {item['url']}")
+            search_results.append(f"[webpage {idx+1+offset} begin]第{idx+1+offset}个网站资料：\\n网站url: {item['url']} \\n标题：{item['title']} \\n摘要：{item['summary']}\\n正文：{item['content']}\\n[webpage {idx+1+offset} end]")
+            search_result_urls.append(f"\n\n[citation:{idx+1+offset}] {item['url']}")
         except Exception as e:
             print(f"生成摘要失败: {e}")
             continue

@@ -152,27 +152,37 @@ export const ensureGlobalMapExists = (sessionHash) => {
 
 /**
  * 清除当前敏感信息映射
- * @param {string} [docHash] 文档哈希值，如果提供则只清除特定文档的映射表
+ * @param {string} [sessionHash] 会话哈希值，如果提供则只清除特定会话的映射表
  */
-export const clearSensitiveInfoMap = (docHash) => {
-  console.log('清除敏感信息映射表', docHash ? `文档哈希: ${docHash}` : '所有映射表');
+export const clearSensitiveInfoMap = (sessionHash) => {
+  console.log('清除敏感信息映射表', sessionHash ? `会话哈希: ${sessionHash}` : '所有映射表');
+  
+  // 如果没有提供会话哈希值，尝试从localStorage获取
+  if (!sessionHash) {
+    const storedHash = localStorage.getItem('sessionHash');
+    if (storedHash) {
+      sessionHash = storedHash;
+      console.log('从localStorage获取当前会话哈希值:', sessionHash);
+    }
+  }
   
   ensureGlobalMapExists();
   
-  if (docHash) {
-    // 只清除特定文档的映射表
-    if (window.currentSensitiveInfoMap[docHash]) {
-      console.log(`原文档 ${docHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[docHash]).length);
-      window.currentSensitiveInfoMap[docHash] = {};
-      console.log(`清除后文档 ${docHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[docHash]).length);
+  if (sessionHash) {
+    // 只清除特定会话的映射表
+    if (window.currentSensitiveInfoMap[sessionHash]) {
+      console.log(`原会话 ${sessionHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[sessionHash]).length);
+      window.currentSensitiveInfoMap[sessionHash] = {};
+      console.log(`清除后会话 ${sessionHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[sessionHash]).length);
     } else {
-      console.log(`文档 ${docHash} 的映射表不存在，无需清除`);
+      console.log(`会话 ${sessionHash} 的映射表不存在，无需清除`);
     }
   } else {
     // 清除所有映射表
     console.log('原映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
     window.currentSensitiveInfoMap = {};
     console.log('清除后映射表条目数:', Object.keys(window.currentSensitiveInfoMap).length);
+    console.log('警告：已清除所有会话的敏感信息映射表！');
   }
   
   // 更新localStorage中的映射表
@@ -202,75 +212,112 @@ export const getSensitiveInfoMap = (docHash) => {
 /**
  * 更新全局敏感信息映射表
  * @param {Object} newMap 新的映射表
- * @param {string} [docHash] 文档哈希值，如果提供则更新特定文档的映射表
+ * @param {string} sessionHash 会话哈希值，用于更新特定会话的映射表
  * @param {boolean} replace 是否替换现有映射表，默认为false（合并）
  */
-export const updateGlobalSensitiveInfoMap = (newMap, docHash, replace = false) => {
+export const updateGlobalSensitiveInfoMap = (newMap, sessionHash, replace = false) => {
   if (!newMap) return;
   
-  ensureGlobalMapExists();
-  console.log('更新敏感信息映射表', docHash ? `文档哈希: ${docHash}` : '默认映射表');
-  
-  if (docHash) {
-    // 更新特定文档的映射表
-    if (!window.currentSensitiveInfoMap[docHash]) {
-      window.currentSensitiveInfoMap[docHash] = {};
+  // 如果没有提供会话哈希值，尝试从localStorage获取
+  if (!sessionHash) {
+    sessionHash = localStorage.getItem('sessionHash');
+    console.log('从localStorage获取当前会话哈希值:', sessionHash);
+    
+    if (!sessionHash) {
+      console.warn('警告：未提供会话哈希值且无法从localStorage获取，无法更新映射表');
+      return;
     }
-    
-    console.log(`原文档 ${docHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[docHash]).length);
-    
-    if (replace) {
-      // 替换现有映射表
-      window.currentSensitiveInfoMap[docHash] = {...newMap};
-      console.log(`文档 ${docHash} 映射表已替换`);
-    } else {
-      // 合并到现有映射表
-      window.currentSensitiveInfoMap[docHash] = {
-        ...window.currentSensitiveInfoMap[docHash],
-        ...newMap
-      };
-      console.log(`新映射已合并到文档 ${docHash} 映射表`);
-    }
-    
-    console.log(`更新后文档 ${docHash} 映射表条目数:`, Object.keys(window.currentSensitiveInfoMap[docHash]).length);
-    console.log(`文档 ${docHash} 映射表详细内容:`);
-    Object.entries(window.currentSensitiveInfoMap[docHash]).forEach(([key, value], index) => {
-      console.log(`  ${index+1}. ${key} => ${value}`);
-    });
-  } else {
-    // 更新默认映射表
-    if (!window.currentSensitiveInfoMap['default']) {
-      window.currentSensitiveInfoMap['default'] = {};
-    }
-    
-    console.log('原默认映射表条目数:', Object.keys(window.currentSensitiveInfoMap['default']).length);
-    
-    if (replace) {
-      // 替换现有映射表
-      window.currentSensitiveInfoMap['default'] = {...newMap};
-      console.log('默认映射表已替换');
-    } else {
-      // 合并到现有映射表
-      window.currentSensitiveInfoMap['default'] = {
-        ...window.currentSensitiveInfoMap['default'],
-        ...newMap
-      };
-      console.log('新映射已合并到默认映射表');
-    }
-    
-    console.log('更新后默认映射表条目数:', Object.keys(window.currentSensitiveInfoMap['default']).length);
-    console.log('默认映射表详细内容:');
-    Object.entries(window.currentSensitiveInfoMap['default']).forEach(([key, value], index) => {
-      console.log(`  ${index+1}. ${key} => ${value}`);
-    });
   }
   
-  // 将更新后的全局映射表保存到localStorage
+  ensureGlobalMapExists();
+  console.log('更新敏感信息映射表，会话哈希:', sessionHash);
+  
   try {
-    localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-    console.log('已将更新后的全局映射表保存到localStorage');
-  } catch (error) {
-    console.error('保存全局映射表到localStorage时出错:', error);
+    // 在更新前清理旧数据
+    const keys = Object.keys(window.currentSensitiveInfoMap);
+    if (keys.length > 5) { // 如果会话数超过5个，清理旧会话
+      console.log('会话数超过限制，开始清理旧会话');
+      // 按最后修改时间排序
+      const sessionsToRemove = keys
+        .filter(k => k !== sessionHash) // 不包括当前会话
+        .sort((a, b) => {
+          const timeA = localStorage.getItem(`session_${a}_timestamp`) || 0;
+          const timeB = localStorage.getItem(`session_${b}_timestamp`) || 0;
+          return timeA - timeB;
+        })
+        .slice(0, keys.length - 4); // 保留最新的4个会话（加上当前会话共5个）
+      
+      sessionsToRemove.forEach(k => {
+        delete window.currentSensitiveInfoMap[k];
+        localStorage.removeItem(`session_${k}_timestamp`);
+        console.log('已删除旧会话:', k);
+      });
+    }
+    
+    // 确保会话的映射表存在
+    if (!window.currentSensitiveInfoMap[sessionHash]) {
+      window.currentSensitiveInfoMap[sessionHash] = {};
+    }
+    
+    // 压缩新映射数据
+    const compressedNewMap = {};
+    Object.entries(newMap).forEach(([k, v]) => {
+      if (v && v.trim()) {
+        compressedNewMap[k] = v;
+      }
+    });
+    
+    // 更新映射表
+    if (replace) {
+      window.currentSensitiveInfoMap[sessionHash] = compressedNewMap;
+    } else {
+      window.currentSensitiveInfoMap[sessionHash] = {
+        ...window.currentSensitiveInfoMap[sessionHash],
+        ...compressedNewMap
+      };
+    }
+    
+    // 如果单个会话的映射数据过大，进行清理
+    const sessionEntries = Object.entries(window.currentSensitiveInfoMap[sessionHash]);
+    if (sessionEntries.length > 100) { // 如果单个会话的映射超过100个
+      console.log('会话映射数超过限制，只保留最新的100个映射');
+      window.currentSensitiveInfoMap[sessionHash] = Object.fromEntries(
+        sessionEntries.slice(-100)
+      );
+    }
+    
+    // 更新会话时间戳
+    localStorage.setItem(`session_${sessionHash}_timestamp`, Date.now().toString());
+    
+    // 尝试保存到localStorage
+    try {
+      const serializedMap = JSON.stringify(window.currentSensitiveInfoMap);
+      localStorage.setItem('globalSensitiveInfoMap', serializedMap);
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        console.warn('存储配额超出，进行紧急清理');
+        // 清理所有会话，只保留当前会话
+        const currentSessionMap = window.currentSensitiveInfoMap[sessionHash];
+        window.currentSensitiveInfoMap = {
+          [sessionHash]: currentSessionMap
+        };
+        // 如果当前会话的映射仍然太大，只保留最新的50个
+        const entries = Object.entries(currentSessionMap);
+        if (entries.length > 50) {
+          window.currentSensitiveInfoMap[sessionHash] = Object.fromEntries(
+            entries.slice(-50)
+          );
+        }
+        // 重试保存
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+      } else {
+        throw e;
+      }
+    }
+    
+    console.log('全局映射表更新成功');
+  } catch (err) {
+    console.error('更新全局映射表时出错:', err);
   }
 };
 
@@ -284,14 +331,22 @@ export const getAllDocumentMaps = () => {
 };
 
 /**
- * 敏感信息检测和掩码处理
+ * 掩码处理文本中的敏感信息
  * @param {string} text 需要处理的文本
- * @param {string} [sessionHash] 会话哈希值，如果提供则使用该会话的映射表
+ * @param {string} [sessionHash] 会话哈希值，用于使用特定会话的映射表
  * @returns {string} 处理后的文本
  */
 export const maskSensitiveInfo = (text, sessionHash) => {
   if (!text) return text;
   
+  // 确保传入sessionHash时一定会使用会话特定的映射表
+  if (!sessionHash) {
+    // 尝试从localStorage获取当前会话哈希值
+    sessionHash = localStorage.getItem('sessionHash');
+    console.log('从localStorage获取当前会话哈希值:', sessionHash);
+  }
+  
+  // 确保全局映射表存在
   ensureGlobalMapExists();
   console.log('开始处理文本，长度:', text.length);
   console.log('文本示例:', text.substring(0, 100));
@@ -308,9 +363,9 @@ export const maskSensitiveInfo = (text, sessionHash) => {
     sensitiveInfoMap = window.currentSensitiveInfoMap[sessionHash];
     console.log(`使用会话 ${sessionHash} 的映射表，条目数:`, Object.keys(sensitiveInfoMap).length);
   } else {
-    // 否则使用默认映射表
-    sensitiveInfoMap = ensureGlobalMapExists();
-    console.log('使用默认映射表，条目数:', Object.keys(sensitiveInfoMap).length);
+    // 如果没有提供会话哈希值，创建一个默认的临时映射表
+    console.warn('警告：未提供会话哈希值，使用临时映射表。这可能导致敏感信息映射不会被保存！');
+    sensitiveInfoMap = {};
   }
   
   // 在处理前先记录当前映射表的状态
@@ -484,7 +539,13 @@ export const unmaskSensitiveInfo = (text, sensitiveInfoMap = {}, sessionHash) =>
     return '';
   }
   
-  // 如果没有提供映射表，尝试使用会话映射表
+  // 如果没有提供会话哈希值，尝试从localStorage获取
+  if (!sessionHash) {
+    sessionHash = localStorage.getItem('sessionHash');
+    console.log('从localStorage获取当前会话哈希值:', sessionHash);
+  }
+  
+  // 如果没有提供映射表但提供了会话哈希值，尝试使用会话映射表
   if (Object.keys(sensitiveInfoMap).length === 0 && sessionHash) {
     console.log('未提供映射表，尝试使用会话映射表，会话哈希值:', sessionHash);
     
@@ -539,46 +600,10 @@ export const unmaskSensitiveInfo = (text, sensitiveInfoMap = {}, sessionHash) =>
     if (missingMaskIds.length > 0) {
       console.warn('警告：以下掩码标识符在映射表中不存在:', missingMaskIds);
       
-      // 如果提供了会话哈希值，尝试从全局映射表中查找缺失的标识符
-      if (sessionHash && window.currentSensitiveInfoMap) {
-        console.log('尝试从全局映射表中查找缺失的标识符');
-        
-        // 创建一个新的映射表，包含原始映射表和从全局映射表中找到的缺失映射
-        const enhancedMap = {...sensitiveInfoMap};
-        let foundMissingMappings = false;
-        
-        // 遍历全局映射表中的所有会话映射表
-        Object.entries(window.currentSensitiveInfoMap).forEach(([hash, sessionMap]) => {
-          if (hash !== sessionHash && typeof sessionMap === 'object') {
-            missingMaskIds.forEach(id => {
-              if (sessionMap[id] && !enhancedMap[id]) {
-                enhancedMap[id] = sessionMap[id];
-                console.log(`从会话 ${hash} 的映射表添加缺失的映射: ${id} => ${sessionMap[id]}`);
-                foundMissingMappings = true;
-              }
-            });
-          }
-        });
-        
-        if (foundMissingMappings) {
-          console.log('使用增强后的映射表进行反映射');
-          sensitiveInfoMap = enhancedMap;
-          
-          // 更新会话映射表
-          if (window.currentSensitiveInfoMap[sessionHash]) {
-            window.currentSensitiveInfoMap[sessionHash] = enhancedMap;
-            
-            // 保存到localStorage
-            try {
-              localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-              console.log('更新后的映射表已保存到localStorage');
-            } catch (error) {
-              console.error('保存全局映射表到localStorage时出错:', error);
-            }
-          }
-        } else {
-          console.warn('在全局映射表中都没有找到缺失的掩码标识符');
-        }
+      // 如果仍然没有找到所有映射，但已经尝试了所有可能的映射来源，只能返回原文本
+      if (missingMaskIds.length === maskIdsInText.length) {
+        console.warn('所有掩码标识符都不在映射表中，无法反映射');
+        return text;
       }
     }
   } else {
@@ -860,4 +885,138 @@ export const processSensitiveFile = async (file) => {
       reject(new Error(`不支持处理 ${file.type || '未知'} 类型的文件。只能处理文本类型的文件和PDF文件。`));
     }
   });
+};
+
+// 存储敏感信息映射
+const saveSensitiveMap = (map, sessionHash) => {
+  try {
+    const key = sessionHash ? `querySensitiveMappings_${sessionHash}` : 'querySensitiveMappings';
+    
+    // 在存储之前清理旧数据
+    try {
+      // 获取所有 localStorage 的键
+      const keys = Object.keys(localStorage);
+      
+      // 找出所有敏感信息映射的键
+      const mappingKeys = keys.filter(k => k.startsWith('querySensitiveMappings'));
+      
+      // 计算当前使用的存储空间
+      let totalSize = 0;
+      mappingKeys.forEach(k => {
+        totalSize += localStorage.getItem(k).length;
+      });
+      
+      console.log('当前敏感信息映射使用存储空间:', totalSize, 'bytes');
+      
+      // 如果总大小超过 4MB 或映射数超过 3 个，开始清理
+      if (totalSize > 4 * 1024 * 1024 || mappingKeys.length > 3) {
+        console.log('开始清理旧的敏感信息映射');
+        // 按时间戳排序（如果有）或者直接删除最旧的
+        mappingKeys.sort((a, b) => {
+          const timeA = localStorage.getItem(a + '_timestamp') || 0;
+          const timeB = localStorage.getItem(b + '_timestamp') || 0;
+          return timeA - timeB;
+        });
+        
+        // 保留最新的3个映射
+        const keysToRemove = mappingKeys.slice(0, -3);
+        keysToRemove.forEach(k => {
+          localStorage.removeItem(k);
+          localStorage.removeItem(k + '_timestamp');
+          console.log('已删除旧映射:', k);
+        });
+      }
+    } catch (e) {
+      console.warn('清理旧敏感信息映射时出错:', e);
+    }
+    
+    // 尝试存储新的映射
+    try {
+      // 压缩映射数据
+      const compressedMap = {};
+      Object.entries(map).forEach(([k, v]) => {
+        // 只保存非空的映射
+        if (v && v.trim()) {
+          compressedMap[k] = v;
+        }
+      });
+      
+      const serializedMap = JSON.stringify(compressedMap);
+      
+      // 如果数据太大，尝试进一步压缩
+      if (serializedMap.length > 2 * 1024 * 1024) { // 如果超过2MB
+        console.log('映射数据过大，进行压缩');
+        // 只保留最新的100个映射
+        const entries = Object.entries(compressedMap);
+        const reducedMap = Object.fromEntries(entries.slice(-100));
+        localStorage.setItem(key, JSON.stringify(reducedMap));
+      } else {
+        localStorage.setItem(key, serializedMap);
+      }
+      
+      // 存储时间戳
+      localStorage.setItem(key + '_timestamp', Date.now().toString());
+      
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        console.warn('存储配额超出，尝试清理并重试');
+        // 清除所有旧的敏感信息映射
+        const keys = Object.keys(localStorage);
+        keys.filter(k => k.startsWith('querySensitiveMappings')).forEach(k => {
+          localStorage.removeItem(k);
+        });
+        
+        // 只保留最新的50个映射
+        const entries = Object.entries(map);
+        const reducedMap = Object.fromEntries(entries.slice(-50));
+        
+        // 重试存储
+        localStorage.setItem(key, JSON.stringify(reducedMap));
+        localStorage.setItem(key + '_timestamp', Date.now().toString());
+      } else {
+        throw e;
+      }
+    }
+  } catch (err) {
+    console.error('保存敏感信息映射时出错:', err);
+    // 不抛出错误，让程序继续运行
+  }
+};
+
+// 获取敏感信息映射
+const getSensitiveMap = (sessionHash) => {
+  try {
+    const key = sessionHash ? `querySensitiveMappings_${sessionHash}` : 'querySensitiveMappings';
+    const serializedMap = localStorage.getItem(key);
+    return serializedMap ? JSON.parse(serializedMap) : {};
+  } catch (err) {
+    console.error('获取敏感信息映射时出错:', err);
+    return {};
+  }
+};
+
+// 清除敏感信息映射
+const clearSensitiveMap = (sessionHash) => {
+  try {
+    if (sessionHash) {
+      // 清除特定会话的映射及其时间戳
+      localStorage.removeItem(`querySensitiveMappings_${sessionHash}`);
+      localStorage.removeItem(`querySensitiveMappings_${sessionHash}_timestamp`);
+    } else {
+      // 清除所有敏感信息映射及其时间戳
+      const keys = Object.keys(localStorage);
+      keys.filter(k => k.startsWith('querySensitiveMappings')).forEach(k => {
+        localStorage.removeItem(k);
+      });
+    }
+  } catch (err) {
+    console.error('清除敏感信息映射时出错:', err);
+  }
+};
+
+// 导出函数
+export {
+  saveSensitiveMap,
+  getSensitiveMap,
+  clearSensitiveMap
 };

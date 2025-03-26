@@ -196,6 +196,15 @@ export const useConversationManagement = (
   const handleDeleteConversation = (e, convId) => {
     e.stopPropagation();
     
+    // 获取要删除的对话信息，用于后续清理对应的映射表
+    const conversationToDelete = conversations.find(conv => conv.id === convId);
+    const sessionHashToDelete = conversationToDelete?.sessionHash;
+    
+    console.log('准备删除对话:', {
+      conversationId: convId,
+      sessionHash: sessionHashToDelete
+    });
+    
     const updatedConversations = conversations.filter(conv => conv.id !== convId);
     if (updatedConversations.length > 0) {
       if (conversations.find(conv => conv.id === convId)?.active) {
@@ -273,6 +282,23 @@ export const useConversationManagement = (
         } catch (error) {
           console.error('保存全局映射表到localStorage时出错:', error);
         }
+      }
+    }
+    
+    // 从全局映射表中删除被删除对话的敏感信息映射
+    if (sessionHashToDelete && window.currentSensitiveInfoMap && window.currentSensitiveInfoMap[sessionHashToDelete]) {
+      console.log(`删除会话 ${sessionHashToDelete} 的敏感信息映射表`);
+      console.log(`原映射表条目数: ${Object.keys(window.currentSensitiveInfoMap[sessionHashToDelete]).length}`);
+      
+      // 删除该会话的映射表
+      delete window.currentSensitiveInfoMap[sessionHashToDelete];
+      
+      // 更新localStorage
+      try {
+        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
+        console.log('更新localStorage中的全局映射表，删除了会话的敏感信息映射');
+      } catch (error) {
+        console.error('更新localStorage中的全局映射表时出错:', error);
       }
     }
     

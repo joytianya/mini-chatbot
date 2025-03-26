@@ -121,23 +121,23 @@ def register_routes():
     register_doc_chat_routes(app, doc_store)
     
     # 测试端点
-    @app.route('/api/test')
-    def test():
-        """测试端点"""
-        try:
-            return jsonify({
-                'status': 'ok',
-                'message': 'Flask 服务器正在运行',
-                'version': '1.0.0',
-                'env': os.getenv('NODE_ENV', 'development'),
-                'ark_api': '已配置' if os.getenv('ARK_API_KEY') else '未配置'
-            })
-        except Exception as e:
-            logger.error(f"测试端点错误: {str(e)}")
-            return jsonify({
-                'status': 'error',
-                'message': str(e)
-            }), 500
+@app.route('/api/test')
+def test():
+    """测试端点"""
+    try:
+        return jsonify({
+            'status': 'ok',
+            'message': 'Flask 服务器正在运行',
+            'version': '1.0.0',
+            'env': os.getenv('NODE_ENV', 'development'),
+            'ark_api': '已配置' if os.getenv('ARK_API_KEY') else '未配置'
+        })
+    except Exception as e:
+        logger.error(f"测试端点错误: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 # 请求前处理
 @app.before_request
@@ -214,9 +214,9 @@ def init_app():
     
     # 注册路由
     register_routes()
-    
-    # 启动调度器
-    scheduler.start()
+
+# 启动调度器
+scheduler.start()
 
 # 主函数
 if __name__ == '__main__':

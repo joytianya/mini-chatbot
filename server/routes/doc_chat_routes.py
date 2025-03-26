@@ -4,10 +4,11 @@ import logging
 import asyncio
 from datetime import datetime
 from openai import OpenAI
+from jina import JinaChatAPI
 from web_kg import get_web_kg
 from utils.text_utils import is_chinese
 from utils.logger_utils import CustomLogger
-from system_prompts import search_answer_zh_template, search_answer_en_template
+from system_prompts import search_answer_zh_template, search_answer_en_template, doc_answer_zh_template, doc_answer_en_template
 
 logger = logging.getLogger(__name__)
 
@@ -135,42 +136,35 @@ def register_doc_chat_routes(app, doc_store):
             
             # 记录聊天完成信息
             CustomLogger.chat_completion(user_query, len(context.split("\n")), context)
-            
-            # 构建系统消息
-            system_message = {
-                "role": "system",
-                "content": f"""你是一个智能助手，可以回答用户关于文档的问题。
-请基于以下文档内容回答用户的问题。如果文档内容中没有相关信息，请诚实地告诉用户你不知道，不要编造答案。
 
-文档内容:
-{context}
-
-请注意:
-1. 回答要简洁明了，直接基于文档内容回答问题
-2. 如果文档内容不足以回答问题，请明确告知用户
-3. 不要在回答中包含"根据文档内容"、"文档中提到"等词语
-4. 如果用户问题与文档无关，请礼貌地将话题引导回文档内容"""
-            }
-            
+            user_query_with_search_result = messages[-1]['content']
+            if is_chinese(user_query):
+                messages[-1]['content'] = doc_answer_zh_template.format(search_results=context, question=user_query_with_search_result)
+            else:
+                messages[-1]['content'] = doc_answer_en_template.format(search_results=context, question=user_query_with_search_result)
             # 构建请求消息
-            request_messages = [system_message]
-            for msg in messages[1:]:  # 跳过原始系统消息
-                request_messages.append(msg)
+            request_messages = messages
+            logger.info(f"构建请求消息: {request_messages}")
+            # 根据模式选择不同的API
+            if is_deep_research:
+                # 使用 JinaChatAPI 进行深度研究
+                chat = JinaChatAPI()
+                response = chat.stream_chat(request_messages)
+            else:
+                # 使用 OpenAI API 进行普通对话
+                client = OpenAI(
+                    api_key=api_key,
+                    base_url=base_url
+                )
             
-            # 创建客户端
-            client = OpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            
-            # 发送请求
-            logger.info(f"发送请求到模型: {model_name}")
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[m for m in request_messages],
-                stream=True,
-                temperature=0.7,
-            )
+                # 发送请求
+                logger.info(f"发送请求到模型: {model_name}")
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=request_messages,
+                    stream=True,
+                    temperature=0.7,
+                )
             
             # 生成流式响应
             def generate():
@@ -182,6 +176,10 @@ def register_doc_chat_routes(app, doc_store):
                             if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                                 content = chunk.choices[0].delta.reasoning_content
                                 yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
+                                full_response.append(content)
+                            elif hasattr(chunk.choices[0].delta, 'reasoning') and chunk.choices[0].delta.reasoning:
+                                content = chunk.choices[0].delta.reasoning
+                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning}}]})}\n\n".encode('utf-8')
                                 full_response.append(content)
                             elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
                                 content = chunk.choices[0].delta.content
