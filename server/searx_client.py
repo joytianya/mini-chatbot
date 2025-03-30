@@ -18,7 +18,7 @@ class MultiSearXClient:
     """
     A client that manages multiple SearXNG instances for parallel searching.
     """
-    def __init__(self, instances_file: str = None, max_instances: int = 10):
+    def __init__(self, instances_file: str = None, max_instances: int = 1):
         # 如果没有指定文件路径,使用当前脚本所在目录下的json文件
         if instances_file is None:
             current_dir = os.path.dirname(os.path.abspath(__file__))
