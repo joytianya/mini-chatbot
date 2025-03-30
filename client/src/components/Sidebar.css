@@ -1,15 +1,292 @@
 /* Sidebar.css */
 
-/* 对话项目悬停时显示删除按钮 */
-.conversation-item:hover .delete-button {
-  visibility: visible !important;
+/* 整体侧边栏样式 */
+.sidebar-container {
+  transition: width 0.3s ease;
 }
 
-/* 按钮悬停效果 */
+/* 模型选择器样式 */
+.model-selector {
+  background-color: transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.model-selector select {
+  appearance: none;
+  width: 100%;
+  cursor: pointer;
+  padding-right: 25px;
+  text-overflow: ellipsis;
+}
+
+.model-selector select option {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.model-selector::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #555;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.dark-mode .model-selector::after {
+  border-top-color: #aaa;
+}
+
+/* 模型图标样式 */
+.model-icon {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.model-icon:hover {
+  transform: scale(1.05);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .model-icon:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.compact-model-dropdown {
+  animation: fadeIn 0.2s ease;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  position: fixed;
+  z-index: 9999;
+}
+
+.compact-model-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.compact-model-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.compact-model-dropdown::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.dark-mode .compact-model-dropdown::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 对话项目悬停时显示删除按钮 */
+.conversation-item {
+  position: relative;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.conversation-item:hover {
+  transform: translateX(2px);
+}
+
+.conversation-item:active {
+  transform: translateX(0) scale(0.98);
+}
+
+.conversation-item.active {
+  font-weight: 500;
+}
+
+.conversation-item .delete-button {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease, background-color 0.2s ease;
+}
+
+.conversation-item:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* 空对话列表指示器 */
+.empty-conversations-indicator {
+  transition: all 0.2s ease;
+}
+
+.empty-conversations-indicator:hover {
+  transform: scale(1.05);
+}
+
+/* 上传文件图标 */
+.upload-icon {
+  transition: all 0.2s ease;
+}
+
+.upload-icon:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.upload-icon:active {
+  transform: scale(0.95);
+}
+
+.doc-hint {
+  transition: all 0.2s ease;
+}
+
+.doc-hint:hover {
+  transform: scale(1.05);
+}
+
+/* 底部操作按钮样式 */
+.action-button {
+  transition: all 0.2s ease;
+  border-radius: 50%;
+}
+
 .action-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.1);
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 .dark-mode .action-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 标题区域样式 */
+.title-area {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.title-area:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .title-area:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 新建对话按钮样式 */
+.new-chat-btn {
+  transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.new-chat-btn:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+
+/* 标签页切换动画 */
+.tab-button {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-button svg {
+  transition: transform 0.2s ease;
+}
+
+.tab-button:hover svg {
+  transform: scale(1.1);
+}
+
+.tab-button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background-color: #1976d2;
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.tab-button.active::after {
+  width: 100%;
+}
+
+.dark-mode .tab-button.active::after {
+  background-color: #4a9eff;
+}
+
+/* 折叠状态下的样式优化 */
+@media (max-width: 768px) {
+  .conversation-item {
+    padding: 8px 0;
+    justify-content: center;
+  }
+  
+  .new-chat-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* 侧边栏折叠状态样式 */
+.sidebar-container[style*="width: 48px"] .conversation-item {
+  padding: 6px 0 !important;
+  justify-content: center;
+  width: 40px !important;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.sidebar-container[style*="width: 48px"] .conversation-item > div {
+  margin: 0 auto !important;
+}
+
+.sidebar-container[style*="width: 48px"] .new-chat-btn {
+  padding: 6px 0 !important;
+  margin: 0 auto 6px auto !important;
+  width: 32px !important;
+  box-sizing: border-box;
+}
+
+.sidebar-container[style*="width: 48px"] .new-chat-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sidebar-container[style*="width: 48px"] .conversation-list {
+  align-items: center;
+  width: 40px !important;
+  margin: 0 auto !important;
+}
+
+.sidebar-container[style*="width: 48px"] .upload-icon,
+.sidebar-container[style*="width: 48px"] .doc-hint,
+.sidebar-container[style*="width: 48px"] .empty-conversations-indicator {
+  margin: 4px auto !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .sidebar-container {
+    width: 100% !important;
+  }
 } 

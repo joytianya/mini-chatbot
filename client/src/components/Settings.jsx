@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, sensitiveInfoProtectionEnabled, toggleSensitiveInfoProtection }) => {
+export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave }) => {
   const [activeTab, setActiveTab] = useState('model');
 
   // 修改状态管理，支持模型和embedding配置
@@ -69,6 +69,54 @@ export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, s
     }
   };
 
+  // 上移配置
+  const moveConfigUp = (type, id) => {
+    if (type === 'model') {
+      setModelConfigs(prev => {
+        const index = prev.findIndex(config => config.id === id);
+        if (index <= 0) return prev; // 已经是第一个，无法上移
+        
+        const newConfigs = [...prev];
+        // 交换当前配置与上一个配置的位置
+        [newConfigs[index], newConfigs[index - 1]] = [newConfigs[index - 1], newConfigs[index]];
+        return newConfigs;
+      });
+    } else {
+      setEmbeddingConfigs(prev => {
+        const index = prev.findIndex(config => config.id === id);
+        if (index <= 0) return prev;
+        
+        const newConfigs = [...prev];
+        [newConfigs[index], newConfigs[index - 1]] = [newConfigs[index - 1], newConfigs[index]];
+        return newConfigs;
+      });
+    }
+  };
+
+  // 下移配置
+  const moveConfigDown = (type, id) => {
+    if (type === 'model') {
+      setModelConfigs(prev => {
+        const index = prev.findIndex(config => config.id === id);
+        if (index >= prev.length - 1) return prev; // 已经是最后一个，无法下移
+        
+        const newConfigs = [...prev];
+        // 交换当前配置与下一个配置的位置
+        [newConfigs[index], newConfigs[index + 1]] = [newConfigs[index + 1], newConfigs[index]];
+        return newConfigs;
+      });
+    } else {
+      setEmbeddingConfigs(prev => {
+        const index = prev.findIndex(config => config.id === id);
+        if (index >= prev.length - 1) return prev;
+        
+        const newConfigs = [...prev];
+        [newConfigs[index], newConfigs[index + 1]] = [newConfigs[index + 1], newConfigs[index]];
+        return newConfigs;
+      });
+    }
+  };
+
   // 保存所有配置
   const handleSave = () => {
     // 保存配置到 localStorage
@@ -92,7 +140,7 @@ export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, s
   if (!isOpen) return null;
 
   const renderConfigFields = (type, configs) => {
-    return configs.map((config) => (
+    return configs.map((config, index) => (
       <div key={config.id} className="config-group" style={{
         backgroundColor: darkMode ? '#3d3d3d' : '#f5f5f5',
         borderRadius: '8px',
@@ -119,19 +167,66 @@ export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, s
               width: '200px'
             }}
           />
-          <button 
-            onClick={() => handleDeleteConfig(type, config.id)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '4px',
-              border: 'none',
-              backgroundColor: '#dc3545',
-              color: '#fff',
-              cursor: 'pointer'
-            }}
-          >
-            删除
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* 上移按钮 */}
+            <button 
+              onClick={() => moveConfigUp(type, config.id)}
+              disabled={index === 0}
+              style={{
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: index === 0 ? (darkMode ? '#444' : '#e0e0e0') : (darkMode ? '#555' : '#f0f0f0'),
+                color: index === 0 ? (darkMode ? '#777' : '#999') : (darkMode ? '#e0e0e0' : '#333'),
+                cursor: index === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="上移"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+            
+            {/* 下移按钮 */}
+            <button 
+              onClick={() => moveConfigDown(type, config.id)}
+              disabled={index === configs.length - 1}
+              style={{
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: index === configs.length - 1 ? (darkMode ? '#444' : '#e0e0e0') : (darkMode ? '#555' : '#f0f0f0'),
+                color: index === configs.length - 1 ? (darkMode ? '#777' : '#999') : (darkMode ? '#e0e0e0' : '#333'),
+                cursor: index === configs.length - 1 ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="下移"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            
+            {/* 删除按钮 */}
+            <button 
+              onClick={() => handleDeleteConfig(type, config.id)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: '#dc3545',
+                color: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              删除
+            </button>
+          </div>
         </div>
         
         <div className="config-fields" style={{
@@ -347,20 +442,6 @@ export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, s
           >
             Embedding配置
           </div>
-          <div 
-            className={`tab ${activeTab === 'privacy' ? 'active' : ''}`}
-            onClick={() => setActiveTab('privacy')}
-            style={{
-              padding: '12px 24px',
-              cursor: 'pointer',
-              color: activeTab === 'privacy' ? (darkMode ? '#fff' : '#1976d2') : (darkMode ? '#aaa' : '#666'),
-              borderBottom: activeTab === 'privacy' ? `2px solid ${darkMode ? '#fff' : '#1976d2'}` : 'none',
-              fontWeight: activeTab === 'privacy' ? 'bold' : 'normal',
-              transition: 'all 0.2s'
-            }}
-          >
-            隐私设置
-          </div>
         </div>
         
         <div className="settings-body" style={{
@@ -433,93 +514,6 @@ export const Settings = ({ isOpen, onClose, darkMode, initialSettings, onSave, s
                 </svg>
                 添加Embedding配置
               </button>
-            </div>
-          )}
-          
-          {activeTab === 'privacy' && (
-            <div className="privacy-settings">
-              <h3 style={{ 
-                margin: '0 0 16px 0', 
-                color: darkMode ? '#fff' : '#333',
-                fontSize: '16px'
-              }}>隐私设置</h3>
-              
-              <div className="setting-item" style={{
-                marginBottom: '16px',
-                padding: '16px',
-                backgroundColor: darkMode ? '#3d3d3d' : '#f5f5f5',
-                borderRadius: '8px'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '8px'
-                }}>
-                  <div>
-                    <h4 style={{ 
-                      margin: '0 0 8px 0', 
-                      color: darkMode ? '#fff' : '#333',
-                      fontSize: '15px'
-                    }}>敏感信息保护</h4>
-                    <p style={{ 
-                      margin: '0', 
-                      color: darkMode ? '#ccc' : '#666',
-                      fontSize: '14px'
-                    }}>
-                      启用后，系统会自动检测并掩码用户上传的文件和消息中的敏感信息（如姓名、电话、地址等），保护您的隐私。
-                    </p>
-                  </div>
-                  <div 
-                    className="toggle-switch"
-                    onClick={toggleSensitiveInfoProtection}
-                    style={{
-                      width: '48px',
-                      height: '24px',
-                      backgroundColor: sensitiveInfoProtectionEnabled ? '#4caf50' : (darkMode ? '#666' : '#ccc'),
-                      borderRadius: '12px',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      backgroundColor: '#fff',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      top: '2px',
-                      left: sensitiveInfoProtectionEnabled ? '26px' : '2px',
-                      transition: 'left 0.2s'
-                    }}></div>
-                  </div>
-                </div>
-                
-                <div style={{
-                  marginTop: '16px',
-                  padding: '12px',
-                  backgroundColor: darkMode ? '#333' : '#e9e9e9',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  color: darkMode ? '#ccc' : '#666'
-                }}>
-                  <p style={{ margin: '0 0 8px 0' }}>系统会检测并掩码以下类型的敏感信息：</p>
-                  <ul style={{ 
-                    margin: '0', 
-                    paddingLeft: '20px',
-                    color: darkMode ? '#bbb' : '#555'
-                  }}>
-                    <li>中文姓名（如：张三 → 张*）</li>
-                    <li>手机号码（如：18872627220 → 188****7220）</li>
-                    <li>电子邮箱（如：zhangsan@example.com → z****@example.com）</li>
-                    <li>身份证号（如：110101199001011234 → 110101********1234）</li>
-                    <li>地址信息（保留省市区县，其他部分掩码）</li>
-                    <li>公司名称（部分掩码）</li>
-                    <li>学校名称（部分掩码）</li>
-                  </ul>
-                </div>
-              </div>
             </div>
           )}
         </div>

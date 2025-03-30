@@ -25,6 +25,7 @@ export const useMessageHandling = (
   const [isReasoning, setIsReasoning] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const [input, setInput] = useState(''); // 添加输入框状态
   
   // 获取当前会话哈希值
   const sessionHash = getOrCreateSessionHash();
@@ -106,7 +107,6 @@ export const useMessageHandling = (
             }
             try {
               const parsed = JSON.parse(data);
-              console.log('收到数据:', data); // 增加日志显示
               
               // 处理思考过程
               if (parsed.type === 'reasoning') {
@@ -168,43 +168,18 @@ export const useMessageHandling = (
         sessionHash: currentSessionHash  // 确保消息包含会话哈希值
       };
       
-      // 更新显示消息
-      setDisplayMessages(prev => [...prev, aiMessage]);
+      console.log('流式响应完成，创建的AI消息:', aiMessage);
       
-      // 更新请求消息
+      // 注意：这里不再更新displayMessages或保存到localStorage
+      // 流式响应结束后，将在ChatArea.jsx中通过handleReplyComplete来保存这条消息
+      
+      // 只更新请求消息，用于后续API请求
       setRequestMessages(prev => [...prev, {
         role: 'assistant',
         content: responseText,
         reasoningContent: reasoningText, // 保存思考过程内容
         sessionHash: currentSessionHash  // 确保请求消息也包含会话哈希值
       }]);
-      
-      // 更新对话历史，保持当前对话的所有属性
-      const updatedConversations = conversations.map(conv => {
-        if (conv.active) {
-          // 获取当前显示的所有消息加上新消息
-          const currentMessages = [...displayMessages, aiMessage];
-          
-          // 获取第一条用户消息作为标题（如果还没有标题）
-          const firstUserMessage = currentMessages.find(msg => msg.role === 'user');
-          const title = conv.title === '新对话' && firstUserMessage 
-            ? firstUserMessage.content.slice(0, 30) 
-            : conv.title;
-          
-          return {
-            ...conv,
-            title,
-            messages: currentMessages,
-            timestamp: Date.now(),
-            sessionHash: currentSessionHash  // 确保对话也包含会话哈希值
-          };
-        }
-        return conv;
-      });
-      
-      // 保存到localStorage
-      localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
-      setConversations(updatedConversations);
       
       // 高亮消息
       setHighlightedMessageId(messageId);
@@ -232,7 +207,7 @@ export const useMessageHandling = (
       setAbortController(controller);
       
       // 获取当前对话轮数
-      const currentTurns = displayMessages.filter(msg => msg.role === 'user').length + 1;
+      const currentTurns = displayMessages.filter(msg => msg.role === 'user').length;
       
       // 获取模型配置
       const modelConfig = getConfigForModel(selectedModel);
@@ -329,16 +304,283 @@ export const useMessageHandling = (
     }
   };
   
+  // 发送聊天请求的包装函数
+  const handleSubmit = async (e, isDeepResearch = false, isWebSearch = false, editedMessage = null, inputText = null) => {
+    if (e) e.preventDefault();
+    
+    // 如果是编辑消息模式，使用编辑后的消息内容
+    if (editedMessage) {
+      console.log('处理编辑后的消息:', editedMessage);
+      
+      // 防御性检查：确保editedMessage是有效的对象
+      if (!editedMessage || typeof editedMessage !== 'object') {
+        console.error('无效的编辑消息对象:', editedMessage);
+        return;
+      }
+      
+      // 如果editedMessage是字符串，说明是直接传入的新内容
+      if (typeof editedMessage === 'string') {
+        // 查找最后一条用户消息
+        const lastUserMessage = displayMessages.findLast(msg => msg.role === 'user');
+        if (!lastUserMessage) {
+          console.error('无法找到要编辑的用户消息');
+          return;
+        }
+        console.log('找到要编辑的用户消息:', lastUserMessage);
+        editedMessage = {
+          ...lastUserMessage,
+          content: editedMessage,
+          timestamp: Date.now(),
+          edited: true
+        };
+      }
+      
+      // 确保消息有ID
+      if (!editedMessage.id) {
+        console.error('编辑的消息缺少ID:', editedMessage);
+        return;
+      }
+      
+      // 获取消息前的历史，包括当前编辑的消息
+      const messageIndex = displayMessages.findIndex(msg => msg.id === editedMessage.id);
+      if (messageIndex === -1) {
+        console.error('无法找到编辑的消息:', editedMessage.id);
+        return;
+      }
+      
+      console.log('找到编辑消息的索引:', messageIndex);
+      
+      // 更新目标消息内容
+      const updatedMessages = displayMessages.map((msg, index) => {
+        if (index === messageIndex) {
+          return {
+            ...msg,
+            content: editedMessage.content,
+            timestamp: editedMessage.timestamp || Date.now(),
+            edited: true
+          };
+        }
+        return msg;
+      });
+      
+      // 只保留到该消息为止的历史，移除后续的所有消息
+      const previousMessages = updatedMessages.slice(0, messageIndex + 1);
+      
+      console.log('保留编辑消息前的历史，消息数量:', previousMessages.length);
+      
+      // 更新显示消息，移除该消息后的所有消息
+      setDisplayMessages(previousMessages);
+      
+      // 更新请求消息，保持与显示消息同步
+      setRequestMessages(previousMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        id: msg.id,
+        timestamp: msg.timestamp,
+        edited: msg.edited
+      })));
+      
+      // 保存到localStorage
+      try {
+        const updatedConversations = conversations.map(conv => {
+          if (conv.active) {
+            return {
+              ...conv,
+              messages: previousMessages.map(msg => ({
+                ...msg,
+                reasoning_content: msg.reasoning_content || msg.reasoningContent || null
+              })),
+              timestamp: Date.now()
+            };
+          }
+          return conv;
+        });
+        
+        localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+        setConversations(updatedConversations);
+      } catch (error) {
+        console.error('保存编辑后的对话历史失败:', error);
+      }
+      
+      // 发送请求
+      try {
+        setIsLoading(true);
+        await sendChatRequestWrapper(editedMessage.content, isDeepResearch, isWebSearch);
+      } catch (error) {
+        console.error('编辑消息请求失败:', error);
+        alert(`编辑请求失败: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+      
+      return;
+    }
+    
+    // 常规消息处理逻辑
+    // 尝试从App.jsx传递的参数获取消息内容
+    let messageText = '';
+    
+    if (inputText) {
+      // 如果传入了inputText参数，使用它
+      messageText = inputText.trim();
+    } else if (typeof input !== 'undefined' && input !== null) {
+      // 否则尝试使用内部状态的input
+      messageText = input.trim();
+    }
+    
+    // 如果没有消息内容，不处理
+    if (!messageText) {
+      console.warn('消息内容为空，不处理');
+      return;
+    }
+    
+    // 确保有会话哈希值
+    console.log('发送新消息，当前会话哈希值:', sessionHash);
+    
+    // 创建用户消息对象
+    const userMessage = {
+      role: 'user',
+      content: messageText,
+      id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      timestamp: Date.now(),
+      sessionHash: sessionHash  // 确保消息包含会话哈希值
+    };
+    
+    console.log('创建用户消息:', userMessage);
+    
+    // 更新显示消息
+    setDisplayMessages(prev => {
+      const newMessages = [...prev, userMessage];
+      
+      // 尝试立即安全地更新本地存储
+      try {
+        console.log('立即保存用户消息到localStorage', {
+          sessionHash,
+          消息内容: newMessages.length > 0 ? newMessages[newMessages.length-1].content.substring(0, 30) + '...' : '无消息'
+        });
+        
+        // ⚠️ 获取localStorage中最新的数据，防止覆盖
+        const latestConversationsStr = localStorage.getItem('conversations');
+        if (!latestConversationsStr) {
+          console.warn('保存用户消息: localStorage中没有会话数据，初始化新的会话');
+          // 第一次使用，初始化会话数据
+          const newConversation = {
+            id: Date.now().toString(),
+            title: '新对话',
+            messages: newMessages,
+            active: true,
+            timestamp: Date.now(),
+            sessionHash: sessionHash
+          };
+          localStorage.setItem('conversations', JSON.stringify([newConversation]));
+          setConversations([newConversation]);
+          console.log('用户消息保存成功: 创建了新会话');
+          return;
+        }
+        
+        // 解析当前localStorage中的会话数据
+        let latestConversations;
+        try {
+          latestConversations = JSON.parse(latestConversationsStr);
+          console.log('获取最新会话数据:', {
+            会话数量: latestConversations.length,
+            当前会话: latestConversations.find(c => c.active)?.title || '无活动会话'
+          });
+        } catch (error) {
+          console.error('解析localStorage会话数据失败:', error);
+          return;
+        }
+        
+        // 查找当前活动会话
+        const currentConversationIndex = latestConversations.findIndex(conv => conv.active);
+        if (currentConversationIndex === -1) {
+          console.warn('保存用户消息: 找不到活动会话，创建新会话');
+          const newConversation = {
+            id: Date.now().toString(),
+            title: '新对话',
+            messages: newMessages,
+            active: true,
+            timestamp: Date.now(),
+            sessionHash: sessionHash
+          };
+          latestConversations.unshift(newConversation);
+        } else {
+          // 更新当前会话的消息
+          const currentConversation = latestConversations[currentConversationIndex];
+          
+          console.log('更新现有会话:', {
+            id: currentConversation.id,
+            title: currentConversation.title,
+            sessionHash: currentConversation.sessionHash,
+            原有消息数: currentConversation.messages?.length || 0,
+            新消息数: newMessages.length
+          });
+          
+          // 更新会话数据
+          latestConversations[currentConversationIndex] = {
+            ...currentConversation,
+            messages: newMessages.map(msg => ({
+              ...msg,
+              reasoning_content: msg.reasoning_content || msg.reasoningContent || null
+            })),
+            timestamp: Date.now(),
+            activeDocuments: typeof activeDocuments !== 'undefined' ? activeDocuments : currentConversation.activeDocuments || [] // 安全地处理activeDocuments
+          };
+        }
+        
+        // 保存到localStorage
+        localStorage.setItem('conversations', JSON.stringify(latestConversations));
+        setConversations(latestConversations);
+        console.log('用户消息保存成功:', {
+          会话数量: latestConversations.length,
+          当前会话: latestConversations.find(c => c.active)?.title,
+          消息数量: latestConversations.find(c => c.active)?.messages.length
+        });
+      } catch (error) {
+        console.error('保存对话历史到localStorage失败:', error);
+      }
+      
+      return newMessages;
+    });
+    
+    // 更新请求消息
+    setRequestMessages(prev => [...prev, userMessage]);
+    
+    // 清空输入框
+    setCurrentResponse('');
+    setReasoningText('');
+    setIsReasoning(false);
+    
+    // 设置流式响应状态
+    setIsLoading(true);
+    
+    try {
+      // 发送请求
+      await sendChatRequestWrapper(messageText, isDeepResearch, isWebSearch);
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      alert(`发送消息失败: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   return {
     isLoading,
+    setIsLoading,
     currentResponse,
+    setCurrentResponse,
     reasoningText,
+    setReasoningText,
     isReasoning,
+    setIsReasoning,
     highlightedMessageId,
     setHighlightedMessageId,
-    sendChatRequestWrapper,
-    sendDocumentChatRequestWrapper,
+    handleSubmit,
     handleStop,
-    handleResponse
+    input,
+    setInput,
+    displayMessages: displayMessages,
+    streaming: isLoading,
   };
 }; 

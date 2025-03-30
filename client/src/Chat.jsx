@@ -158,13 +158,6 @@ function Chat() {
         
         {/* 聊天区域 */}
         <div className="main-content">
-          {/* 敏感信息演示组件 - 仅在没有对话时显示 */}
-          {/* {displayMessages.length <= 1 && sensitiveInfoProtectionEnabled && (
-            <div style={{ padding: '20px', overflowY: 'auto' }}>
-              <SensitiveInfoDemo darkMode={darkMode} />
-            </div>
-          )} */}
-          
           {/* 聊天区域组件 */}
           <ErrorBoundary>
             <ChatArea 
@@ -185,7 +178,6 @@ function Chat() {
               loadingHistory={loadingHistory}
               activeDocuments={activeDocuments}
               setActiveDocuments={setActiveDocuments}
-              sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
               input={input}
               setInput={setInput}
               handleSubmit={handleSubmit}
@@ -197,7 +189,6 @@ function Chat() {
               maxHistoryLength={maxHistoryLength}
               setDarkMode={setDarkMode}
               handleExport={handleExport}
-              handleFileUpload={handleFileUpload}
               sessionHash={sessionHash}
             />
           </ErrorBoundary>

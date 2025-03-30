@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const MessageBubble = ({ 
   content, 
@@ -13,8 +15,7 @@ const MessageBubble = ({
   id,
   highlightedMessageId,
   darkMode,
-  isWebSearch,  // 添加联网搜索参数
-  sensitiveInfoProtectionEnabled
+  isWebSearch
 }) => {
   const [showButtons, setShowButtons] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -22,9 +23,13 @@ const MessageBubble = ({
   
   // 从 localStorage 读取折叠状态，如果没有则默认展开
   const [isReasoningExpanded, setIsReasoningExpanded] = useState(() => {
-    const saved = localStorage.getItem('reasoningExpanded');
-    return saved === null ? true : JSON.parse(saved);
+    return true; // 默认始终展开
   });
+
+  // 当content prop变化时更新编辑框的值
+  useEffect(() => {
+    setEditValue(content || '');
+  }, [content]);
 
   // 处理折叠/展开点击
   const handleReasoningClick = () => {
@@ -46,8 +51,34 @@ const MessageBubble = ({
       headerIds: false,  // 禁用标题 ID
       mangle: false,    // 禁用链接编码
       smartLists: true, // 优化列表渲染
-      xhtml: false      // 使用简单的 HTML
+      xhtml: false,     // 使用简单的 HTML
+      highlight: (code, lang) => {
+        // 使用 SyntaxHighlighter 进行代码高亮
+        try {
+          return SyntaxHighlighter({
+            children: code,
+            language: lang || 'javascript',
+            style: dracula,
+            customStyle: {
+              margin: 0,
+              padding: '1em',
+              borderRadius: '6px',
+              fontSize: '14px'
+            }
+          }).props.children;
+        } catch (error) {
+          console.error('代码高亮出错:', error);
+          return code;
+        }
+      }
     });
+
+    // 自定义处理代码块渲染
+    const renderer = new marked.Renderer();
+    renderer.code = (code, lang) => {
+      return `<pre class="code-block"><code class="language-${lang || 'javascript'}">${code}</code></pre>`;
+    };
+    marked.use({ renderer });
   }, []);
 
   // 安全地渲染 Markdown
@@ -65,57 +96,34 @@ const MessageBubble = ({
     return <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />;
   };
 
+  // 思考过程内容的ref
+  const reasoningContentRef = useRef(null);
+
+  // 监听思考内容变化，自动滚动到底部
+  useEffect(() => {
+    if (reasoningContentRef.current && isStreaming) {
+      const element = reasoningContentRef.current;
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [reasoningContent, isStreaming]);
+
   // 渲染推理内容
   const renderReasoningContent = () => {
     if (!reasoningContent) return null;
 
     return (
-      <div 
-        className="reasoning-bubble"
-        style={{
-          padding: '8px 12px',
-          backgroundColor: darkMode ? '#1a1a1a' : '#f5f5f5',
-          borderRadius: '8px',
-          fontSize: '14px',
-          color: darkMode ? '#aaaaaa' : '#666',
-          cursor: 'pointer',
-          userSelect: 'text'
-        }}
-        onClick={handleReasoningClick}
-      >
-        <div style={{ 
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span style={{ fontWeight: 500 }}>
-            {isStreaming ? '思考中...' : '思考过程'}
-          </span>
-          <svg 
-            width="12" 
-            height="12" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2"
-            style={{
-              transform: isReasoningExpanded ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.3s ease'
-            }}
-          >
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+      <div className="thinking-process" data-state={isReasoningExpanded ? "open" : "closed"} data-dark={darkMode}>
+        <button className="thinking-header" onClick={handleReasoningClick}>
+          <span className="thinking-icon" style={{
+            transform: isReasoningExpanded ? 'none' : 'rotate(-90deg)'
+          }}>🤔</span>
+          <span className="thinking-title">思考过程</span>
+        </button>
+        <div className="thinking-content">
+          <pre className="thinking-text" ref={reasoningContentRef}>
+            {reasoningContent}
+          </pre>
         </div>
-        {isReasoningExpanded && (
-          <div style={{ 
-            marginTop: '8px',
-            whiteSpace: 'pre-wrap'
-          }}>
-            <div className="markdown-content">
-              {renderMarkdown(reasoningContent)}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -127,23 +135,6 @@ const MessageBubble = ({
       return (
         <div className="user-message-content">
           {content}
-          {sensitiveInfoProtectionEnabled && (
-            <div style={{
-              marginTop: '4px',
-              fontSize: '12px',
-              color: darkMode ? '#a8c7e0' : '#0d47a1',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                <circle cx="12" cy="16" r="1"></circle>
-              </svg>
-              <span>已进行敏感信息保护处理</span>
-            </div>
-          )}
         </div>
       );
     } else {
@@ -152,9 +143,37 @@ const MessageBubble = ({
     }
   };
 
+  // 处理编辑提交
+  const handleSubmitEdit = (e) => {
+    e.preventDefault();
+    if (!editValue.trim()) return;
+    
+    // 传递完整的消息对象，包含id
+    if (typeof onEdit === 'function') {
+      try {
+        // 直接传递编辑内容，让父组件处理查找消息ID等工作
+        onEdit(editValue);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('提交编辑时出错:', error);
+        alert('提交编辑失败，请重试');
+      }
+    }
+  };
+  
+  // 修改编辑按钮的点击处理器
+  const handleEditClick = () => {
+    if (typeof onEdit !== 'function') {
+      console.error('编辑功能不可用: onEdit不是函数');
+      return;
+    }
+    setIsEditing(true);
+    setEditValue(content || '');
+  };
+
   return (
     <div 
-      className={`message-bubble ${isUser ? 'user' : ''}`} 
+      className={`message-bubble ${isUser ? 'user' : 'assistant'} ${darkMode ? 'dark' : ''}`} 
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -163,7 +182,7 @@ const MessageBubble = ({
         borderRadius: '12px',
         backgroundColor: darkMode 
           ? (isUser ? '#1e3a5f' : '#2d2d2d')  // 深色模式背景
-          : (isUser ? '#e3f2fd' : '#fff'),     // 浅色模式背景
+          : (isUser ? '#e3f2fd' : '#f5f5f5'),  // 浅色模式背景，与最终显示一致
         color: darkMode ? '#e0e0e0' : 'inherit',  // 深色模式文字颜色
         boxShadow: darkMode 
           ? '0 1px 2px rgba(0,0,0,0.3)' 
@@ -242,10 +261,7 @@ const MessageBubble = ({
                 取消
               </button>
               <button
-                onClick={() => {
-                  onEdit(editValue);
-                  setIsEditing(false);
-                }}
+                onClick={handleSubmitEdit}
                 style={{
                   padding: '8px 16px',
                   border: 'none',
@@ -336,7 +352,7 @@ const MessageBubble = ({
                 {/* 编辑按钮 - 仅对用户消息显示 */}
                 {isUser && onEdit && !isEditing && (
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => handleEditClick()}
                     style={{
                       border: 'none',
                       background: 'none',

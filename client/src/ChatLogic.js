@@ -65,7 +65,7 @@ export const formatTime = (timestamp) => {
 export const useChatLogic = () => {
   // 所有状态定义放在最前面
   const [displayMessages, setDisplayMessages] = useState(() => {
-    const saved = localStorage.getItem('chatHistory');
+    const saved = localStorage.getItem('conversations');
     if (saved) {
       const parsed = JSON.parse(saved);
       const activeConversation = parsed.find(conv => conv.active);
@@ -78,7 +78,7 @@ export const useChatLogic = () => {
   });
 
   const [requestMessages, setRequestMessages] = useState(() => {
-    const saved = localStorage.getItem('chatHistory');
+    const saved = localStorage.getItem('conversations');
     if (saved) {
       const parsed = JSON.parse(saved);
       const activeConversation = parsed.find(conv => conv.active);
@@ -113,7 +113,7 @@ export const useChatLogic = () => {
     return saved ? JSON.parse(saved) : false;
   });
   const [conversations, setConversations] = useState(() => {
-    const saved = localStorage.getItem('chatHistory');
+    const saved = localStorage.getItem('conversations');
     if (saved) {
       // 确保每个会话都有activeDocuments字段
       const parsedConversations = JSON.parse(saved);
@@ -141,7 +141,7 @@ export const useChatLogic = () => {
   });
   const [activeDocuments, setActiveDocuments] = useState(() => {
     // 从当前活动会话中获取活动文档
-    const saved = localStorage.getItem('chatHistory');
+    const saved = localStorage.getItem('conversations');
     if (saved) {
       const parsedConversations = JSON.parse(saved);
       const activeConv = parsedConversations.find(conv => conv.active);
@@ -267,7 +267,7 @@ export const useChatLogic = () => {
       content: newMessage.content,
       sessionHash: newMessage.sessionHash  // 确保请求消息也包含会话哈希值
     }]);
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
   };
 
@@ -364,7 +364,7 @@ export const useChatLogic = () => {
         }
         return conv;
       });
-      localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+      localStorage.setItem('conversations', JSON.stringify(updatedConversations));
       setConversations(updatedConversations);
       
       return newMessages;
@@ -592,12 +592,12 @@ export const useChatLogic = () => {
                 const newMessages = [...prev, aiMessage];
                 
                 // 保存到localStorage
-                const activeConversation = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+                const activeConversation = JSON.parse(localStorage.getItem('conversations') || '[]')
                   .find(conv => conv.active);
                 
                 if (activeConversation) {
                   // 更新活动会话的消息
-                  const updatedHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]')
+                  const updatedHistory = JSON.parse(localStorage.getItem('conversations') || '[]')
                     .map(conv => {
                       if (conv.active) {
                         return {
@@ -616,7 +616,7 @@ export const useChatLogic = () => {
                       return conv;
                     });
                   
-                  localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+                  localStorage.setItem('conversations', JSON.stringify(updatedHistory));
                 }
                 
                 return newMessages;
@@ -872,7 +872,7 @@ export const useChatLogic = () => {
     setConversations(updatedConversations);
     setDisplayMessages(newConversation.messages);
     setRequestMessages(newConversation.messages);
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     
     // 更新当前会话哈希值
     setSessionHash(newSessionHash);
@@ -897,11 +897,32 @@ export const useChatLogic = () => {
 
   // 处理对话点击
   const handleConversationClick = (conv) => {
-    const updatedConversations = conversations.map(c => ({
+  // 在切换会话前保存当前会话
+  const saved = localStorage.getItem('conversations');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    const activeConv = parsed.find(c => c.active);
+    if (activeConv) {
+      const currentDisplayed = displayMessages;
+      const updated = parsed.map(c => {
+        if (c.active) {
+          return {
+            ...c,
+            messages: currentDisplayed,
+            timestamp: Date.now()
+          };
+        }
+        return c;
+      });
+      localStorage.setItem('conversations', JSON.stringify(updated));
+    }
+  }
+
+  const updatedConversations = conversations.map(c => ({
       ...c,
       active: c.id === conv.id
     }));
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
     
     setCurrentResponse('');
@@ -942,7 +963,7 @@ export const useChatLogic = () => {
         }
         return c;
       });
-      localStorage.setItem('chatHistory', JSON.stringify(updatedWithHash));
+      localStorage.setItem('conversations', JSON.stringify(updatedWithHash));
       setConversations(updatedWithHash);
       
       console.log('会话没有哈希值，生成新的哈希值:', newSessionHash);
@@ -986,12 +1007,11 @@ export const useChatLogic = () => {
   };
 
   // 处理删除对话
-  const handleDeleteConversation = (e, convId) => {
-    e.stopPropagation();
-    
-    const updatedConversations = conversations.filter(conv => conv.id !== convId);
+const handleDeleteConversation = (sessionHash) => {
+    // 使用sessionHash作为参数，不再需要事件对象
+    const updatedConversations = conversations.filter(conv => conv.sessionHash !== sessionHash);
     if (updatedConversations.length > 0) {
-      if (conversations.find(conv => conv.id === convId)?.active) {
+      if (conversations.find(conv => conv.sessionHash === sessionHash)?.active) {
         updatedConversations[0].active = true;
         setDisplayMessages(updatedConversations[0].messages);
         setRequestMessages(updatedConversations[0].messages);
@@ -1006,7 +1026,7 @@ export const useChatLogic = () => {
       });
     }
     
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
   };
 
@@ -1029,7 +1049,7 @@ export const useChatLogic = () => {
       setConversations([newConversation]);
       setDisplayMessages(newConversation.messages);
       setRequestMessages(newConversation.messages);
-      localStorage.setItem('chatHistory', JSON.stringify([newConversation]));
+      localStorage.setItem('conversations', JSON.stringify([newConversation]));
       
       // 更新当前会话哈希值
       setSessionHash(newSessionHash);
@@ -1328,8 +1348,8 @@ export const useChatLogic = () => {
 
   // 添加敏感信息处理状态
   const [sensitiveInfoProtectionEnabled, setSensitiveInfoProtectionEnabled] = useState(() => {
-    const saved = localStorage.getItem('sensitiveInfoProtection');
-    return saved ? JSON.parse(saved) : true; // 默认启用
+    // 默认关闭敏感信息保护
+    return false;
   });
 
   // 文件上传处理
@@ -1799,6 +1819,75 @@ export const useChatLogic = () => {
       localStorage.setItem('sensitiveInfoProtection', JSON.stringify(newValue));
       return newValue;
     });
+  };
+
+  // 检查是否有保存的对话历史
+  const loadSavedConversations = () => {
+    try {
+      const saved = localStorage.getItem('conversations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      return [];
+    } catch (error) {
+      console.error('加载保存的对话失败:', error);
+      return [];
+    }
+  };
+
+  // 获取活跃的对话
+  const getActiveConversation = () => {
+    try {
+      const saved = localStorage.getItem('conversations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.find(conv => conv.active) || null;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('获取活跃对话失败:', error);
+      return null;
+    }
+  };
+
+  // 获取所有保存的对话
+  const getAllConversations = () => {
+    try {
+      const saved = localStorage.getItem('conversations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
+    } catch (error) {
+      console.error('获取所有对话失败:', error);
+      return [];
+    }
+  };
+
+  // 获取指定会话的消息
+  const getConversationMessages = (sessionHash) => {
+    try {
+      const saved = localStorage.getItem('conversations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const conversation = parsed.find(conv => conv.sessionHash === sessionHash);
+          if (conversation && Array.isArray(conversation.messages)) {
+            return conversation.messages;
+          }
+        }
+      }
+      return [];
+    } catch (error) {
+      console.error('获取会话消息失败:', error);
+      return [];
+    }
   };
 
   return {

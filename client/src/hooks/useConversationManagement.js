@@ -1,5 +1,5 @@
 // 对话管理相关的逻辑钩子
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateSessionHash } from '../utils/SessionUtils';
 import { ensureGlobalMapExists } from '../utils/SensitiveInfoMasker';
 
@@ -19,294 +19,248 @@ export const useConversationManagement = (
   const [editingTitle, setEditingTitle] = useState(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
 
-  // 处理新建对话
-  const handleNewChat = () => {
-    // 生成新的会话哈希值
-    const newSessionHash = generateSessionHash();
+  // 加载保存的会话历史
+  useEffect(() => {
+    try {
+      const storedHistory = localStorage.getItem('conversations');
+      if (storedHistory) {
+        const parsedHistory = JSON.parse(storedHistory);
+        setConversations(parsedHistory);
+        
+        // 查找活动会话
+        const activeConversation = parsedHistory.find(conv => conv.active);
+        if (activeConversation) {
+          console.log('找到活动会话:', activeConversation.title);
+          
+          // 设置会话哈希
+          if (activeConversation.sessionHash) {
+            localStorage.setItem('sessionHash', activeConversation.sessionHash);
+          }
+          
+          // 设置当前会话的消息
+          if (activeConversation.messages && Array.isArray(activeConversation.messages)) {
+            setDisplayMessages(activeConversation.messages);
+          }
+          
+          // 更新请求消息
+          if (activeConversation.messages && Array.isArray(activeConversation.messages)) {
+            // 转换消息格式为请求格式
+            const filteredMessages = activeConversation.messages.filter(msg => 
+              msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system'
+            );
+            setRequestMessages(filteredMessages);
+          }
+          
+          // 设置活动文档
+          if (activeConversation.activeDocuments) {
+            setActiveDocuments(activeConversation.activeDocuments);
+          }
+        }
+      } else {
+        console.log('未找到已保存的会话历史，创建新会话');
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error('加载会话历史时出错:', error);
+      handleNewChat();
+    }
+  }, []);
+
+  // 处理对话点击
+  const handleConversationClick = (sessionHash) => {
+    console.log('===== 切换对话 =====');
+    console.log('目标会话Hash:', sessionHash);
     
-    // 创建新对话
+    try {
+      // 直接从localStorage获取最新数据，不依赖displayMessages
+      const storedHistory = localStorage.getItem('conversations');
+      if (storedHistory) {
+        let conversationsCopy = JSON.parse(storedHistory);
+        console.log('从localStorage获取的最新会话数据:', {
+          会话数量: conversationsCopy.length,
+          当前活动会话: conversationsCopy.find(c => c.active)?.title || '无活动会话'
+        });
+        
+        // 查找目标会话
+        const targetConv = conversationsCopy.find(conv => conv.sessionHash === sessionHash);
+        if (targetConv) {
+          console.log('目标对话:', {
+            id: targetConv.id,
+            title: targetConv.title,
+            sessionHash: targetConv.sessionHash,
+            消息数量: targetConv.messages?.length || 0
+          });
+          
+          // 更新会话激活状态，不重写任何消息数据
+          const updatedConversations = conversationsCopy.map(conv => ({
+            ...conv,
+            active: conv.sessionHash === sessionHash
+          }));
+          
+          // 保存会话列表到localStorage
+          localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+          console.log('已更新会话激活状态，写入localStorage');
+          
+          // 在内存中更新会话列表
+          setConversations(updatedConversations);
+          
+          // 加载选定对话的消息
+          const messages = targetConv.messages || [];
+          
+          // 筛选出需要显示的消息
+          const displayableMessages = [
+            { role: 'system', content: '你是一个有用的AI助手。', id: 'system-1', timestamp: Date.now() }, // 默认系统消息
+            ...messages.filter(msg => msg.role !== 'system') // 排除系统消息
+          ];
+          
+          console.log('加载到显示消息列表的消息数量:', displayableMessages.length);
+          
+          // 更新显示消息和请求消息
+          setDisplayMessages(displayableMessages);
+          
+          // 只保留用户消息和助手消息作为历史，不包括系统消息
+          const requestMsgs = messages.filter(msg => msg.role !== 'system');
+          setRequestMessages(requestMsgs);
+          
+          // 更新活动文档和会话哈希
+          setActiveDocuments(targetConv.activeDocuments || []);
+          localStorage.setItem('sessionHash', sessionHash);
+          
+          // 重置其他状态
+          setCurrentResponse('');
+          setReasoningText('');
+          
+          // 滚动到底部
+          scrollToBottom();
+          
+          console.log('对话切换完成');
+        } else {
+          console.error('找不到目标会话:', sessionHash);
+        }
+      }
+    } catch (error) {
+      console.error('切换对话时出错:', error);
+    }
+    
+    console.log('===== 对话切换结束 =====');
+  };
+  
+  // 创建新对话
+  const handleNewChat = () => {
+    console.log('创建新对话');
+    
+    // 生成新的会话哈希值
+    const newSessionHash = Date.now().toString();
+    console.log('新会话哈希值:', newSessionHash);
+    
+    // 创建新的对话对象
     const newConversation = {
       id: Date.now().toString(),
       title: '新对话',
-      active: true,
       messages: [{ 
-        role: "system", 
-        content: "You are a helpful assistant.",
-        sessionHash: newSessionHash  // 为系统消息添加会话哈希值
+        role: 'system', 
+        content: '你是一个有用的AI助手。', 
+        id: 'system-' + Date.now(), 
+        timestamp: Date.now() 
       }],
       timestamp: Date.now(),
-      sessionHash: newSessionHash, // 添加新的会话哈希值
-      activeDocuments: [] // 添加空的活动文档列表
+      active: true,
+      sessionHash: newSessionHash
     };
     
-    // 更新对话列表
+    // 更新对话列表，确保只有一个活动对话
     const updatedConversations = conversations.map(conv => ({
       ...conv,
       active: false
     }));
     updatedConversations.unshift(newConversation);
     
-    // 保存到localStorage
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    // 保存更新后的对话列表
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
-    
-    // 更新显示消息和请求消息
-    setDisplayMessages(newConversation.messages);
-    setRequestMessages(newConversation.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content,
-      sessionHash: newSessionHash  // 确保请求消息也有会话哈希值
-    })));
-    
-    // 重置状态
-    setCurrentResponse('');
-    setReasoningText('');
-    setStreaming(false);
-    setActiveDocuments([]); // 清空活动文档
-    
-    // 确保全局映射表存在
-    ensureGlobalMapExists();
-    
-    // 为新会话创建空的映射表
-    if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[newSessionHash]) {
-      window.currentSensitiveInfoMap[newSessionHash] = {};
-      console.log('为新会话创建空的映射表，会话哈希值:', newSessionHash);
-      
-      // 保存到localStorage
-      try {
-        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-      } catch (error) {
-        console.error('保存全局映射表到localStorage时出错:', error);
-      }
-    }
-    
-    console.log('创建新对话，会话哈希值:', newSessionHash);
-  };
-
-  // 处理对话点击
-  const handleConversationClick = (conv) => {
-    // 保存当前会话的活动文档
-    const currentActiveConv = conversations.find(c => c.active);
-    if (currentActiveConv) {
-      currentActiveConv.activeDocuments = activeDocuments || [];
-    }
-    
-    // 更新活动状态
-    const updatedConversations = conversations.map(c => ({
-      ...c,
-      active: c.id === conv.id
-    }));
-    
-    // 保存到localStorage
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
-    setConversations(updatedConversations);
-    
-    // 重置当前状态
-    setCurrentResponse('');
-    setReasoningText('');
-    setStreaming(false);
     
     // 更新当前会话哈希值
-    if (conv.sessionHash) {
-      // 使用会话的哈希值
-      localStorage.setItem('sessionHash', conv.sessionHash);
-      console.log('切换到会话，哈希值:', conv.sessionHash);
-      
-      // 确保全局映射表存在
-      ensureGlobalMapExists();
-      
-      // 为会话创建映射表（如果不存在）
-      if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[conv.sessionHash]) {
-        window.currentSensitiveInfoMap[conv.sessionHash] = {};
-        console.log('为会话创建空的映射表，会话哈希值:', conv.sessionHash);
-        
-        // 保存到localStorage
-        try {
-          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        } catch (error) {
-          console.error('保存全局映射表到localStorage时出错:', error);
-        }
-      }
-    } else {
-      // 如果会话没有哈希值，生成一个新的
-      const newSessionHash = generateSessionHash();
-      localStorage.setItem('sessionHash', newSessionHash);
-      
-      // 更新会话的哈希值
-      const updatedWithHash = updatedConversations.map(c => {
-        if (c.id === conv.id) {
-          return { ...c, sessionHash: newSessionHash };
-        }
-        return c;
-      });
-      localStorage.setItem('chatHistory', JSON.stringify(updatedWithHash));
-      setConversations(updatedWithHash);
-      
-      console.log('会话没有哈希值，生成新的哈希值:', newSessionHash);
-      
-      // 确保全局映射表存在
-      ensureGlobalMapExists();
-      
-      // 为会话创建映射表
-      if (window.currentSensitiveInfoMap) {
-        window.currentSensitiveInfoMap[newSessionHash] = {};
-        console.log('为会话创建空的映射表，会话哈希值:', newSessionHash);
-        
-        // 保存到localStorage
-        try {
-          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        } catch (error) {
-          console.error('保存全局映射表到localStorage时出错:', error);
-        }
-      }
+    localStorage.setItem('sessionHash', newSessionHash);
+    
+    // 重置显示状态
+    setDisplayMessages(newConversation.messages);
+    setRequestMessages([]);  // 新对话不需要初始请求消息
+    setCurrentResponse('');
+    setReasoningText('');
+    setStreaming(false);
+    setActiveDocuments([]);
+    
+    // 滚动到底部
+    scrollToBottom();
+    
+    console.log('新对话创建完成');
+    return newSessionHash;
+  };
+  
+  // 删除对话
+  const handleDeleteConversation = (sessionHash) => {
+    console.log('删除对话:', sessionHash);
+    
+    // 找到要删除的对话
+    const convToDelete = conversations.find(conv => conv.sessionHash === sessionHash);
+    if (!convToDelete) {
+      console.error('无法找到要删除的对话:', sessionHash);
+      return;
     }
     
-    // 恢复会话的活动文档
-    const docsToRestore = conv.activeDocuments || [];
-    setActiveDocuments(docsToRestore);
-    console.log('恢复会话的活动文档:', docsToRestore);
+    // 如果删除的是当前活动对话，需要切换到其他对话
+    const wasActive = convToDelete.active;
     
-    // 获取会话消息并设置显示消息
-    const messages = conv.messages || [{ role: "system", content: "You are a helpful assistant." }];
-    console.log('加载会话消息，消息数量:', messages.length);
+    // 更新对话列表
+    const updatedConversations = conversations.filter(conv => conv.sessionHash !== sessionHash);
     
-    // 确保每条消息都有会话哈希值
-    const messagesWithSessionHash = messages.map(msg => ({
-      ...msg,
-      sessionHash: msg.sessionHash || (conv.sessionHash || conv.sessionHash)
-    }));
-    
-    // 设置显示消息和请求消息
-    setDisplayMessages(messagesWithSessionHash);
-    setRequestMessages(messagesWithSessionHash.map(msg => ({
-      role: msg.role,
-      content: msg.content,
-      reasoningContent: msg.reasoningContent, // 加载思考过程内容
-      sessionHash: msg.sessionHash
-    })));
-
-    // 重置用户滚动状态，确保滚动到底部
-    setUserHasScrolled(false);
-    
-    // 使用 scrollToBottom 函数滚动到底部
-    scrollToBottom(true);
-  };
-
-  // 处理删除对话
-  const handleDeleteConversation = (e, convId) => {
-    e.stopPropagation();
-    
-    // 获取要删除的对话信息，用于后续清理对应的映射表
-    const conversationToDelete = conversations.find(conv => conv.id === convId);
-    const sessionHashToDelete = conversationToDelete?.sessionHash;
-    
-    console.log('准备删除对话:', {
-      conversationId: convId,
-      sessionHash: sessionHashToDelete
-    });
-    
-    const updatedConversations = conversations.filter(conv => conv.id !== convId);
-    if (updatedConversations.length > 0) {
-      if (conversations.find(conv => conv.id === convId)?.active) {
-        // 设置第一个对话为活动对话
-        updatedConversations[0].active = true;
-        
-        // 获取新活动对话的会话哈希值
-        const newActiveSessionHash = updatedConversations[0].sessionHash || generateSessionHash();
-        
-        // 如果对话没有会话哈希值，添加一个
-        if (!updatedConversations[0].sessionHash) {
-          updatedConversations[0].sessionHash = newActiveSessionHash;
-        }
-        
-        // 更新当前会话哈希值
-        localStorage.setItem('sessionHash', newActiveSessionHash);
-        
-        // 确保所有消息都有会话哈希值
-        const messagesWithSessionHash = updatedConversations[0].messages.map(msg => ({
-          ...msg,
-          sessionHash: msg.sessionHash || newActiveSessionHash
-        }));
-        
-        // 更新对话的消息
-        updatedConversations[0].messages = messagesWithSessionHash;
-        
-        // 设置显示消息和请求消息
-        setDisplayMessages(messagesWithSessionHash);
-        setRequestMessages(messagesWithSessionHash.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          sessionHash: msg.sessionHash
-        })));
-      }
-    } else {
-      // 如果没有对话了，创建一个新的
-      const newSessionHash = generateSessionHash();
+    // 如果删除后还有对话，且删除的是活动对话，激活最新的对话
+    if (wasActive && updatedConversations.length > 0) {
+      updatedConversations[0].active = true;
       
-      updatedConversations.push({
-        id: Date.now().toString(),
-        title: '新对话',
-        active: true,
-        messages: [{ 
-          role: "system", 
-          content: "You are a helpful assistant.",
-          sessionHash: newSessionHash
-        }],
-        timestamp: Date.now(),
-        sessionHash: newSessionHash
-      });
+      // 更新显示状态为新的活动对话
+      setDisplayMessages(updatedConversations[0].messages || []);
       
-      // 更新当前会话哈希值
-      localStorage.setItem('sessionHash', newSessionHash);
+      // 更新请求消息，只需要用户和助手消息
+      const filteredMessages = updatedConversations[0].messages
+        ? updatedConversations[0].messages.filter(msg => msg.role !== 'system')
+        : [];
       
-      // 设置显示消息和请求消息
-      setDisplayMessages(updatedConversations[0].messages);
-      setRequestMessages(updatedConversations[0].messages.map(msg => ({
+      setRequestMessages(filteredMessages.map(msg => ({
         role: msg.role,
         content: msg.content,
-        reasoningContent: msg.reasoningContent, // 加载思考过程内容
-        sessionHash: msg.sessionHash
+        id: msg.id,
+        timestamp: msg.timestamp,
+        reasoningContent: msg.reasoning_content || msg.reasoningContent
       })));
       
-      // 确保全局映射表存在
-      ensureGlobalMapExists();
+      // 更新活动文档
+      setActiveDocuments(updatedConversations[0].activeDocuments || []);
       
-      // 为新会话创建空的映射表
-      if (window.currentSensitiveInfoMap && !window.currentSensitiveInfoMap[newSessionHash]) {
-        window.currentSensitiveInfoMap[newSessionHash] = {};
-        console.log('为新会话创建空的映射表，会话哈希值:', newSessionHash);
-        
-        // 保存到localStorage
-        try {
-          localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        } catch (error) {
-          console.error('保存全局映射表到localStorage时出错:', error);
-        }
-      }
+      // 更新当前会话哈希值
+      localStorage.setItem('sessionHash', updatedConversations[0].sessionHash);
+      
+      console.log('切换到新的活动对话, ID:', updatedConversations[0].id);
+    } else if (updatedConversations.length === 0) {
+      // 如果没有对话了，创建一个新对话
+      console.log('没有剩余对话，创建新对话');
+      handleNewChat();
+      return;
     }
     
-    // 从全局映射表中删除被删除对话的敏感信息映射
-    if (sessionHashToDelete && window.currentSensitiveInfoMap && window.currentSensitiveInfoMap[sessionHashToDelete]) {
-      console.log(`删除会话 ${sessionHashToDelete} 的敏感信息映射表`);
-      console.log(`原映射表条目数: ${Object.keys(window.currentSensitiveInfoMap[sessionHashToDelete]).length}`);
-      
-      // 删除该会话的映射表
-      delete window.currentSensitiveInfoMap[sessionHashToDelete];
-      
-      // 更新localStorage
-      try {
-        localStorage.setItem('globalSensitiveInfoMap', JSON.stringify(window.currentSensitiveInfoMap));
-        console.log('更新localStorage中的全局映射表，删除了会话的敏感信息映射');
-      } catch (error) {
-        console.error('更新localStorage中的全局映射表时出错:', error);
-      }
-    }
-    
-    // 保存到localStorage
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    // 保存更新后的对话列表
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
     
-    console.log('删除对话后，剩余对话数量:', updatedConversations.length);
+    // 重置其他状态
+    setCurrentResponse('');
+    setReasoningText('');
+    setStreaming(false);
+    
+    // 滚动到底部
+    scrollToBottom();
+    
+    console.log('对话删除完成');
   };
 
   // 处理清除所有对话
@@ -337,7 +291,7 @@ export const useConversationManagement = (
         reasoningContent: msg.reasoningContent, // 加载思考过程内容
         sessionHash: newSessionHash  // 确保请求消息也有会话哈希值
       })));
-      localStorage.setItem('chatHistory', JSON.stringify([newConversation]));
+      localStorage.setItem('conversations', JSON.stringify([newConversation]));
       
       // 更新当前会话哈希值
       localStorage.setItem('sessionHash', newSessionHash);
@@ -388,7 +342,7 @@ export const useConversationManagement = (
       return conv;
     });
     
-    localStorage.setItem('chatHistory', JSON.stringify(updatedConversations));
+    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
     setConversations(updatedConversations);
     setEditingTitle(null);
     setEditingTitleValue('');
