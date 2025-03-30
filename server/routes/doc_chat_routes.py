@@ -114,8 +114,8 @@ def register_doc_chat_routes(app, doc_store):
                         docs = doc_store.search(user_query, k=5, document_id=doc_id)
                         if docs:
                             # 将每个文档的搜索结果添加到上下文中
-                            doc_context = "\n\n".join([doc.page_content for doc in docs])
-                            context += f"\n\n文档 {doc_id} 的相关内容:\n{doc_context}"
+                            doc_context = "\\n\\n".join([doc.page_content for doc in docs])
+                            context += f"\\n\\n文档 {doc_id} 的相关内容:\n{doc_context}"
                             logger.info(f"在文档 {doc_id} 中找到 {len(docs)} 个相关片段")
                         else:
                             logger.warning(f"在文档 {doc_id} 中未找到相关内容")
@@ -125,7 +125,7 @@ def register_doc_chat_routes(app, doc_store):
                 # 如果没有提供文档ID，则在所有文档中搜索
                 logger.info("在所有文档中搜索相关内容")
                 docs = doc_store.search(user_query, k=5)
-                context = "\n\n".join([doc.page_content for doc in docs])
+                context = "\\n\\n".join([doc.page_content for doc in docs])
                 logger.info(f"找到 {len(docs)} 个相关片段")
             
             # 如果没有找到相关内容，记录警告
@@ -181,25 +181,25 @@ def register_doc_chat_routes(app, doc_store):
                         if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
                             if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                                 content = chunk.choices[0].delta.reasoning_content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
+                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\\n\\n".encode('utf-8')
                                 full_response.append(content)
                             elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
                                 content = chunk.choices[0].delta.content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n".encode('utf-8')
+                                yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\\n\\n".encode('utf-8')
                                 full_response.append(content)
                         else:
                             logger.error("收到 chunk 中没有 choices 字段")
                     
                     # 如果启用了联网搜索，添加网页链接
                     if is_web_search and search_result_urls_str:
-                        yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\n\n相关网页链接：{search_result_urls_str}\n'}}]})}\n\n".encode('utf-8')
+                        yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\\n\\n相关网页链接：{search_result_urls_str}\n'}}]})}\\n\\n".encode('utf-8')
 
-                    yield b"data: [DONE]\n\n"
+                    yield b"data: [DONE]\\n\\n"
                     CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
                 except Exception as e:
                     logger.error("生成响应流时出错: %s", str(e))
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
-                    yield b"data: [DONE]\n\n"
+                    yield f"data: {json.dumps({'error': str(e)})}\\n\\n".encode('utf-8')
+                    yield b"data: [DONE]\\n\\n"
 
             return Response(
                 stream_with_context(generate()),

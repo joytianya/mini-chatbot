@@ -164,30 +164,30 @@ def register_chat_routes(app):
                         if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
                             if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                                 content = chunk.choices[0].delta.reasoning_content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
+                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\\n\\n".encode('utf-8')
                                 full_response.append(content)
                             elif hasattr(chunk.choices[0].delta, 'reasoning') and chunk.choices[0].delta.reasoning:
                                 content = chunk.choices[0].delta.reasoning
-                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning}}]})}\n\n".encode('utf-8')
+                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning}}]})}\\n\\n".encode('utf-8')
                                 full_response.append(content)
                             elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
                                 content = chunk.choices[0].delta.content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n".encode('utf-8')
+                                yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\\n\\n".encode('utf-8')
                                 full_response.append(content)
                         else:
                             logger.error("收到 chunk 中没有 choices 字段")
                     
                     # 如果启用了联网搜索，添加网页链接
                     if is_web_search and search_result_urls_str:
-                        content_str = '\n\n相关网页链接：' + search_result_urls_str + '\n'
-                        yield f"data: {json.dumps({'choices': [{'delta': {'content': content_str}}]})}\n\n".encode('utf-8')
+                        content_str = '\\n\\n相关网页链接：' + search_result_urls_str + '\n'
+                        yield f"data: {json.dumps({'choices': [{'delta': {'content': content_str}}]})}\\n\\n".encode('utf-8')
 
-                    yield b"data: [DONE]\n\n"
+                    yield b"data: [DONE]\\n\\n"
                     CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
                 except Exception as e:
                     logger.error("生成响应流时出错: %s", str(e))
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
-                    yield b"data: [DONE]\n\n"
+                    yield f"data: {json.dumps({'error': str(e)})}\\n\\n".encode('utf-8')
+                    yield b"data: [DONE]\\n\\n"
 
             return Response(
                 stream_with_context(generate()),
