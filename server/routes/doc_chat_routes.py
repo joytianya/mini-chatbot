@@ -192,7 +192,7 @@ def register_doc_chat_routes(app, doc_store):
                     
                     # 如果启用了联网搜索，添加网页链接
                     if is_web_search and search_result_urls_str:
-                        yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\\n\\n相关网页链接：{search_result_urls_str}\n'}}]})}\\n\\n".encode('utf-8')
+                        yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\\n\\n相关网页链接：{search_result_urls_str}\\n'}}]})}\\n\\n".encode('utf-8')
 
                     yield b"data: [DONE]\\n\\n"
                     CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
