@@ -132,15 +132,17 @@ const ChatArea = ({
       if (!message.timestamp) {
         message.timestamp = Date.now();
       }
-      if (!message.sessionHash && sessionHash) {
-        message.sessionHash = sessionHash;
-      }
-
+      
+      // 检查会话哈希值
+      const messageSessionHash = message.sessionHash || sessionHash;
+      
       console.log('ChatArea.saveMessageToLocalStorage: 开始保存消息', {
         id: message.id,
         role: message.role,
         content: message.content.substring(0, 30) + '...',
-        sessionHash: message.sessionHash || sessionHash
+        sessionHash: messageSessionHash,
+        当前会话Hash: sessionHash,
+        原会话Hash: lastSessionRef.current
       });
 
       // 检查显示消息列表中是否存在相同内容的消息，但不阻止保存
@@ -172,18 +174,141 @@ const ChatArea = ({
         return false;
       }
       
+      // 优先检查是否需要保存到原会话
+      if (sessionHash !== lastSessionRef.current && lastSessionRef.current) {
+        const originalConvIndex = conversations.findIndex(c => c.sessionHash === lastSessionRef.current);
+        if (originalConvIndex !== -1) {
+          console.log('ChatArea.saveMessageToLocalStorage: 尝试将消息保存到原会话', lastSessionRef.current);
+          const originalConv = conversations[originalConvIndex];
+          
+          // 检查消息是否已存在
+          if (originalConv.messages && Array.isArray(originalConv.messages)) {
+            const duplicateMsgInOriginal = originalConv.messages.find(msg => 
+              msg.id === message.id || (msg.role === message.role && msg.content === message.content)
+            );
+            
+            if (!duplicateMsgInOriginal) {
+              // 克隆消息并设置正确的会话哈希
+              const messageToSave = {
+                ...message,
+                sessionHash: lastSessionRef.current
+              };
+              
+              // 添加消息到原会话
+              originalConv.messages.push(messageToSave);
+              originalConv.lastUpdated = Date.now();
+              
+              // 更新会话列表
+              conversations[originalConvIndex] = originalConv;
+              
+              // 保存到localStorage
+              try {
+                localStorage.setItem('conversations', JSON.stringify(conversations));
+                console.log('ChatArea.saveMessageToLocalStorage: 成功保存消息到原会话', {
+                  会话ID: originalConv.id,
+                  会话标题: originalConv.title,
+                  会话Hash: originalConv.sessionHash,
+                  消息数量: originalConv.messages.length,
+                  最新消息ID: messageToSave.id
+                });
+                return true;
+              } catch (error) {
+                console.error('ChatArea.saveMessageToLocalStorage: 保存到localStorage失败', error);
+              }
+            } else {
+              console.log('ChatArea.saveMessageToLocalStorage: 消息已存在于原会话中，不再保存');
+              return true;
+            }
+          }
+        }
+      }
+      
       // 查找当前会话
       const currentConversationIndex = conversations.findIndex(c => c.sessionHash === sessionHash);
       if (currentConversationIndex === -1) {
-        console.error('ChatArea.saveMessageToLocalStorage: 无法找到当前会话:', sessionHash);
+        console.error('ChatArea: 无法找到当前会话:', sessionHash);
+        
+        // 尝试使用消息自身的sessionHash查找会话
+        if (message.sessionHash && message.sessionHash !== sessionHash) {
+          const alternativeIndex = conversations.findIndex(c => c.sessionHash === message.sessionHash);
+          if (alternativeIndex !== -1) {
+            console.log('ChatArea.saveMessageToLocalStorage: 使用消息自身的会话哈希找到了会话:', message.sessionHash);
+            const alternativeConversation = conversations[alternativeIndex];
+            
+            // 检查消息是否已存在
+            if (alternativeConversation.messages && Array.isArray(alternativeConversation.messages)) {
+              const duplicateMsgInAlt = alternativeConversation.messages.find(msg => 
+                msg.id === message.id || (msg.role === message.role && msg.content === message.content)
+              );
+              
+              if (duplicateMsgInAlt) {
+                console.log('ChatArea.saveMessageToLocalStorage: 消息已存在于替代会话中，不再保存');
+                return true;
+              }
+            } else {
+              alternativeConversation.messages = [];
+            }
+            
+            // 添加消息到替代会话
+            alternativeConversation.messages.push(message);
+            alternativeConversation.lastUpdated = Date.now();
+            
+            // 更新会话列表并保存
+            conversations[alternativeIndex] = alternativeConversation;
+            localStorage.setItem('conversations', JSON.stringify(conversations));
+            
+            console.log('ChatArea.saveMessageToLocalStorage: 消息已保存到替代会话:', message.sessionHash);
+            return true;
+          }
+        }
+        
+        // 尝试遍历所有会话，查找是否有包含相同消息列表的会话
+        for (let i = 0; i < conversations.length; i++) {
+          const conv = conversations[i];
+          if (conv.messages && Array.isArray(conv.messages) && conv.messages.length > 0) {
+            // 检查是否有用户消息匹配
+            const hasMatchingMessages = conv.messages.some(msg => 
+              displayMessages.some(dMsg => 
+                dMsg.role === msg.role && 
+                dMsg.content === msg.content && 
+                dMsg.role === 'user'
+              )
+            );
+            
+            if (hasMatchingMessages) {
+              console.log('ChatArea.saveMessageToLocalStorage: 找到匹配消息内容的会话:', conv.sessionHash);
+              
+              // 检查消息是否已存在
+              const duplicateMsg = conv.messages.find(msg => 
+                msg.id === message.id || (msg.role === message.role && msg.content === message.content)
+              );
+              
+              if (duplicateMsg) {
+                console.log('ChatArea.saveMessageToLocalStorage: 消息已存在于匹配会话中，不再保存');
+                return true;
+              }
+              
+              // 添加消息到匹配会话
+              const messageToSave = {...message, sessionHash: conv.sessionHash};
+              conv.messages.push(messageToSave);
+              conv.lastUpdated = Date.now();
+              
+              // 更新会话列表并保存
+              conversations[i] = conv;
+              localStorage.setItem('conversations', JSON.stringify(conversations));
+              
+              console.log('ChatArea.saveMessageToLocalStorage: 消息已保存到匹配会话:', conv.sessionHash);
+              return true;
+            }
+          }
+        }
+        
         return false;
       }
-      
-      const currentConversation = conversations[currentConversationIndex];
-      
+
       // 检查消息是否已存在于会话中
-      if (currentConversation.messages && Array.isArray(currentConversation.messages)) {
-        const duplicateMsgInStorage = currentConversation.messages.find(msg => 
+      if (conversations[currentConversationIndex].messages && Array.isArray(conversations[currentConversationIndex].messages)) {
+        const duplicateMsgInStorage = conversations[currentConversationIndex].messages.find(msg => 
           msg.id === message.id || (msg.role === message.role && msg.content === message.content)
         );
         
@@ -195,32 +320,35 @@ const ChatArea = ({
           return true;  // 返回true表示消息已处理
         }
       } else {
-        currentConversation.messages = [];
+        conversations[currentConversationIndex].messages = [];
       }
       
       // 添加消息到会话
       console.log('ChatArea.saveMessageToLocalStorage: 添加消息到会话', {
-        会话ID: currentConversation.id,
-        会话标题: currentConversation.title,
-        会话Hash: currentConversation.sessionHash,
-        当前消息数: currentConversation.messages.length
+        会话ID: conversations[currentConversationIndex].id,
+        会话标题: conversations[currentConversationIndex].title,
+        会话Hash: conversations[currentConversationIndex].sessionHash,
+        当前消息数: conversations[currentConversationIndex].messages.length
       });
       
-      currentConversation.messages.push(message);
-      currentConversation.lastUpdated = Date.now();
+      // 确保消息有正确的会话哈希值
+      const messageToSave = {
+        ...message,
+        sessionHash: sessionHash
+      };
       
-      // 更新会话列表
-      conversations[currentConversationIndex] = currentConversation;
+      conversations[currentConversationIndex].messages.push(messageToSave);
+      conversations[currentConversationIndex].lastUpdated = Date.now();
       
       // 保存到localStorage
       try {
         localStorage.setItem('conversations', JSON.stringify(conversations));
         console.log('ChatArea.saveMessageToLocalStorage: 成功保存会话到localStorage', {
-          会话ID: currentConversation.id,
-          会话标题: currentConversation.title,
-          会话Hash: currentConversation.sessionHash,
-          消息数量: currentConversation.messages.length,
-          最新消息ID: message.id
+          会话ID: conversations[currentConversationIndex].id,
+          会话标题: conversations[currentConversationIndex].title,
+          会话Hash: conversations[currentConversationIndex].sessionHash,
+          消息数量: conversations[currentConversationIndex].messages.length,
+          最新消息ID: messageToSave.id
         });
         return true;
       } catch (error) {
@@ -288,10 +416,180 @@ const ChatArea = ({
             }
             
             const conversations = JSON.parse(latestConversationsStr);
+            
+            // 检查会话哈希值是否已更改
+            if (sessionHash !== lastSessionRef.current) {
+              console.log('ChatArea: 会话已切换，尝试将消息保存到原会话', {
+                原会话: lastSessionRef.current,
+                当前会话: sessionHash
+              });
+              
+              // 尝试找到原会话
+              const originalConvIndex = conversations.findIndex(c => c.sessionHash === lastSessionRef.current);
+              if (originalConvIndex !== -1) {
+                const originalConv = conversations[originalConvIndex];
+                
+                // 检查消息是否已存在
+                if (originalConv.messages && Array.isArray(originalConv.messages)) {
+                  const duplicateMsg = originalConv.messages.find(msg => 
+                    msg.id === lastAssistantMessage.id || 
+                    (msg.role === lastAssistantMessage.role && msg.content === lastAssistantMessage.content)
+                  );
+                  
+                  if (!duplicateMsg) {
+                    // 添加消息到原会话
+                    const messageToSave = {
+                      ...lastAssistantMessage,
+                      id: lastAssistantMessage.id || `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+                      timestamp: lastAssistantMessage.timestamp || Date.now(),
+                      sessionHash: lastSessionRef.current
+                    };
+                    
+                    originalConv.messages.push(messageToSave);
+                    originalConv.lastUpdated = Date.now();
+                    conversations[originalConvIndex] = originalConv;
+                    
+                    localStorage.setItem('conversations', JSON.stringify(conversations));
+                    console.log('ChatArea: 成功保存AI回复到原会话', {
+                      会话标题: originalConv.title,
+                      消息数量: originalConv.messages.length,
+                      会话哈希: originalConv.sessionHash
+                    });
+                    
+                    // 如果有回调，通知完成
+                    if (typeof handleReplyComplete === 'function') {
+                      handleReplyComplete(messageToSave, originalConv, true);
+                    }
+                    
+                    return;
+                  } else {
+                    console.log('ChatArea: AI回复已存在于原会话中，不再保存');
+                    return;
+                  }
+                }
+              }
+            }
+            
+            // 正常查找当前会话
             const currentConversationIndex = conversations.findIndex(c => c.sessionHash === sessionHash);
             
             if (currentConversationIndex === -1) {
               console.error('ChatArea: 无法找到当前会话:', sessionHash);
+              
+              // 尝试使用消息自身的sessionHash查找会话
+              if (lastAssistantMessage.sessionHash && lastAssistantMessage.sessionHash !== sessionHash) {
+                const alternativeIndex = conversations.findIndex(c => 
+                  c.sessionHash === lastAssistantMessage.sessionHash
+                );
+                
+                if (alternativeIndex !== -1) {
+                  console.log('ChatArea: 使用消息自身的会话哈希找到了会话:', lastAssistantMessage.sessionHash);
+                  const alternativeConversation = conversations[alternativeIndex];
+                  
+                  // 检查消息是否已存在
+                  const duplicateMsg = alternativeConversation.messages?.find(msg => 
+                    msg.id === lastAssistantMessage.id || 
+                    (msg.role === lastAssistantMessage.role && msg.content === lastAssistantMessage.content)
+                  );
+                  
+                  if (duplicateMsg) {
+                    console.log('ChatArea: AI回复已存在于替代会话中，不再保存');
+                    return;
+                  }
+                  
+                  // 确保消息列表存在
+                  if (!alternativeConversation.messages || !Array.isArray(alternativeConversation.messages)) {
+                    alternativeConversation.messages = [];
+                  }
+                  
+                  // 添加消息到替代会话
+                  const messageToSave = {
+                    ...lastAssistantMessage,
+                    id: lastAssistantMessage.id || `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+                    timestamp: lastAssistantMessage.timestamp || Date.now(),
+                    sessionHash: lastAssistantMessage.sessionHash
+                  };
+                  
+                  alternativeConversation.messages.push(messageToSave);
+                  alternativeConversation.lastUpdated = Date.now();
+                  
+                  // 更新会话列表并保存
+                  conversations[alternativeIndex] = alternativeConversation;
+                  localStorage.setItem('conversations', JSON.stringify(conversations));
+                  
+                  console.log('ChatArea: 成功保存AI回复到替代会话', {
+                    会话标题: alternativeConversation.title,
+                    消息数量: alternativeConversation.messages.length,
+                    会话哈希: alternativeConversation.sessionHash
+                  });
+                  return;
+                }
+              }
+              
+              // 尝试查找匹配的会话
+              let bestMatchIndex = -1;
+              let bestMatchCount = 0;
+              
+              // 遍历所有会话，查找匹配度最高的
+              for (let i = 0; i < conversations.length; i++) {
+                const conv = conversations[i];
+                if (conv.messages && Array.isArray(conv.messages) && conv.messages.length > 0) {
+                  let matchCount = 0;
+                  
+                  // 计算匹配消息数
+                  displayMessages.forEach(dMsg => {
+                    if (dMsg.role === 'user' && 
+                        conv.messages.some(msg => msg.role === 'user' && msg.content === dMsg.content)) {
+                      matchCount++;
+                    }
+                  });
+                  
+                  if (matchCount > bestMatchCount) {
+                    bestMatchCount = matchCount;
+                    bestMatchIndex = i;
+                  }
+                }
+              }
+              
+              if (bestMatchIndex !== -1 && bestMatchCount > 0) {
+                console.log(`ChatArea: 找到最佳匹配会话，匹配了${bestMatchCount}条消息`);
+                const matchedConv = conversations[bestMatchIndex];
+                
+                // 检查消息是否已存在
+                const duplicateMsg = matchedConv.messages.find(msg => 
+                  msg.id === lastAssistantMessage.id || 
+                  (msg.role === lastAssistantMessage.role && msg.content === lastAssistantMessage.content)
+                );
+                
+                if (duplicateMsg) {
+                  console.log('ChatArea: AI回复已存在于匹配会话中，不再保存');
+                  return;
+                }
+                
+                // 添加消息到匹配会话
+                const messageToSave = {
+                  ...lastAssistantMessage,
+                  id: lastAssistantMessage.id || `assistant-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
+                  timestamp: lastAssistantMessage.timestamp || Date.now(),
+                  sessionHash: matchedConv.sessionHash
+                };
+                
+                matchedConv.messages.push(messageToSave);
+                matchedConv.lastUpdated = Date.now();
+                
+                // 更新会话列表并保存
+                conversations[bestMatchIndex] = matchedConv;
+                localStorage.setItem('conversations', JSON.stringify(conversations));
+                
+                console.log('ChatArea: 成功保存AI回复到匹配会话', {
+                  会话标题: matchedConv.title,
+                  消息数量: matchedConv.messages.length,
+                  会话哈希: matchedConv.sessionHash
+                });
+                return;
+              }
+              
+              console.log('ChatArea: 无法找到合适的会话保存消息，尝试创建新会话');
               return;
             }
             
@@ -321,35 +619,7 @@ const ChatArea = ({
             // 添加消息到会话
             currentConversation.messages.push(messageToSave);
             currentConversation.lastUpdated = Date.now();
-            // 打印会话列表详细内容
-            console.log('ChatArea: 保存后的会话列表:', {
-              会话总数: conversations.length,
-              当前会话: {
-                标题: currentConversation.title,
-                消息数量: currentConversation.messages.length,
-                会话哈希: currentConversation.sessionHash,
-                最后更新: new Date(currentConversation.lastUpdated).toLocaleString(),
-                消息内容: currentConversation.messages.map(msg => ({
-                  角色: msg.role,
-                  内容: msg.content,
-                  ID: msg.id,
-                  时间: new Date(msg.timestamp).toLocaleString()
-                }))
-              },
-              所有会话: conversations.map(conv => ({
-                标题: conv.title,
-                消息数量: conv.messages.length,
-                会话哈希: conv.sessionHash,
-                是否激活: conv.active,
-                最后更新: new Date(conv.lastUpdated).toLocaleString(),
-                消息列表: conv.messages.map(msg => ({
-                  角色: msg.role,
-                  内容: msg.content,
-                  ID: msg.id,
-                  时间: new Date(msg.timestamp).toLocaleString()
-                }))
-              }))
-            });
+            
             // 保存更新后的会话
             localStorage.setItem('conversations', JSON.stringify(conversations));
             
@@ -358,6 +628,11 @@ const ChatArea = ({
               消息数量: currentConversation.messages.length,
               最新消息: messageToSave.id
             });
+            
+            // 如果有回调，通知完成
+            if (typeof handleReplyComplete === 'function') {
+              handleReplyComplete(messageToSave, currentConversation, false);
+            }
           } catch (error) {
             console.error('ChatArea: 保存AI回复时出错:', error);
           }
@@ -370,7 +645,10 @@ const ChatArea = ({
         console.log('ChatArea: 流式传输已结束，但未找到助手消息可保存');
       }
     }
-  }, [streaming, displayMessages, sessionHash]);
+    
+    // 更新上一次会话哈希值引用
+    lastSessionRef.current = sessionHash;
+  }, [streaming, displayMessages, sessionHash, handleReplyComplete]);
 
   // 动画引用和滚动行为
   const scrollToBottom = () => {

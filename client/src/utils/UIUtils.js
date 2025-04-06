@@ -1,19 +1,24 @@
 // UI相关的工具函数
 
-// 格式化时间戳
+/**
+ * 格式化时间戳
+ * @param {number} timestamp - 时间戳
+ * @returns {string} 格式化后的时间
+ */
 export const formatTime = (timestamp) => {
+  if (!timestamp) return '';
+  
   const date = new Date(timestamp);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
-  const isYesterday = date.toDateString() === new Date(now - 86400000).toDateString();
   
+  // 对于今天的日期，只显示时间
   if (isToday) {
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  } else if (isYesterday) {
-    return '昨天';
-  } else {
-    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
+  
+  // 对于其他日期，显示日期
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
 // 更新状态函数
@@ -83,4 +88,33 @@ export const showCopyToast = (message = '已复制到剪贴板') => {
   setTimeout(() => {
     document.body.removeChild(toast);
   }, 2000);
+};
+
+/**
+ * 切换深色模式
+ * @param {Function} setDarkMode - 设置深色模式的函数
+ */
+export const toggleDarkMode = (setDarkMode) => {
+  setDarkMode(prev => {
+    const newValue = !prev;
+    localStorage.setItem('darkMode', JSON.stringify(newValue));
+    document.body.classList.toggle('dark-mode', newValue);
+    return newValue;
+  });
+};
+
+/**
+ * 滚动到底部
+ * @param {React.RefObject} containerRef - 容器的ref
+ * @param {boolean} [smooth=true] - 是否平滑滚动
+ */
+export const scrollToBottom = (containerRef, smooth = true) => {
+  if (!containerRef || !containerRef.current) return;
+  
+  const scrollOptions = smooth ? { behavior: 'smooth' } : {};
+  
+  containerRef.current.scrollTo({
+    top: containerRef.current.scrollHeight,
+    ...scrollOptions
+  });
 }; 

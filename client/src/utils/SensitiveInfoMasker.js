@@ -64,15 +64,7 @@ const initGlobalSensitiveInfoMap = () => {
   return window.currentSensitiveInfoMap;
 };
 
-// 立即初始化全局映射表
-console.log('SensitiveInfoMasker.js 被加载，立即初始化全局映射表');
-initGlobalSensitiveInfoMap();
-
-// 确保全局映射表在每次页面加载时都被正确初始化
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('页面加载完成，确保全局映射表初始化');
-  initGlobalSensitiveInfoMap();
-});
+// 页面加载时初始化全局映射表的代码已移除
 
 /**
  * 生成文件哈希值（简化版，实际应用中可能需要更复杂的哈希算法）

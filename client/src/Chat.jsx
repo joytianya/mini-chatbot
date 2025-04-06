@@ -1,23 +1,25 @@
 // 导入必要的React组件和钩子
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 // 导入配置文件中的历史记录长度限制
 import { maxHistoryLength, serverURL } from './Config';
-// 导入侧边栏和聊天区域组件
-import Sidebar from './components/Sidebar';
-import ChatArea from './components/ChatArea';
-import { Settings } from './components/Settings';
+// 导入组件
+import Sidebar from './components/sidebar/Sidebar';
+import ChatArea from './components/chat/ChatArea';
+import Settings from './components/settings/Settings';
 // 导入聊天逻辑钩子
-import { useChatLogic } from './ChatLogic';
-import axios from 'axios';
+import useChatLogic from './hooks/useChatLogic';
 // 导入敏感信息演示组件
 import SensitiveInfoDemo from './components/SensitiveInfoDemo';
 // 导入错误边界组件
 import ErrorBoundary from './components/ErrorBoundary';
 import './Chat.css';
+// 导入会话管理工具
+import { handleReplyComplete } from './utils/sessionManager';
 
 // 主聊天组件
 function Chat() {
   const [showSettings, setShowSettings] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
   
   // 使用自定义钩子获取所有聊天相关的状态和方法
   const {
@@ -34,6 +36,7 @@ function Chat() {
     darkMode,            // 深色模式状态
     setDarkMode,         // 设置深色模式
     conversations,       // 对话列表
+    setConversations,    // 设置对话列表
     isSidebarExpanded,   // 侧边栏是否展开
     chatContainerRef,    // 聊天容器的引用
     handleSubmit,        // 提交消息处理函数
@@ -47,76 +50,27 @@ function Chat() {
     handleCopy,          // 复制文本处理函数
     handleEdit,          // 编辑消息处理函数
     handleScroll,        // 滚动处理函数
+    scrollToBottom,      // 滚动到底部
+    handleToggleSidebar, // 切换侧边栏
     formatTime,          // 时间格式化函数
     currentTurns,        // 当前对话轮次
     highlightedMessageId,// 高亮消息ID
     loadingHistory,      // 是否正在加载历史记录
-    sendChatRequest,     // 发送普通聊天请求
-    sendDocumentChatRequest,  // 发送文档聊天请求
-    activeDocuments,      // 当前活动文档列表
-    setActiveDocuments,    // 设置当前活动文档列表
-    handleToggleSidebar,  // 添加这一行
+    activeDocuments,     // 当前活动文档列表
+    setActiveDocuments,  // 设置当前活动文档列表
     availableModels,     // 可用模型列表
-    setAvailableModels,   // 可用模型列表的设置函数
-    setModelConfigs,      // 设置模型配置的函数
-    getConfigForModel,    // 获取模型配置的函数
+    setAvailableModels,  // 可用模型列表的设置函数
+    modelConfigs,        // 模型配置
+    setModelConfigs,     // 设置模型配置的函数
+    handleSettingsSave,  // 保存设置的函数
+    getConfigForModel,   // 获取模型配置的函数
     sensitiveInfoProtectionEnabled, // 敏感信息保护开关
-    toggleSensitiveInfoProtection,   // 切换敏感信息保护的函数
-    editingTitle,
-    setEditingTitle,
-    editingTitleValue,
-    setEditingTitleValue,
-    displayLimit,
-    sentMessageId,
-    abortController,
-    userHasScrolled,
-    handleDeleteChat,
-    handleSelectChat,
-    handleTitleEdit,
-    handleTitleChange,
-    handleTitleSave,
-    handleTitleCancel,
-    handleFileUpload,
-    sessionHash         // 添加会话哈希值
+    toggleSensitiveInfoProtection,  // 切换敏感信息保护的函数
+    toggleDarkMode,      // 切换深色模式
+    sessionHash,         // 会话哈希值
+    handleFileUpload     // 文件上传处理函数
   } = useChatLogic();
-
-  // 文件上传相关状态
-  const [files, setFiles] = React.useState([]);
-
-  // 处理设置面板的显示和隐藏
-  const toggleSettings = () => {
-    setShowSettings(!showSettings);
-  };
-
-  // 保存模型配置
-  const saveModelConfigs = (settings) => {
-    const { configs, modelNames, embeddingConfigs } = settings;
-    
-    // 保存模型配置
-    setModelConfigs(configs);
-    localStorage.setItem('modelConfigs', JSON.stringify(configs));
-    
-    // 保存 embedding 配置
-    if (embeddingConfigs) {
-      localStorage.setItem('embeddingConfigs', JSON.stringify(embeddingConfigs));
-    }
-    
-    // 如果有配置，自动选择第一个模型
-    if (configs.length > 0 && configs[0].model_name) {
-      setSelectedModel(configs[0].model_name);
-      // 确保选择的模型被正确保存到本地存储
-      localStorage.setItem('selectedModel', configs[0].model_name);
-    }
-    
-    // 更新可用模型列表
-    const updatedModels = modelNames || configs
-      .map(config => config.model_name)
-      .filter(name => name && name.trim() !== '');
-    
-    setAvailableModels(updatedModels);
-    localStorage.setItem('availableModels', JSON.stringify(updatedModels));
-  };
-
+  
   // 添加一个调试日志，检查文件上传和模型选择状态
   useEffect(() => {
     console.log("当前选择的模型:", selectedModel);
@@ -143,17 +97,10 @@ function Chat() {
           availableModels={availableModels}
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
-          handleSettingsSave={saveModelConfigs}
+          handleSettingsSave={handleSettingsSave}
           sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
           toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
-          formatTime={formatTime}
           handleToggleSidebar={handleToggleSidebar}
-          editingTitle={editingTitle}
-          editingTitleValue={editingTitleValue}
-          onTitleEdit={handleTitleEdit}
-          onTitleChange={handleTitleChange}
-          onTitleSave={handleTitleSave}
-          onTitleCancel={handleTitleCancel}
         />
         
         {/* 聊天区域 */}
@@ -190,6 +137,12 @@ function Chat() {
               setDarkMode={setDarkMode}
               handleExport={handleExport}
               sessionHash={sessionHash}
+              handleReplyComplete={handleReplyComplete}
+              handleNewChat={handleNewChat}
+              handleToggleSidebar={handleToggleSidebar}
+              toggleDarkMode={toggleDarkMode}
+              setShowFileUpload={setShowFileUpload}
+              openSettings={() => setShowSettings(true)}
             />
           </ErrorBoundary>
         </div>
@@ -197,15 +150,10 @@ function Chat() {
         {showSettings && (
           <Settings
             isOpen={showSettings}
-            onClose={toggleSettings}
-            darkMode={darkMode}
-            initialSettings={{
-              modelConfigs: JSON.parse(localStorage.getItem('modelConfigs') || '[]'),
-              embeddingConfigs: JSON.parse(localStorage.getItem('embeddingConfigs') || '[]')
-            }}
-            onSave={saveModelConfigs}
-            sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-            toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
+            onClose={() => setShowSettings(false)}
+            onSave={handleSettingsSave}
+            modelConfigs={modelConfigs}
+            availableModels={availableModels}
           />
         )}
       </div>
@@ -213,27 +161,4 @@ function Chat() {
   );
 }
 
-// 导出Chat组件
-export default Chat; 
-
-const ModelSelector = ({ models, selectedModel, onModelChange, disabled }) => {
-  return (
-    <select
-      value={selectedModel}
-      onChange={(e) => onModelChange(e.target.value)}
-      disabled={disabled}
-      style={{
-        padding: '8px',
-        borderRadius: '4px',
-        border: '1px solid #ddd',
-        backgroundColor: disabled ? '#f5f5f5' : 'white'
-      }}
-    >
-      {(models || []).map((model) => (
-        <option key={model} value={model}>
-          {model}
-        </option>
-      ))}
-    </select>
-  );
-};
+export default Chat;

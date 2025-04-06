@@ -1,10 +1,8 @@
 .chat-container {
   display: flex;
   height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
-  position: relative;
-  background-color: #f9f9f9;
+  background: var(--bg-color);
+  color: var(--text-color);
 }
 
 .chat-container.dark-mode {
@@ -18,6 +16,7 @@
   flex-direction: column;
   height: 100vh;
   position: relative;
+  background: var(--bg-color);
 }
 
 /* 敏感信息切换按钮样式 */
@@ -46,42 +45,93 @@
   background-color: #555;
 }
 
-/* 敏感信息包装器样式 */
-.sensitive-message-wrapper {
-  position: relative;
-  margin-bottom: 16px;
-}
-
-/* 敏感信息保护开关样式 */
+/* 敏感信息开关 */
 .sensitive-info-switch {
   display: flex;
   align-items: center;
-  margin: 10px 0;
-  padding: 8px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-}
-
-.dark-mode .sensitive-info-switch {
-  background-color: #333;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin: 0.5rem;
+  background: var(--bg-color);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
 }
 
 .sensitive-info-switch label {
-  margin-left: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  user-select: none;
 }
 
-/* 敏感信息保护图标 */
 .sensitive-info-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-right: 6px;
-  color: #2196f3;
+  color: var(--primary-color);
+  width: 1rem;
+  height: 1rem;
 }
 
-.dark-mode .sensitive-info-icon {
-  color: #61dafb;
+/* 敏感信息包装器 */
+.sensitive-message-wrapper {
+  position: relative;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: var(--bg-color);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+
+/* 模型选择器 */
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-color);
+}
+
+.model-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.model-version {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* 高级版按钮 */
+.advanced-button {
+  margin-left: auto;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.advanced-button:hover {
+  background: var(--surface-color);
+  border-color: var(--text-secondary);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .chat-container {
+    flex-direction: column;
+  }
+  
+  .model-selector {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .advanced-button {
+    padding: 0.25rem 0.5rem;
+  }
 } 
