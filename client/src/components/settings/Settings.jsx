@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import styles from './Settings.module.css'; // 导入 CSS Modules
 
 const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) => {
   const [configs, setConfigs] = useState([]);
 
-  // 内联样式
+  // 移除内联样式对象
+  /*
   const styles = {
     modal: {
       position: 'fixed',
@@ -106,8 +108,12 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
       cursor: 'pointer',
     }
   };
+  */
 
   useEffect(() => {
+    // 当模态框打开时，才设置 display: flex
+    const modalStyle = isOpen ? { display: 'flex' } : { display: 'none' };
+
     if (isOpen) {
       setConfigs(modelConfigs || []);
     }

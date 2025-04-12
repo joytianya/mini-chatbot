@@ -1,0 +1,122 @@
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex; /* Default to flex, controlled by isOpen prop in component */
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.content {
+  width: 80%;
+  max-width: 800px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.saveButton {
+  background-color: #1976d2;
+  color: white;
+}
+
+.cancelButton {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.configItem {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  box-sizing: border-box; /* Add box-sizing */
+}
+
+.label {
+  display: block;
+  margin-bottom: 10px; /* Adjusted from marginBottom */
+}
+
+.addButton {
+  background-color: #4caf50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.deleteButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.closeButton {
+  background-color: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
