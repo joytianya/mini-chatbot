@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import MessageBubble from '../MessageBubble';
 
-export function MessageList({
+const MessageListComponent = ({
   displayMessages,
   currentResponse,
   reasoningText,

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo } from 'react';
 import MessageList from './MessageList';
 import { MessageInput } from './MessageInput';
 import ChatHeader from './ChatHeader';
@@ -159,4 +159,5 @@ const ChatArea = ({
   );
 };
 
-export default ChatArea;
+// 使用 React.memo 包裹组件
+export default memo(ChatArea);

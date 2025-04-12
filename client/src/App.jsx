@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import { useConversationManagement } from './hooks/useConversationManagement';
@@ -7,7 +7,7 @@ import { useMessageHandling } from './hooks/useMessageHandling';
 const App = () => {
   // 添加chatContainerRef
   const chatContainerRef = useRef(null);
-  
+
   const [conversations, setConversations] = useState([]);
   const [currentSessionHash, setCurrentSessionHash] = useState('');
   const [darkMode, setDarkMode] = useState(false);
@@ -20,15 +20,15 @@ const App = () => {
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
-  // 修改scrollToBottom函数使用ref
-  const scrollToBottom = () => {
+  // 修改scrollToBottom函数使用ref并用useCallback包裹
+  const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  };
+  }, [chatContainerRef]); // 依赖项是 chatContainerRef
 
-  // 使用不同的名称实现保存对话函数
-  const saveCompletedReply = (assistantMessage) => {
+  // 使用不同的名称实现保存对话函数并用useCallback包裹
+  const saveCompletedReply = useCallback((assistantMessage) => {
     console.log('App.jsx中的saveCompletedReply被调用', assistantMessage?.id);
     
     // 防御性检查：确保assistantMessage是对象且有必要属性
@@ -141,7 +141,7 @@ const App = () => {
       console.error('App.jsx: 保存AI回复时发生错误:', error);
       return false;
     }
-  };
+  }, [displayMessages, conversations, setConversations, setDisplayMessages]); // 添加依赖项
 
   // 使用对话管理钩子
   const {
@@ -201,8 +201,8 @@ const App = () => {
     scrollToBottom // 使用之前定义的scrollToBottom函数
   );
 
-  // 包装handleSubmit函数，确保消息发送后清空输入框
-  const handleSubmit = async (e, isDeepResearch = false, isWebSearch = false) => {
+  // 包装handleSubmit函数，确保消息发送后清空输入框，并用useCallback包裹
+  const handleSubmit = useCallback(async (e, isDeepResearch = false, isWebSearch = false) => {
     // 保存当前输入值用于创建用户消息
     const currentInput = input.trim();
     
@@ -219,14 +219,14 @@ const App = () => {
     
     // 调用原始的handleSubmit函数并传入当前输入值
     return await originalHandleSubmit(e, isDeepResearch, isWebSearch, null, currentInput);
-  };
+  }, [input, setInput, originalHandleSubmit]); // 添加依赖项
 
   const handleFileUpload = (file) => {
     // Implementation of handleFileUpload
   };
 
-  // 处理编辑消息
-  const handleEdit = (message, newContent = null) => {
+  // 处理编辑消息，并用useCallback包裹
+  const handleEdit = useCallback((message, newContent = null) => {
     console.log('处理编辑消息:', message, newContent);
     
     // 如果只传递了一个参数，且是字符串，则视为新内容
@@ -293,7 +293,7 @@ const App = () => {
       console.error('处理编辑消息时出错:', error);
       alert('处理编辑消息失败，请重试');
     }
-  };
+  }, [displayMessages, setDisplayMessages, conversations, setConversations, originalHandleSubmit]); // 添加依赖项
 
   // 组件渲染前确保saveCompletedReply函数有效
   console.log('App组件渲染，saveCompletedReply函数类型:', typeof saveCompletedReply);
