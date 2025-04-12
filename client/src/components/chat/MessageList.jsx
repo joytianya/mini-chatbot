@@ -14,7 +14,7 @@ const MessageListComponent = ({
   handleEdit,
   darkMode,
   formatTime
-}) {
+}) => {
   const messagesEndRef = useRef(null);
 
   // 自动滚动到底部
