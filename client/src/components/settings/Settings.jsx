@@ -159,8 +159,8 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
       <div className={styles.content}>
         <div className={styles.header}>
           <h2>模型设置</h2>
-          <button 
-            style={{ backgroundColor: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} 
+          <button
+            className={styles.closeButton} // 使用 closeButton 类
             onClick={onClose}
           >
             ✕
@@ -170,72 +170,72 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
         <div style={styles.body}>
           <div style={styles.section}>
             <h3>模型配置</h3>
-            
+
             {configs.map((config, index) => (
-              <div key={index} style={styles.configItem}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
+              <div key={index} className={styles.configItem}> {/* 应用 configItem 类 */}
+                <div className={styles.formGroup}> {/* 应用 formGroup 类 */}
+                  <label className={styles.label}> {/* 应用 label 类 */}
                     模型名称:
-                    <input 
-                      style={styles.input}
-                      type="text" 
-                      value={config.model_name || ''} 
+                    <input
+                      className={styles.input} // 应用 input 类
+                      type="text"
+                      value={config.model_name || ''}
                       onChange={(e) => handleConfigChange(index, 'model_name', e.target.value)}
                       placeholder="例如: gpt-3.5-turbo"
                     />
                   </label>
                 </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
+
+                <div className={styles.formGroup}> {/* 应用 formGroup 类 */}
+                  <label className={styles.label}> {/* 应用 label 类 */}
                     基础URL:
-                    <input 
-                      style={styles.input}
-                      type="text" 
-                      value={config.base_url || ''} 
+                    <input
+                      className={styles.input} // 应用 input 类
+                      type="text"
+                      value={config.base_url || ''}
                       onChange={(e) => handleConfigChange(index, 'base_url', e.target.value)}
                       placeholder="例如: https://api.openai.com/v1"
                     />
                   </label>
                 </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
+
+                <div className={styles.formGroup}> {/* 应用 formGroup 类 */}
+                  <label className={styles.label}> {/* 应用 label 类 */}
                     API密钥:
-                    <input 
-                      style={styles.input}
-                      type="password" 
-                      value={config.api_key || ''} 
+                    <input
+                      className={styles.input} // 应用 input 类
+                      type="password"
+                      value={config.api_key || ''}
                       onChange={(e) => handleConfigChange(index, 'api_key', e.target.value)}
                       placeholder="输入您的API密钥"
                     />
                   </label>
                 </div>
-                
-                <button 
-                  style={styles.deleteButton} 
+
+                <button
+                  className={styles.deleteButton} // 应用 deleteButton 类
                   onClick={() => handleDeleteConfig(index)}
                 >
                   删除
                 </button>
               </div>
             ))}
-            
-            <button style={styles.addButton} onClick={handleAddConfig}>
+
+            <button className={styles.addButton} onClick={handleAddConfig}> {/* 应用 addButton 类 */}
               添加模型配置
             </button>
           </div>
         </div>
-        
-        <div style={styles.footer}>
-          <button 
-            style={{...styles.button, ...styles.saveButton}} 
+
+        <div className={styles.footer}> {/* 应用 footer 类 */}
+          <button
+            className={`${styles.button} ${styles.saveButton}`} // 应用 button 和 saveButton 类
             onClick={handleSave}
           >
             保存
           </button>
-          <button 
-            style={{...styles.button, ...styles.cancelButton}} 
+          <button
+            className={`${styles.button} ${styles.cancelButton}`} // 应用 button 和 cancelButton 类
             onClick={onClose}
           >
             取消
