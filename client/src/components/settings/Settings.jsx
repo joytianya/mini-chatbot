@@ -111,9 +111,6 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
   */
 
   useEffect(() => {
-    // 当模态框打开时，才设置 display: flex
-    const modalStyle = isOpen ? { display: 'flex' } : { display: 'none' };
-
     if (isOpen) {
       setConfigs(modelConfigs || []);
     }
@@ -154,10 +151,13 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
     onClose();
   };
 
+  // 使用 style 控制 modal 的显示/隐藏
+  const modalStyle = isOpen ? { display: 'flex' } : { display: 'none' };
+
   return (
-    <div style={styles.modal}>
-      <div style={styles.content}>
-        <div style={styles.header}>
+    <div className={styles.modal} style={modalStyle}>
+      <div className={styles.content}>
+        <div className={styles.header}>
           <h2>模型设置</h2>
           <button 
             style={{ backgroundColor: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} 
