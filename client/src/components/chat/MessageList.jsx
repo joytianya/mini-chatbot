@@ -58,6 +58,9 @@ const MessageListComponent = ({
       <div ref={messagesEndRef} />
     </div>
   );
-}
+};
 
-export default MessageList; 
+// 使用 React.memo 包裹组件
+const MemoizedMessageList = memo(MessageListComponent);
+
+export default MemoizedMessageList;
