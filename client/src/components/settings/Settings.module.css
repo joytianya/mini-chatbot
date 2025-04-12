@@ -50,16 +50,25 @@
   border: none;
   cursor: pointer;
   margin-left: 10px;
+  transition: background-color 0.2s ease, color 0.2s ease; /* Add transition */
 }
 
 .saveButton {
-  background-color: #1976d2;
-  color: white;
+  background-color: var(--primary-color); /* Use variable */
+  color: white; /* Assuming light text */
+  border: 1px solid var(--primary-color); /* Add border */
+}
+.saveButton:hover {
+  opacity: 0.9;
 }
 
 .cancelButton {
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: var(--surface-color); /* Use variable */
+  color: var(--text-secondary); /* Use variable */
+  border: 1px solid var(--border-color); /* Add border */
+}
+.cancelButton:hover {
+  background-color: var(--bg-color);
 }
 
 .formGroup {
@@ -82,10 +91,17 @@
   width: 100%;
   padding: 8px;
   margin-top: 5px;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-  box-sizing: border-box; /* Add box-sizing */
+  border-radius: var(--radius-sm); /* Use variable */
+  border: 1px solid var(--border-color); /* Use variable */
+  box-sizing: border-box; 
+  background-color: var(--surface-color); /* Ensure bg color */
+  color: var(--text-color); /* Ensure text color */
 }
+.input:focus {
+  border-color: var(--primary-color); /* Highlight focus */
+  outline: none;
+}
+
 
 .label {
   display: block;
@@ -113,10 +129,25 @@
   padding: 5px 10px;
   cursor: pointer;
 }
+.deleteButton:hover {
+  opacity: 0.9;
+}
 
 .closeButton {
   background-color: transparent;
   border: none;
   font-size: 20px;
   cursor: pointer;
+  color: var(--text-secondary); /* Style close button */
 }
+.closeButton:hover {
+  color: var(--text-color);
+}
+
+/* Dark mode adjustments (add if needed, requires setup) */
+/* Example:
+:global(.dark-mode) .content { background-color: var(--surface-color); }
+:global(.dark-mode) .input { background-color: var(--bg-color); border-color: var(--border-color); color: var(--text-color); }
+:global(.dark-mode) .cancelButton { background-color: var(--surface-color); color: var(--text-secondary); border-color: var(--border-color); }
+:global(.dark-mode) .cancelButton:hover { background-color: var(--bg-color); }
+*/

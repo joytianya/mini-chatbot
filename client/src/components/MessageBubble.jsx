@@ -173,27 +173,7 @@ const MessageBubble = ({
 
   return (
     <div 
-      className={`message-bubble ${isUser ? 'user' : 'assistant'} ${darkMode ? 'dark' : ''}`} 
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        backgroundColor: darkMode 
-          ? (isUser ? '#1e3a5f' : '#2d2d2d')  // 深色模式背景
-          : (isUser ? '#e3f2fd' : '#f5f5f5'),  // 浅色模式背景，与最终显示一致
-        color: darkMode ? '#e0e0e0' : 'inherit',  // 深色模式文字颜色
-        boxShadow: darkMode 
-          ? '0 1px 2px rgba(0,0,0,0.3)' 
-          : '0 1px 2px rgba(0,0,0,0.1)',
-        maxWidth: '85%',
-        alignSelf: isUser ? 'flex-end' : 'flex-start',
-        position: 'relative',
-        transition: 'all 0.3s ease',
-        transform: id === highlightedMessageId ? 'scale(1.02)' : 'scale(1)',
-        cursor: 'pointer'
-      }}
+      className={`message-bubble ${isUser ? 'user' : 'assistant'} ${darkMode ? 'dark' : ''} ${id === highlightedMessageId ? 'highlighted' : ''}`}
       onMouseEnter={() => setShowButtons(true)}
       onMouseLeave={() => setShowButtons(false)}
     >
@@ -201,76 +181,28 @@ const MessageBubble = ({
       {renderReasoningContent()}
 
       {/* 消息内容部分 */}
-      <div style={{ 
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-      }}>
+      <div className="message-main-content">
         {isEditing ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            maxWidth: '85%',
-            width: '500px',
-            margin: '0 auto'
-          }}>
+          <div className="message-edit-area">
             <textarea
+              className="message-edit-textarea"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              style={{
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
-                backgroundColor: darkMode ? '#1a1a1a' : '#fff',
-                color: darkMode ? '#e0e0e0' : 'inherit',
-                minHeight: '100px',
-                width: '100%',
-                resize: 'vertical',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                outline: 'none',
-                boxShadow: darkMode 
-                  ? '0 2px 4px rgba(0,0,0,0.2)'
-                  : '0 2px 4px rgba(0,0,0,0.05)',
-                transition: 'border-color 0.2s'
-              }}
               autoFocus
             />
-            <div style={{ 
-              display: 'flex', 
-              gap: '8px', 
-              justifyContent: 'flex-end'
-            }}>
+            <div className="message-edit-actions">
               <button
+                className="message-edit-button cancel"
                 onClick={() => {
                   setIsEditing(false);
                   setEditValue(content);
-                }}
-                style={{
-                  padding: '8px 16px',
-                  border: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
-                  borderRadius: '6px',
-                  background: darkMode ? '#2d2d2d' : '#fff',
-                  color: darkMode ? '#e0e0e0' : '#666',
-                  cursor: 'pointer',
-                  fontSize: '14px'
                 }}
               >
                 取消
               </button>
               <button
+                className="message-edit-button submit"
                 onClick={handleSubmitEdit}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  background: '#1976d2',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
               >
                 提交
               </button>
@@ -279,12 +211,8 @@ const MessageBubble = ({
         ) : (
           <>
             <div 
+              className="message-text-container"
               onClick={handleMessageClick}
-              style={{ 
-                whiteSpace: 'pre-wrap',
-                cursor: 'pointer',
-                color: darkMode ? '#e0e0e0' : 'inherit'
-              }}
             >
               <div className="markdown-content">
                 {renderContent()}
@@ -293,50 +221,25 @@ const MessageBubble = ({
 
             {/* 操作按钮 */}
             {!isStreaming && (showButtons || isEditing) && (
-              <div style={{
-                display: 'flex',
-                gap: '8px',
-                justifyContent: isUser ? 'flex-end' : 'flex-start',
-                marginTop: '4px'
-              }}>
+              <div className={`message-actions ${isUser ? 'user' : 'assistant'}`}>
                 {/* 复制按钮 - 对所有消息显示 */}
                 <button
+                  className="message-action-button"
                   onClick={() => onCopy && onCopy(content)}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '12px',
-                    color: darkMode ? '#aaaaaa' : '#666666'
-                  }}
                   title="复制"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                     <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                   </svg>
-                  复制
+                  <span>复制</span>
                 </button>
 
                 {/* 重试按钮 - 仅对 AI 消息显示 */}
                 {!isUser && onRetry && (
                   <button
-                    onClick={() => onRetry()}  // 传递联网搜索状态
-                    style={{
-                      border: 'none',
-                      background: 'none',
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '12px',
-                      color: darkMode ? '#aaaaaa' : '#666666'
-                    }}
+                    className="message-action-button"
+                    onClick={() => onRetry()}
                     title="重试"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -345,32 +248,22 @@ const MessageBubble = ({
                       <path d="M3 22v-6h6"/>
                       <path d="M21 12a9 9 0 01-15 6.7L3 16"/>
                     </svg>
-                    重试
+                    <span>重试</span>
                   </button>
                 )}
 
                 {/* 编辑按钮 - 仅对用户消息显示 */}
                 {isUser && onEdit && !isEditing && (
                   <button
+                    className="message-action-button"
                     onClick={() => handleEditClick()}
-                    style={{
-                      border: 'none',
-                      background: 'none',
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '12px',
-                      color: darkMode ? '#aaaaaa' : '#666666'
-                    }}
                     title="编辑"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                       <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
-                    编辑
+                    <span>编辑</span>
                   </button>
                 )}
               </div>

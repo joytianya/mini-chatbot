@@ -22,10 +22,28 @@
   --transition: all 0.2s ease;
   --font-sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, monospace;
+
+  /* Message Bubble Specific Variables */
+  --message-padding: var(--spacing-sm) var(--spacing-md); /* Adjusted padding */
+  --message-radius: var(--radius-md); /* Consistent radius */
+  --message-shadow: var(--shadow-sm);
+  --message-max-width: 80%; /* Slightly reduced max-width */
+  --message-user-text: #ffffff;
+  --message-assistant-text: var(--text-color);
+  --message-action-button-color: var(--text-secondary);
+  --message-action-button-hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* Thinking Process */
+  --thinking-bg: rgba(0, 0, 0, 0.03);
+  --thinking-border: rgba(0, 0, 0, 0.05);
+  --thinking-header-color: var(--text-secondary);
+  --thinking-content-bg: transparent; /* Keep it subtle */
+  --thinking-text-color: var(--text-secondary);
 }
 
 /* 暗色模式变量 */
-.dark-mode {
+.dark-mode, /* Apply dark mode styles directly to .dark-mode */
+:root.dark { /* Also support root level dark class */
   --bg-color: #1f1f1f;
   --surface-color: #2d2d2d;
   --text-color: #e3e3e3;
@@ -33,8 +51,20 @@
   --border-color: #3d3d3d;
   --primary-color: #3b82f6;
   --secondary-color: #60a5fa;
-  --message-user-bg: #3b82f6;
-  --message-assistant-bg: #1e293b;
+  --message-user-bg: #1e3a5f; /* Adjusted dark user bg */
+  --message-assistant-bg: #2d2d2d; /* Adjusted dark assistant bg */
+  --message-user-text: #e0e0e0;
+  --message-assistant-text: var(--text-color);
+  --message-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --message-action-button-color: #a8a9ab;
+  --message-action-button-hover-bg: rgba(255, 255, 255, 0.08);
+
+  /* Dark Thinking Process */
+  --thinking-bg: rgba(255, 255, 255, 0.05);
+  --thinking-border: rgba(255, 255, 255, 0.1);
+  --thinking-header-color: var(--text-secondary);
+  --thinking-content-bg: transparent;
+  --thinking-text-color: var(--text-secondary);
 }
 
 /* 基础样式重置 */
@@ -73,33 +103,116 @@ body {
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
   z-index: 10;
+  gap: var(--spacing-sm); /* Add gap for spacing */
 }
 
-.chat-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.header-actions {
+.header-left,
+.header-right {
   display: flex;
-  gap: var(--spacing-sm);
+  align-items: center;
+  gap: var(--spacing-sm); /* Consistent gap */
 }
 
 .header-button {
-  display: flex;
+  display: inline-flex; /* Use inline-flex for better alignment */
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  padding: var(--spacing-xs);
-  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm); /* Adjust padding */
+  border-radius: var(--radius-md); /* Consistent radius */
   color: var(--text-secondary);
+  transition: var(--transition);
+  font-size: 0.9rem; /* Consistent font size */
+  line-height: 1; /* Ensure icon vertical alignment */
 }
 
 .header-button:hover {
-  background-color: var(--surface-color);
+  background-color: var(--bg-color); /* Subtle hover */
   color: var(--text-color);
+}
+
+.header-button .icon {
+  font-size: 1.2em; /* Slightly larger icons */
+  margin-right: 0.3em; /* Space between icon and text */
+  display: inline-block; /* Ensure proper spacing */
+}
+
+.header-button.icon-button .icon {
+  margin-right: 0; /* No margin for icon-only buttons */
+}
+
+.header-button.icon-button {
+  padding: var(--spacing-xs); /* Square padding for icon buttons */
+}
+
+.new-chat-button .icon {
+  font-weight: bold;
+}
+
+.turn-counter {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  flex-grow: 1; /* Allow counter to take space if needed */
+  white-space: nowrap;
+}
+
+/* Active Documents in Header */
+.active-documents {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  overflow: hidden; /* Prevent long names breaking layout */
+}
+
+.active-documents h3 {
+  font-weight: 500;
+  margin: 0;
+  font-size: inherit; /* Inherit size */
+  white-space: nowrap;
+}
+
+.document-list {
+  display: flex;
+  gap: var(--spacing-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto; /* Allow scrolling if too many docs */
+  max-width: 300px; /* Limit width */
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-color);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.document-name {
+  max-width: 150px; /* Limit name width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-document-button {
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 50%;
+}
+
+.remove-document-button:hover {
+  background-color: var(--border-color);
 }
 
 /* 消息区域容器 */
@@ -111,63 +224,228 @@ body {
   background-color: var(--bg-color);
 }
 
-/* 消息样式 */
-.message {
+/* Message Bubble Styles */
+.message-bubble {
   display: flex;
-  margin-bottom: var(--spacing-lg);
+  flex-direction: column;
+  gap: var(--spacing-xs); /* Reduced gap */
+  padding: var(--message-padding);
+  border-radius: var(--message-radius);
+  background-color: var(--message-assistant-bg); /* Default to assistant */
+  color: var(--message-assistant-text);
+  box-shadow: var(--message-shadow);
+  max-width: var(--message-max-width);
+  position: relative;
+  transition: all 0.3s ease, transform 0.2s ease; /* Added transform transition */
+  margin-bottom: var(--spacing-md); /* Consistent margin */
   animation: fadeIn 0.3s ease;
-  max-width: 85%;
 }
 
-.message.user {
-  margin-left: auto;
-  flex-direction: row-reverse;
+.message-bubble.user {
+  background-color: var(--message-user-bg);
+  color: var(--message-user-text);
+  align-self: flex-end;
 }
 
-.message.assistant {
-  margin-right: auto;
+.message-bubble.assistant {
+  align-self: flex-start;
 }
 
-/* 消息头像 */
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+.message-bubble.highlighted {
+  transform: scale(1.01); /* Subtle highlight */
+  box-shadow: var(--shadow-md);
+}
+
+.message-main-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.message-text-container {
+  white-space: pre-wrap;
+  cursor: pointer; /* Keep cursor pointer */
+  color: inherit; /* Inherit color from bubble */
+}
+
+/* Thinking Process */
+.thinking-process {
+  border: 1px solid var(--thinking-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-xs);
+  background-color: var(--thinking-bg);
+  overflow: hidden; /* Ensure content stays within borders */
+}
+
+.thinking-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: var(--surface-color);
-  margin: 0 var(--spacing-sm);
-  font-size: 16px;
-  flex-shrink: 0;
+  gap: var(--spacing-xs);
+  padding: 6px 10px; /* Smaller padding */
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  color: var(--thinking-header-color);
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
-.user .avatar {
-  background-color: var(--primary-color);
-  color: white;
+.thinking-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 1em; /* Match header font size */
 }
 
-/* 消息内容 */
-.message-content {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  position: relative;
-  background-color: var(--surface-color);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
+.thinking-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.thinking-process[data-state="open"] .thinking-content {
+  max-height: 300px; /* Or a suitable max height */
+  overflow-y: auto; /* Add scroll if content exceeds max-height */
+}
+
+.thinking-text {
+  padding: 8px 12px; /* Padding inside content area */
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--thinking-text-color);
+  white-space: pre-wrap;
   word-break: break-word;
+  margin: 0; /* Remove default pre margin */
+  background-color: var(--thinking-content-bg);
 }
 
-.user .message-content {
-  background-color: var(--message-user-bg);
-  color: white;
+/* Message Actions (Copy, Retry, Edit Buttons) */
+.message-actions {
+  display: flex;
+  gap: var(--spacing-sm); /* Increased gap */
+  margin-top: var(--spacing-xs);
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.2s ease;
 }
 
-.assistant .message-content {
-  background-color: var(--message-assistant-bg);
+.message-bubble:hover .message-actions {
+  opacity: 1; /* Show on hover */
 }
 
-/* 输入区域 */
+.message-actions.user {
+  justify-content: flex-end;
+}
+
+.message-actions.assistant {
+  justify-content: flex-start;
+}
+
+.message-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 4px 6px; /* Slightly more padding */
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--message-action-button-color);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+}
+
+.message-action-button svg {
+  flex-shrink: 0; /* Prevent icon shrinking */
+}
+
+.message-action-button:hover {
+  background-color: var(--message-action-button-hover-bg);
+}
+
+/* Message Editing Area */
+.message-edit-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 100%; /* Take full width of bubble */
+  max-width: 500px; /* Limit max width */
+  margin: 0 auto; /* Center if needed */
+}
+
+.message-edit-textarea {
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  min-height: 80px; /* Reduced min-height */
+  width: 100%;
+  resize: vertical;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s;
+}
+
+.message-edit-textarea:focus {
+  border-color: var(--primary-color);
+}
+
+.dark-mode .message-edit-textarea {
+  background-color: var(--bg-color); /* Use bg color for dark textarea */
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  justify-content: flex-end;
+}
+
+.message-edit-button {
+  padding: 6px 12px; /* Smaller padding */
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: var(--transition);
+  border: 1px solid var(--border-color);
+}
+
+.message-edit-button.cancel {
+  background-color: var(--surface-color);
+  color: var(--text-secondary);
+}
+
+.message-edit-button.cancel:hover {
+  background-color: var(--bg-color);
+}
+
+.message-edit-button.submit {
+  background-color: var(--primary-color);
+  color: white; /* Assuming primary color has light text */
+  border-color: var(--primary-color);
+}
+
+.message-edit-button.submit:hover {
+  opacity: 0.9;
+}
+
+.dark-mode .message-edit-button.cancel {
+  background-color: var(--surface-color);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+.dark-mode .message-edit-button.cancel:hover {
+   background-color: var(--bg-color);
+}
+
+
+/* Input Area (Keep existing styles for now, refine later if needed) */
 .input-area {
   padding: var(--spacing-md) var(--spacing-lg);
   background-color: var(--surface-color);

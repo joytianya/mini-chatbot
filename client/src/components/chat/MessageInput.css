@@ -13,17 +13,29 @@
 .feature-button {
   padding: 0.5rem 1rem;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
-  background: transparent;
-  color: var(--text-color);
+  border-radius: var(--radius-md); /* Use variable */
+  background: var(--surface-color); /* Match surface */
+  color: var(--text-secondary); /* Use secondary text color */
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--transition); /* Use variable */
+  border: 1px solid var(--border-color); /* Add border */
 }
 
 .feature-button:hover {
-  background-color: var(--hover-color);
+  background-color: var(--bg-color); /* Use bg for hover */
+  color: var(--text-color);
+  border-color: var(--border-color); /* Keep border color */
 }
+
+/* Add active state if needed later */
+/*
+.feature-button.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+*/
 
 .input-form {
   display: flex;
@@ -37,10 +49,10 @@ textarea {
   max-height: 200px;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border-color);
-  border-radius: 24px;
+  border-radius: var(--radius-lg); /* Use variable */
   background-color: var(--surface-color);
   color: var(--text-color);
-  font-size: 1rem;
+  font-size: 0.9375rem; /* Match ChatArea */
   line-height: 1.5;
   resize: none;
   outline: none;
@@ -66,19 +78,24 @@ textarea:disabled {
   border: none;
   border-radius: 50%;
   background-color: transparent;
-  color: #5f6368;
+  color: var(--text-secondary); /* Use variable */
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--transition); /* Use variable */
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  height: 44px;
+  width: 40px; /* Match ChatArea */
+  height: 40px; /* Match ChatArea */
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .send-button.active {
   background-color: var(--primary-color);
-  color: white;
+  color: white; /* Assuming light text on primary */
+}
+
+.send-button.active:hover {
+  opacity: 0.9; /* Add hover effect */
 }
 
 .send-button:disabled {
