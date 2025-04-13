@@ -144,10 +144,50 @@
   color: var(--text-color);
 }
 
-/* Dark mode adjustments (add if needed, requires setup) */
-/* Example:
-:global(.dark-mode) .content { background-color: var(--surface-color); }
-:global(.dark-mode) .input { background-color: var(--bg-color); border-color: var(--border-color); color: var(--text-color); }
-:global(.dark-mode) .cancelButton { background-color: var(--surface-color); color: var(--text-secondary); border-color: var(--border-color); }
-:global(.dark-mode) .cancelButton:hover { background-color: var(--bg-color); }
-*/
+/* Dark mode adjustments using :global selector */
+:global(.dark) .content { 
+  background-color: var(--surface-color); 
+  border: 1px solid var(--border-color); /* Add border for contrast */
+}
+:global(.dark) .header,
+:global(.dark) .footer {
+  border-color: var(--border-color);
+}
+:global(.dark) .header h2 {
+  color: var(--text-color);
+}
+:global(.dark) .body {
+  color: var(--text-color);
+}
+:global(.dark) .configItem { 
+  border-color: var(--border-color); 
+  background-color: rgba(255, 255, 255, 0.03); /* Subtle background */
+}
+:global(.dark) .label {
+  color: var(--text-secondary);
+}
+:global(.dark) .input { 
+  background-color: var(--bg-color); 
+  border-color: var(--border-color); 
+  color: var(--text-color); 
+}
+:global(.dark) .input:focus {
+  border-color: var(--primary-color);
+}
+:global(.dark) .cancelButton { 
+  background-color: var(--surface-color); 
+  color: var(--text-secondary); 
+  border-color: var(--border-color); 
+}
+:global(.dark) .cancelButton:hover { 
+  background-color: var(--bg-color); 
+}
+:global(.dark) .closeButton {
+  color: var(--text-secondary);
+}
+:global(.dark) .closeButton:hover {
+  color: var(--text-color);
+}
+/* Keep Add/Delete button colors or adjust for dark mode if needed */
+/* :global(.dark) .addButton { ... } */
+/* :global(.dark) .deleteButton { ... } */

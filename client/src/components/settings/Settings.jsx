@@ -167,8 +167,9 @@ const Settings = ({ isOpen, onClose, onSave, modelConfigs, availableModels }) =>
           </button>
         </div>
         
-        <div style={styles.body}>
-          <div style={styles.section}>
+        {/* Use CSS Module classes instead of inline styles */}
+        <div className={styles.body}> 
+          <div className={styles.section}> 
             <h3>模型配置</h3>
 
             {configs.map((config, index) => (

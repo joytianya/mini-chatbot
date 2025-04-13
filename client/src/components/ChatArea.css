@@ -452,11 +452,13 @@ body {
   border-top: 1px solid var(--border-color);
   box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.05);
   z-index: 5;
+  /* Remove bottom shadow if input area is always visible */
+  box-shadow: none; 
 }
 
 .input-container {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-end; /* Align items to bottom (textarea grows up) */
   gap: var(--spacing-md);
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
@@ -475,10 +477,13 @@ body {
   display: flex;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
+  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
 }
 
-.feature-button {
-  display: flex;
+/* Style for feature buttons and model selector */
+.feature-button,
+.model-selector {
+  display: inline-flex; /* Use inline-flex */
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -489,20 +494,45 @@ body {
   font-size: 0.875rem;
   cursor: pointer;
   transition: var(--transition);
+  height: 36px; /* Consistent height */
+  box-sizing: border-box;
 }
 
-.feature-button:hover {
+.feature-button:hover,
+.model-selector:hover {
   background-color: var(--bg-color);
   color: var(--text-color);
+  border-color: var(--border-color); /* Keep border consistent on hover */
 }
 
 .feature-button.active {
-  background-color: rgba(37, 99, 235, 0.1);
+  background-color: rgba(37, 99, 235, 0.1); /* Example active state */
   border-color: var(--primary-color);
   color: var(--primary-color);
 }
 
-/* 文本输入框 */
+.model-selector {
+  /* Specific styles for dropdown */
+  appearance: none; /* Remove default arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23626365' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-sm) center;
+  padding-right: calc(var(--spacing-sm) * 2.5); /* Space for arrow */
+  min-width: 150px; /* Give dropdown some width */
+}
+
+.dark-mode .model-selector {
+   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23a8a9ab' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+}
+
+/* Text Input Area */
+.input-form {
+  display: flex;
+  flex-grow: 1; /* Allow form to take remaining space */
+  align-items: flex-end; /* Align items (textarea, button) to bottom */
+  gap: var(--spacing-sm); /* Gap between textarea and button */
+}
+
 .message-input {
   flex: 1;
   border: none;
@@ -514,35 +544,48 @@ body {
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   color: var(--text-color);
+  line-height: 1.5; /* Ensure consistent line height */
 }
 
 .message-input:focus {
   outline: none;
+  /* Remove focus border from container if textarea has focus */
+  /* The :focus-within on .input-container handles the border */
 }
 
 .message-input::placeholder {
   color: var(--text-secondary);
 }
 
-/* 发送按钮 */
-.send-button {
+/* Send and Stop Buttons */
+.send-button,
+.stop-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 40px; /* Consistent size */
+  height: 40px; /* Consistent size */
   border: none;
-  border-radius: 50%;
-  background-color: var(--primary-color);
-  color: white;
+  border-radius: 50%; /* Circular */
   cursor: pointer;
   transition: var(--transition);
-  flex-shrink: 0;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
-.send-button:hover:not(:disabled) {
-  background-color: var(--secondary-color);
-  transform: scale(1.05);
+.send-button {
+  background-color: var(--surface-color); /* Default background */
+  color: var(--text-secondary); /* Default color */
+  border: 1px solid var(--border-color); /* Add border */
+}
+
+.send-button.active {
+  background-color: var(--primary-color);
+  color: white; /* Assuming light text on primary */
+  border-color: var(--primary-color);
+}
+
+.send-button.active:hover {
+  opacity: 0.9;
 }
 
 .send-button:disabled {
@@ -550,7 +593,19 @@ body {
   cursor: not-allowed;
 }
 
-/* Markdown 内容样式 */
+.stop-button {
+  background-color: var(--destructive); /* Use destructive color */
+  color: white; /* Assuming light text */
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.stop-button:hover {
+  opacity: 0.9;
+}
+
+
+/* Markdown Content Styles (ensure consistency) */
 .markdown-content {
   font-size: 0.9375rem;
   line-height: 1.6;

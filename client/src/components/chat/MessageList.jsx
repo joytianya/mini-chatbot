@@ -31,10 +31,14 @@ const MessageListComponent = ({
       {displayMessages.filter(msg => msg.role !== 'system').map((message) => (
         <MessageBubble
           key={message.id || message.timestamp}
-          message={message}
-          highlighted={message.id === highlightedMessageId}
-          onRetry={handleRetry}
-          onCopy={handleCopy}
+          id={message.id || message.timestamp} // Pass id
+          content={message.content}
+          reasoningContent={message.reasoning_content} // Pass reasoning content
+          isUser={message.role === 'user'}
+          isStreaming={false} // Existing messages are not streaming
+          highlightedMessageId={highlightedMessageId} // Pass highlighted ID
+          onRetry={() => handleRetry(message)} // Pass message to retry handler
+          onCopy={handleCopy} // Pass copy handler
           onEdit={handleEdit}
           darkMode={darkMode}
           formatTime={formatTime}
@@ -43,14 +47,12 @@ const MessageListComponent = ({
       {streaming && (
         <MessageBubble
           key="streaming-message"
-          message={{
-            role: 'assistant',
-            content: currentResponse,
-            reasoning_content: reasoningText,
-            timestamp: Date.now(),
-          }}
-          isStreaming={true}
-          isReasoning={isReasoning}
+          id="streaming-message" // Unique key/id for streaming bubble
+          content={currentResponse}
+          reasoningContent={reasoningText}
+          isUser={false} // Streaming response is always assistant
+          isStreaming={true} // Indicate streaming
+          // No retry/copy/edit for streaming message
           darkMode={darkMode}
           formatTime={formatTime}
         />

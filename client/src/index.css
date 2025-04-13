@@ -48,6 +48,10 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    /* Dark mode specific markdown styles */
+    --markdown-code-bg: rgba(255, 255, 255, 0.1); /* Lighter background for dark mode code */
+    --markdown-pre-bg: rgba(255, 255, 255, 0.1); /* Lighter background for dark mode code blocks */
   }
 }
 
@@ -121,6 +125,16 @@ body {
   white-space: pre-wrap;
   word-wrap: normal;
 }
+
+/* Apply dark mode styles for markdown */
+.dark .markdown-content code {
+  background-color: var(--markdown-code-bg);
+}
+
+.dark .markdown-content pre {
+  background-color: var(--markdown-pre-bg);
+}
+
 
 .markdown-content li {
   margin: 0.2em 0;

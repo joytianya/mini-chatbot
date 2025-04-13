@@ -11,11 +11,11 @@ const MessageBubble = ({
   onRetry, 
   onCopy,
   onEdit, 
-  isStreaming,
+  isStreaming, // isStreaming indicates if this bubble represents the live stream
   id,
   highlightedMessageId,
-  darkMode,
-  isWebSearch
+  darkMode
+  // isWebSearch prop seems unused, removed for now unless needed later
 }) => {
   const [showButtons, setShowButtons] = useState(false);
   const [isEditing, setIsEditing] = useState(false);

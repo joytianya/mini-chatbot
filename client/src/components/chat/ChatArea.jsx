@@ -145,15 +145,16 @@ const ChatArea = ({
         />
       </div>
       
+      {/* Pass all necessary props to MessageInput */}
       <MessageInput 
         input={input}
         setInput={setInput}
-        handleSubmit={handleSubmit}
+        onSendMessage={handleSubmit} // Rename prop to match MessageInput expectation
         handleStop={handleStop}
         streaming={streaming}
         selectedModel={selectedModel}
-        modelOptions={modelOptions || []}
         setSelectedModel={setSelectedModel}
+        modelOptions={modelOptions || []} // Ensure modelOptions is always an array
       />
     </div>
   );
