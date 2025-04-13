@@ -1,6 +1,4 @@
 import React from 'react';
-
-import React from 'react';
 import './ChatHeader.css'; // Assuming you might create a separate CSS file later or use ChatArea.css
 
 const ChatHeader = ({
