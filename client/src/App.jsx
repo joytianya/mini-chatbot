@@ -299,14 +299,30 @@ const App = () => {
   console.log('App组件渲染，saveCompletedReply函数类型:', typeof saveCompletedReply);
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      overflow: 'hidden'
-    }}>
-      <Sidebar
-        conversations={conversations}
-        currentSessionHash={currentSessionHash}
+    // Add app-layout class and remove inline styles for layout
+    <div className="app-layout"> 
+      {/* Add sidebar-column class */}
+      <div className="sidebar-column"> 
+        <Sidebar
+          conversations={conversations}
+          currentSessionHash={currentSessionHash}
+          handleConversationClick={handleConversationClick}
+          handleNewChat={handleNewChat}
+          handleDeleteConversation={handleDeleteConversation}
+          handleClearAll={handleClearAll}
+          onUploadSuccess={handleFileUpload}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          streaming={streaming}
+          isSidebarExpanded={isSidebarExpanded}
+          handleToggleSidebar={() => {}} // Placeholder, might need actual implementation
+        />
+      </div>
+      {/* Add chat-column class */}
+      <div className="chat-column"> 
+        <ChatArea
+          input={input}
+          setInput={setInput}
         handleConversationClick={handleConversationClick}
         handleNewChat={handleNewChat}
         handleDeleteConversation={handleDeleteConversation}
@@ -332,10 +348,32 @@ const App = () => {
         activeDocuments={activeDocuments}
         sessionHash={currentSessionHash}
         chatContainerRef={chatContainerRef}
-        handleScroll={() => {}}
+        handleScroll={() => {}} // Placeholder, might need actual implementation
         handleEdit={handleEdit}
-        setDisplayMessages={setDisplayMessages}
+        setDisplayMessages={setDisplayMessages} // Pass setDisplayMessages
+        // Pass other necessary props from ChatArea's definition
+        handleRetry={handleRetry} // Assuming handleRetry comes from useMessageHandling or similar
+        handleCopy={handleCopy} // Assuming handleCopy comes from useMessageHandling or similar
+        formatTime={formatTime} // Assuming formatTime comes from somewhere
+        highlightedMessageId={highlightedMessageId} // Assuming highlightedMessageId exists
+        loadingHistory={loadingHistory} // Assuming loadingHistory exists
+        setActiveDocuments={setActiveDocuments}
+        handleStop={handleStop}
+        selectedModel={selectedModel} // Assuming selectedModel exists
+        setSelectedModel={setSelectedModel} // Assuming setSelectedModel exists
+        modelOptions={modelOptions} // Assuming modelOptions exists
+        currentTurns={currentTurns} // Assuming currentTurns exists
+        maxHistoryLength={maxHistoryLength} // Assuming maxHistoryLength exists
+        setDarkMode={setDarkMode}
+        handleExport={handleExport} // Assuming handleExport exists
+        handleReplyComplete={handleReplyComplete} // Pass handleReplyComplete
+        handleNewChat={handleNewChat} // Pass handleNewChat for header
+        handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} // Pass toggle function
+        toggleDarkMode={toggleDarkMode} // Pass toggleDarkMode for header
+        setShowFileUpload={setShowFileUpload} // Pass setShowFileUpload for header
+        openSettings={openSettings} // Pass openSettings for header
       />
+      </div>
     </div>
   );
 };

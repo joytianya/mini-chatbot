@@ -148,3 +148,37 @@ body {
 .spin {
   animation: spin 1s linear infinite;
 } 
+
+/* App Layout Styles */
+.app-layout {
+  display: flex;
+  height: 100vh; /* Full viewport height */
+  overflow: hidden; /* Prevent scrolling at the app level */
+}
+
+.sidebar-column {
+  width: 260px; /* Adjust width as needed */
+  flex-shrink: 0; /* Prevent sidebar from shrinking */
+  height: 100%; /* Full height */
+  display: flex; /* Use flex for internal Sidebar layout */
+  flex-direction: column; /* Stack elements vertically */
+  border-right: 1px solid var(--border); /* Add a border */
+  background-color: var(--sidebar); /* Use sidebar background color */
+}
+
+.chat-column {
+  flex-grow: 1; /* Take remaining width */
+  height: 100%; /* Full height */
+  display: flex; /* Use flex to allow ChatArea to fill space */
+  flex-direction: column; /* Stack header, messages, input vertically */
+  overflow: hidden; /* Prevent chat column itself from scrolling */
+}
+
+/* Ensure ChatArea component fills the chat-column */
+.chat-area {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; /* Allow ChatArea to grow */
+  height: 100%; /* Fill parent height */
+  overflow: hidden; /* Prevent ChatArea itself from scrolling */
+}
