@@ -315,29 +315,62 @@ const App = () => {
           setDarkMode={setDarkMode}
           streaming={streaming}
           isSidebarExpanded={isSidebarExpanded}
-          handleToggleSidebar={() => {}} // Placeholder, might need actual implementation
+          // Pass the actual toggle function to Sidebar if it needs it, 
+          // otherwise remove or keep placeholder
+          handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} 
         />
       </div>
       {/* Add chat-column class */}
       <div className="chat-column"> 
+        {/* Ensure only one ChatArea is rendered */}
         <ChatArea
-          input={input}
+          // Pass props from useMessageHandling hook
+          input={input} 
           setInput={setInput}
-        handleConversationClick={handleConversationClick}
-        handleNewChat={handleNewChat}
-        handleDeleteConversation={handleDeleteConversation}
-        handleClearAll={handleClearAll}
-        onUploadSuccess={handleFileUpload}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        streaming={streaming}
-        isSidebarExpanded={isSidebarExpanded}
-        handleToggleSidebar={() => {}}
-      />
-      <ChatArea
-        input={input}
-        setInput={setInput}
-        handleSubmit={handleSubmit}
+          handleSubmit={handleSubmit} // Use the wrapped handleSubmit
+          displayMessages={messageHandlingDisplayMessages || displayMessages} // Use state from hook or App
+          streaming={messageHandlingStreaming || streaming} // Use state from hook or App
+          currentResponse={messageHandlingCurrentResponse || currentResponse} // Use state from hook or App
+          reasoningText={messageHandlingReasoningText || reasoningText} // Use state from hook or App
+          isReasoning={isReasoning} // Pass isReasoning
+          handleStop={handleStop} // Pass handleStop
+          handleReplyComplete={handleReplyComplete} // Pass handleReplyComplete
+          
+          // Pass props from useConversationManagement hook or App state
+          conversations={conversations} // Pass conversations if needed inside ChatArea (e.g., for header info)
+          currentSessionHash={currentSessionHash} // Pass sessionHash
+          activeDocuments={activeDocuments} // Pass activeDocuments
+          setActiveDocuments={setActiveDocuments} // Pass setActiveDocuments
+          
+          // Pass general App state and handlers
+          darkMode={darkMode}
+          setDarkMode={setDarkMode} // Pass setDarkMode if needed inside ChatArea
+          chatContainerRef={chatContainerRef} // Pass the ref
+          handleScroll={() => {}} // Placeholder for scroll handling if needed
+          handleEdit={handleEdit} // Pass handleEdit
+          setDisplayMessages={setMessageHandlingDisplayMessages || setDisplayMessages} // Pass setDisplayMessages
+          
+          // Props specifically for ChatHeader (passed down through ChatArea)
+          handleNewChat={handleNewChat} // Pass handleNewChat for header button
+          handleExport={handleExport} // Pass handleExport for header button
+          handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} // Pass toggle for header button
+          toggleDarkMode={toggleDarkMode} // Pass toggleDarkMode for header button
+          setShowFileUpload={setShowFileUpload} // Pass setShowFileUpload for header button
+          openSettings={openSettings} // Pass openSettings for header button
+          currentTurns={currentTurns} // Pass currentTurns for header display
+          
+          // Props specifically for MessageList (passed down through ChatArea)
+          handleRetry={handleRetry} // Pass handleRetry (ensure it's defined, likely from useMessageHandling)
+          handleCopy={handleCopy} // Pass handleCopy (ensure it's defined)
+          formatTime={formatTime} // Pass formatTime (ensure it's defined)
+          highlightedMessageId={highlightedMessageId} // Pass highlightedMessageId (ensure it's defined)
+          loadingHistory={loadingHistory} // Pass loadingHistory (ensure it's defined)
+          
+          // Props specifically for MessageInput (passed down through ChatArea)
+          selectedModel={selectedModel} // Pass selectedModel (ensure it's defined)
+          setSelectedModel={setSelectedModel} // Pass setSelectedModel (ensure it's defined)
+          modelOptions={modelOptions} // Pass modelOptions (ensure it's defined)
+          maxHistoryLength={maxHistoryLength} // Pass maxHistoryLength if needed by input/validation
         displayMessages={messageHandlingDisplayMessages || displayMessages}
         streaming={messageHandlingStreaming || streaming}
         currentResponse={messageHandlingCurrentResponse || currentResponse}
@@ -358,21 +391,7 @@ const App = () => {
         highlightedMessageId={highlightedMessageId} // Assuming highlightedMessageId exists
         loadingHistory={loadingHistory} // Assuming loadingHistory exists
         setActiveDocuments={setActiveDocuments}
-        handleStop={handleStop}
-        selectedModel={selectedModel} // Assuming selectedModel exists
-        setSelectedModel={setSelectedModel} // Assuming setSelectedModel exists
-        modelOptions={modelOptions} // Assuming modelOptions exists
-        currentTurns={currentTurns} // Assuming currentTurns exists
-        maxHistoryLength={maxHistoryLength} // Assuming maxHistoryLength exists
-        setDarkMode={setDarkMode}
-        handleExport={handleExport} // Assuming handleExport exists
-        handleReplyComplete={handleReplyComplete} // Pass handleReplyComplete
-        handleNewChat={handleNewChat} // Pass handleNewChat for header
-        handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} // Pass toggle function
-        toggleDarkMode={toggleDarkMode} // Pass toggleDarkMode for header
-        setShowFileUpload={setShowFileUpload} // Pass setShowFileUpload for header
-        openSettings={openSettings} // Pass openSettings for header
-      />
+        />
       </div>
     </div>
   );

@@ -215,10 +215,10 @@ body {
   background-color: var(--border-color);
 }
 
-/* 消息区域容器 */
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
+/* 消息区域容器 - Renamed to .chat-messages in ChatArea.jsx */
+.chat-messages { 
+  flex: 1; /* Allow this area to grow and shrink */
+  overflow-y: auto; /* Enable vertical scrolling */
   padding: var(--spacing-lg);
   scroll-behavior: smooth;
   background-color: var(--bg-color);
@@ -647,27 +647,27 @@ body {
   }
 }
 
-/* 滚动条样式 */
-.messages-container::-webkit-scrollbar {
+/* 滚动条样式 - Apply to .chat-messages */
+.chat-messages::-webkit-scrollbar {
   width: 6px;
 }
 
-.messages-container::-webkit-scrollbar-track {
+.chat-messages::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.messages-container::-webkit-scrollbar-thumb {
+.chat-messages::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 3px;
 }
 
-.messages-container::-webkit-scrollbar-thumb:hover {
+.chat-messages::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-secondary);
 }
 
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .messages-container {
+  .chat-messages { /* Adjust padding for smaller screens */
     padding: var(--spacing-md);
   }
   
