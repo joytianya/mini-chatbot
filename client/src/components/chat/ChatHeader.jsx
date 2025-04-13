@@ -1,5 +1,5 @@
 import React from 'react';
-import './ChatHeader.css'; // Assuming you might create a separate CSS file later or use ChatArea.css
+// Removed unused import: import './ChatHeader.css'; 
 
 const ChatHeader = ({
   handleToggleSidebar,
