@@ -2,7 +2,6 @@
   "name": "mini-chatbot-client",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "dev": "PORT=5002 vite",
     "build": "vite build",
