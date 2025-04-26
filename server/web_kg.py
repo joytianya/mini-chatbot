@@ -1,10 +1,20 @@
+# -*- coding: utf-8 -*-
+
 import requests
 import asyncio
 from crawl4ai import AsyncWebCrawler
 import json
 import re
+import sys
 from bs4 import BeautifulSoup
 from searx_client import MultiSearXClient
+
+# 确保任何输出使用 UTF-8 编码
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', buffering=1)
+
 # SearXNG搜索函数
 def search_with_searxng(query, num_results=5, engines="google,bing"):
     url = 'https://searxng-render.onrender.com/search'

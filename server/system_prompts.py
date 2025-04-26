@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 doc_answer_zh_template = \
 '''# 以下内容是基于用户发送的消息的文档结果:
 {search_results}

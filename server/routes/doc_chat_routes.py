@@ -163,14 +163,34 @@ def register_doc_chat_routes(app, doc_store):
                 base_url=base_url
             )
             
+            # 检查是否为 OpenRouter 请求
+            is_openrouter = "openrouter.ai" in base_url
+            
+            # 创建请求参数
+            completion_args = {
+                "model": model_name,
+                "messages": [m for m in request_messages],
+                "stream": True,
+                "temperature": 0.7,
+            }
+            
+            # 添加 OpenRouter 所需的额外请求头
+            if is_openrouter:
+                # 获取请求头信息
+                referer = request.headers.get('HTTP-Referer', 'https://mini-chatbot.example.com')
+                title = request.headers.get('X-Title', 'Mini-Chatbot')
+                
+                # 添加到 extra_headers
+                completion_args["extra_headers"] = {
+                    "HTTP-Referer": referer,
+                    "X-Title": title
+                }
+                
+                logger.info(f"使用 OpenRouter API，模型: {model_name}")
+            
             # 发送请求
             logger.info(f"发送请求到模型: {model_name}")
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[m for m in request_messages],
-                stream=True,
-                temperature=0.7,
-            )
+            response = client.chat.completions.create(**completion_args)
             
             # 生成流式响应
             def generate():

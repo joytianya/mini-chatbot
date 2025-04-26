@@ -1,8 +1,9 @@
 import logging
-from logging import Formatter, StreamHandler
+from logging import Formatter, StreamHandler, FileHandler
 import traceback
 import os
 import json
+import sys
 
 # 创建自定义格式化器
 class CustomFormatter(Formatter):
@@ -31,7 +32,18 @@ def setup_logger():
     logger = logging.getLogger()
     
     # 创建处理器并设置格式化器
-    handler = StreamHandler()
+    # 尝试为 StreamHandler 设置 UTF-8 编码
+    # 注意：这在所有 Python 版本和环境中不一定完全可靠，
+    # 最可靠的方法还是确保运行环境 (如通过 PYTHONIOENCODING) 使用 UTF-8。
+    # 但我们在这里添加它作为一层额外的保障。
+    try:
+        # Python 3.9+ 支持直接为 StreamHandler 设置 encoding
+        handler = StreamHandler(sys.stdout, encoding='utf-8')
+    except TypeError:
+        # 对于旧版本 Python，StreamHandler 可能不接受 encoding 参数
+        # 此时依赖于 sys.stdout 本身的编码 (应通过环境变量设置)
+        handler = StreamHandler(sys.stdout)
+
     handler.setFormatter(CustomFormatter(
         fmt='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'

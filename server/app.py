@@ -1,3 +1,22 @@
+# -*- coding: utf-8 -*-
+# 设置全局编码为 UTF-8
+import sys
+import io
+import locale
+
+# 确保控制台输出使用 UTF-8
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# 尝试设置 locale
+try:
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+except locale.Error:
+    try:
+        locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+    except locale.Error:
+        pass  # 如果设置失败，继续使用默认值
+
 from flask import Flask, request, jsonify, Response, stream_with_context, make_response
 from flask_cors import CORS
 import os
@@ -27,6 +46,7 @@ from utils.file_utils import ALLOWED_EXTENSIONS
 from routes.upload_routes import register_upload_routes
 from routes.chat_routes import register_chat_routes
 from routes.doc_chat_routes import register_doc_chat_routes
+from routes.test_routes import register_test_routes  # 添加新的导入
 
 # 加载环境变量
 load_dotenv()
@@ -119,6 +139,9 @@ def register_routes():
     
     # 注册文档聊天相关路由
     register_doc_chat_routes(app, doc_store)
+    
+    # 注册测试路由
+    register_test_routes(app)  # 添加新的路由注册
     
     # 测试端点
 @app.route('/api/test')
