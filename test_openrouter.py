@@ -4,29 +4,99 @@
 import requests
 import json
 import sys
-import time
-import argparse
+import os
+import random
+import dotenv
+from dotenv import load_dotenv
 
-# 确保 Python 使用 UTF-8
+# 加载环境变量
+def load_env_vars():
+    # 尝试加载环境变量，首先尝试当前目录下的.env，然后尝试server目录下的.env
+    env_file_path = None
+    if os.path.exists('.env'):
+        load_dotenv('.env')
+        env_file_path = '.env'
+        print("已加载当前目录下的.env文件")
+    elif os.path.exists('server/.env'):
+        load_dotenv('server/.env')
+        env_file_path = 'server/.env'
+        print("已加载server目录下的.env文件")
+    else:
+        print("警告: 未找到.env文件，请创建.env文件并添加必要的环境变量")
+        print("需要在以下位置创建.env文件: './server/.env' 或 './.env'")
+        print("请在该文件中添加以下环境变量:")
+        print("  OPENROUTER_API_KEY=你的API密钥")
+        print("  OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free (可选，默认为此值)")
+        print("  OPENROUTER_BASE_URL=https://openrouter.ai/api/v1 (可选，默认为此值)")
+    
+    # 检查必要的环境变量是否存在
+    required_vars = {
+        'OPENROUTER_MODEL': 'google/gemini-2.0-flash-exp:free',
+        'OPENROUTER_BASE_URL': 'https://openrouter.ai/api/v1'
+    }
+    
+    missing_vars = []
+    if not os.getenv('OPENROUTER_API_KEY'):
+        missing_vars.append('OPENROUTER_API_KEY')
+    
+    if missing_vars:
+        print("警告: 以下必需的环境变量在.env文件中缺失:")
+        for var in missing_vars:
+            print(f"  - {var}")
+        print("\n请在.env文件中添加这些变量，例如:")
+        print("OPENROUTER_API_KEY=你的API密钥")
+        print("\n未提供API密钥将导致测试失败")
+
+# 加载环境变量
+load_env_vars()
+
+# 确保输出编码为 UTF-8
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
+# 从环境变量获取API密钥和模型
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'google/gemini-2.0-flash-exp:free')
+
+# 确保Python使用UTF-8编码输出
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-def test_openrouter(api_key, base_url, model, prompt, stream=True):
-    """测试 OpenRouter API 连接"""
-    print(f"=== 测试 OpenRouter API 连接 ===")
-    print(f"基础 URL: {base_url}")
-    print(f"模型: {model}")
-    print(f"流式响应: {stream}")
-    print(f"提示: {prompt}")
+# 从环境变量获取默认值
+DEFAULT_BASE_URL = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
+
+# 检查API密钥是否存在，但不中断测试
+if not OPENROUTER_API_KEY:
+    print("警告: 缺少OPENROUTER_API_KEY环境变量。请在.env文件中添加此变量。")
+    print("例如: OPENROUTER_API_KEY=你的API密钥")
+    print("测试将无法进行，因为API密钥是必需的。")
+
+def test_openrouter(prompt="请用中文介绍一下你自己", stream=False, api_key=None, base_url=None, model=None):
+    # 使用参数提供的值或默认值
+    api_key = api_key or OPENROUTER_API_KEY
+    base_url = base_url or DEFAULT_BASE_URL
+    model = model or OPENROUTER_MODEL
     
-    # 后端服务器地址
-    server_url = "http://localhost:5001"
-    endpoint = f"{server_url}/api/test_openrouter"
+    # 如果没有提供API密钥，退出测试
+    if not api_key:
+        print("错误: 没有提供API密钥，无法进行测试")
+        return None
     
-    # 请求数据
+    # 显示当前使用的参数（遮蔽API密钥的大部分）
+    masked_key = api_key[:5] + "..." + api_key[-3:] if api_key and len(api_key) > 8 else "****"
+    print(f"使用模型: {model}")
+    print(f"基础URL: {base_url}")
+    print(f"API密钥: {masked_key}")
+    
+    # 构建请求
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://mini-chatbot.example.com",
+        "X-Title": "Mini-Chatbot Test"
+    }
+    
     payload = {
-        "api_key": api_key,
-        "base_url": base_url,
         "model": model,
         "messages": [
             {"role": "user", "content": prompt}
@@ -34,108 +104,64 @@ def test_openrouter(api_key, base_url, model, prompt, stream=True):
         "stream": stream
     }
     
-    # 发送请求
-    try:
-        print("\n发送请求中...")
-        start_time = time.time()
-        
-        if stream:
-            # 使用流式响应
-            response = requests.post(
-                endpoint,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "text/event-stream"
-                },
-                stream=True,
-                timeout=60
-            )
-            
-            print(f"状态码: {response.status_code}")
-            
-            if response.status_code == 200:
-                print("\n流式响应内容:")
-                full_response = []
-                
-                for line in response.iter_lines():
-                    if line:
-                        decoded_line = line.decode('utf-8')
-                        print(f"  {decoded_line}")
-                        
-                        if decoded_line.startswith("data: "):
-                            # 解析数据
-                            data_str = decoded_line[6:]  # 移除 "data: " 前缀
-                            if data_str == "[DONE]":
-                                break
-                            
-                            try:
-                                data = json.loads(data_str)
-                                if "choices" in data and len(data["choices"]) > 0:
-                                    if "delta" in data["choices"][0] and "content" in data["choices"][0]["delta"]:
-                                        content = data["choices"][0]["delta"]["content"]
-                                        full_response.append(content)
-                                        sys.stdout.write(content)
-                                        sys.stdout.flush()
-                            except json.JSONDecodeError:
-                                print(f"无法解析 JSON 数据: {data_str}")
-                
-                print("\n\n完整响应:")
-                print(''.join(full_response))
-            else:
-                print(f"错误: {response.text}")
-        else:
-            # 使用普通响应
-            response = requests.post(
-                endpoint,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=60
-            )
-            
-            print(f"状态码: {response.status_code}")
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                print("\n响应内容:")
-                print(json.dumps(response_data, ensure_ascii=False, indent=2))
-                
-                if "content" in response_data:
-                    print("\n模型输出:")
-                    print(response_data["content"])
-            else:
-                print(f"错误: {response.text}")
-        
-        # 计算响应时间
-        elapsed_time = time.time() - start_time
-        print(f"\n响应时间: {elapsed_time:.2f} 秒")
-        
-    except requests.exceptions.ConnectionError:
-        print(f"错误: 无法连接到后端服务器 {server_url}")
-        print("请确保服务器正在运行，并且可以从当前主机访问。")
-    except requests.exceptions.Timeout:
-        print("错误: 请求超时。OpenRouter 或后端服务可能处理缓慢。")
-    except Exception as e:
-        print(f"错误: 测试过程中发生错误: {str(e)}")
+    print(f"发送请求: {prompt[:50]}{'...' if len(prompt) > 50 else ''}")
     
-    print("\n测试完成。")
+    # 发送请求
+    response = requests.post(
+        f"{base_url}/chat/completions",
+        headers=headers,
+        json=payload,
+        stream=stream
+    )
+    
+    # 处理响应
+    if response.status_code == 200:
+        if stream:
+            print("接收流式响应...")
+            content = ""
+            for chunk in response.iter_lines():
+                if chunk:
+                    chunk_str = chunk.decode('utf-8')
+                    if chunk_str.startswith('data: '):
+                        data_str = chunk_str[6:]  # 去掉 'data: ' 前缀
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            if "choices" in data and data["choices"] and "delta" in data["choices"][0]:
+                                if "content" in data["choices"][0]["delta"]:
+                                    content_chunk = data["choices"][0]["delta"]["content"]
+                                    if content_chunk:
+                                        content += content_chunk
+                                        sys.stdout.write(content_chunk)
+                                        sys.stdout.flush()
+                        except json.JSONDecodeError:
+                            print(f"无法解析JSON: {data_str}")
+            print("\n\n完整响应:")
+            print(content)
+            return content
+        else:
+            response_data = response.json()
+            content = response_data["choices"][0]["message"]["content"]
+            print("\n响应内容:")
+            print(content)
+            return content
+    else:
+        print(f"请求失败: 状态码 {response.status_code}")
+        print(response.text)
+        return None
+
+def main():
+    # 检查API密钥是否存在
+    if not OPENROUTER_API_KEY:
+        print("错误: 缺少OPENROUTER_API_KEY环境变量。无法进行测试。")
+        print("请在.env文件中添加此变量后重新运行测试。")
+        sys.exit(1)
+        
+    # 测试两种模式
+    test_openrouter("请用中文介绍一下你自己，不要太长", stream=False)
+    print("\n---\n")
+    test_openrouter("请用中文解释一下什么是量子计算", stream=True)
 
 if __name__ == "__main__":
-    # 命令行参数解析
-    parser = argparse.ArgumentParser(description='测试 OpenRouter API 连接')
-    parser.add_argument('--api-key', required=True, help='OpenRouter API 密钥')
-    parser.add_argument('--base-url', default='https://openrouter.ai/api/v1', help='基础 URL')
-    parser.add_argument('--model', default='google/gemini-2.0-flash-exp:free', help='模型名称')
-    parser.add_argument('--prompt', default='你好，请用中文回答：什么是人工智能？', help='测试提示')
-    parser.add_argument('--no-stream', action='store_true', help='使用非流式响应')
-    
-    args = parser.parse_args()
-    
-    # 运行测试
-    test_openrouter(
-        api_key=args.api_key,
-        base_url=args.base_url,
-        model=args.model,
-        prompt=args.prompt,
-        stream=not args.no_stream
-    ) 
+    main() 

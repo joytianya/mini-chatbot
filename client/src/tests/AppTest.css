@@ -1,0 +1,192 @@
+.app-test {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.app-test h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+}
+
+.test-controls {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.test-button, .clear-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.test-button {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.test-button:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.clear-button {
+  background-color: #f44336;
+  color: white;
+}
+
+.clear-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+.test-button:disabled, .clear-button:disabled {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
+
+.current-test {
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f0f8ff;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.test-results {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.test-results h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 10px;
+}
+
+.no-results {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.result-item {
+  background-color: white;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #ccc;
+}
+
+.result-item.passed {
+  border-left-color: #4CAF50;
+}
+
+.result-item.failed {
+  border-left-color: #f44336;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.result-name {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.result-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.result-status.passed {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.result-status.failed {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.result-message {
+  margin-bottom: 10px;
+  color: #555;
+}
+
+.result-details {
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.result-details pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 5px 0 0;
+  font-family: monospace;
+  font-size: 12px;
+  background-color: #eee;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.result-time {
+  font-size: 12px;
+  color: #888;
+  text-align: right;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.error-message button {
+  background-color: #c62828;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.error-message button:hover {
+  background-color: #b71c1c;
+}

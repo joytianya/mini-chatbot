@@ -21,7 +21,7 @@ export function ConversationList({
       <button
         onClick={onNewChat}
         className={cn(
-          'flex items-center gap-2 rounded-lg border border-border/50 px-4 py-2',
+          'flex items-center gap-2 rounded-lg border border-[hsl(var(--border))]/50 px-4 py-2',
           'hover:bg-accent/50 transition-colors',
           'text-base font-medium'
         )}
@@ -35,7 +35,7 @@ export function ConversationList({
           type="text"
           placeholder="搜索对话..."
           className={cn(
-            'w-full rounded-lg border border-border/50 bg-transparent px-4 py-2',
+            'w-full rounded-lg border border-[hsl(var(--border))]/50 bg-transparent px-4 py-2',
             'focus:outline-none focus:ring-2 focus:ring-ring/50',
             'placeholder:text-muted-foreground'
           )}

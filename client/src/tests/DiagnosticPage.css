@@ -1,0 +1,228 @@
+.diagnostic-page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  color: #333;
+}
+
+.diagnostic-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.diagnostic-header h1 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.diagnostic-nav {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.nav-link {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #3498db;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.nav-link:hover {
+  background-color: #2980b9;
+}
+
+.diagnostic-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.diagnostic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.action-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s, opacity 0.3s;
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-button.primary {
+  background-color: #3498db;
+  color: white;
+}
+
+.action-button.primary:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.action-button.secondary {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.action-button.secondary:hover:not(:disabled) {
+  background-color: #7f8c8d;
+}
+
+.action-button.warning {
+  background-color: #f39c12;
+  color: white;
+}
+
+.action-button.warning:hover:not(:disabled) {
+  background-color: #e67e22;
+}
+
+.action-button.danger {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.action-button.danger:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+.diagnostic-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.result-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  overflow: hidden;
+}
+
+.result-card h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.no-data {
+  color: #7f8c8d;
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.status-list, .error-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.status-item {
+  padding: 10px;
+  border-left: 4px solid #ccc;
+  margin-bottom: 10px;
+  background-color: #f9f9f9;
+}
+
+.status-item.ok {
+  border-left-color: #2ecc71;
+}
+
+.status-item.warning {
+  border-left-color: #f39c12;
+}
+
+.status-item.error {
+  border-left-color: #e74c3c;
+}
+
+.status-item.info {
+  border-left-color: #3498db;
+}
+
+.status-key {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.status-message {
+  display: block;
+  margin-top: 5px;
+}
+
+.status-details {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.key-list {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 5px 0;
+}
+
+.status-error, .status-details pre {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #ffe6e6;
+  border-radius: 4px;
+  color: #c0392b;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.error-item {
+  padding: 10px;
+  border-left: 4px solid #e74c3c;
+  margin-bottom: 10px;
+  background-color: #fff9f9;
+}
+
+.error-time {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 5px;
+}
+
+.error-message {
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+}
+
+.diagnostic-footer {
+  margin-top: 40px;
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 14px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}

@@ -5,18 +5,20 @@ from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 from pathlib import Path
 from browser_use import Agent, Browser, BrowserConfig
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-#load_dotenv()
-
-api_key_deepseek = os.getenv('DEEPSEEK_API_KEY', 'sk-4fe839d0554c439384048110f16f8665')
-if not api_key_deepseek:
-	raise ValueError('DEEPSEEK_API_KEY is not set')
-from langchain_openai import ChatOpenAI
-from browser_use import Agent, Browser, BrowserConfig
-from dotenv import load_dotenv
+# 加载环境变量
 load_dotenv()
 
-import asyncio
+# 从环境变量获取API密钥，不要使用硬编码的默认值
+api_key_deepseek = os.getenv('DEEPSEEK_API_KEY')
+if not api_key_deepseek:
+	raise ValueError('DEEPSEEK_API_KEY 环境变量未设置，请在.env文件中添加此变量')
+
+# 从环境变量获取Google Gemini API密钥
+google_api_key = os.getenv('GOOGLE_API_KEY')
+if not google_api_key:
+	raise ValueError('GOOGLE_API_KEY 环境变量未设置，请在.env文件中添加此变量')
 
 task="""
    ### Prompt for Shopping Agent – Migros Online Grocery Order
@@ -116,10 +118,9 @@ At this stage, check the basket on the top right (indicates the price) and check
 **Important:** Ensure efficiency and accuracy throughout the process."""
 
 browser = Browser()
-from langchain_google_genai import ChatGoogleGenerativeAI
 llm = ChatGoogleGenerativeAI(
 		model='gemini-2.0-flash',
-		api_key=SecretStr("AIzaSyAt3STSfq10PVYsSGu-Tyh6UMhwWsBxdpI"),
+		api_key=SecretStr(google_api_key),
 	)
 agent = Agent(task=task, llm=llm, browser=browser)
 

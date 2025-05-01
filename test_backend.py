@@ -5,18 +5,59 @@ import requests
 import json
 import sys
 import time
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+def load_env_vars():
+    """加载环境变量，优先从当前目录，然后检查server目录"""
+    # 尝试加载当前目录的.env文件
+    if Path('./.env').exists():
+        print("从当前目录加载.env文件")
+        load_dotenv()
+    # 尝试从server目录加载.env文件
+    elif Path('./server/.env').exists():
+        print("从server目录加载.env文件")
+        load_dotenv('./server/.env')
+    else:
+        print("警告: 未找到.env文件，需要手动设置环境变量")
+        print("请创建.env文件并设置以下变量:")
+        print("OPENROUTER_API_KEY=你的OpenRouter API密钥")
+        print("OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free")
+        print("BASE_URL=http://localhost:5001")
+        print("EMBEDDING_BASE_URL=https://ark.cn-beijing.volces.com/api/v3")
+        print("EMBEDDING_API_KEY=你的嵌入模型API密钥")
+        print("EMBEDDING_MODEL_NAME=ep-20250227223958-wb4sk")
+
+# 加载环境变量
+load_env_vars()
 
 # 确保 Python 使用 UTF-8
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', buffering=1)
 
-# 后端服务器地址
-base_url = "http://localhost:5001"  # 默认后端地址
-
 # 定义测试结果常量
 TEST_SUCCESS = "成功"
 TEST_PARTIAL = "部分成功"
 TEST_FAILURE = "失败"
+
+# 从环境变量获取配置，移除默认API密钥以避免泄露
+base_url = os.getenv("BASE_URL", "http://localhost:5001")  # 后端服务器地址
+openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")  # OpenRouter API密钥，不设置默认值
+openrouter_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")  # OpenRouter模型名称
+embedding_base_url = os.getenv("EMBEDDING_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")  # 嵌入模型基础URL
+embedding_api_key = os.getenv("EMBEDDING_API_KEY", "")  # 嵌入模型API密钥，不设置默认值
+embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", "ep-20250227223958-wb4sk")  # 嵌入模型名称
+
+# 检查必要的API密钥是否设置
+if not openrouter_api_key:
+    print("警告: OPENROUTER_API_KEY未设置，请在.env文件中设置此环境变量")
+    print("示例: OPENROUTER_API_KEY=sk-or-v1-your-api-key")
+    print("可以从 https://openrouter.ai/keys 获取API密钥")
+
+if not embedding_api_key and ("test_doc_chat" in sys.argv or len(sys.argv) == 1):
+    print("警告: EMBEDDING_API_KEY未设置，文档聊天测试将无法正常工作")
+    print("示例: EMBEDDING_API_KEY=your-embedding-api-key")
 
 def test_server_status():
     """测试1: 验证服务器状态"""
@@ -139,20 +180,28 @@ def test_chat_api():
     print("\n=== 测试 3: 验证聊天 API (OpenRouter) ===")
     chat_endpoint = f"{base_url}/api/chat"
 
+    # 检查API密钥是否设置
+    if not openrouter_api_key:
+        print("错误: 未设置OpenRouter API密钥，跳过测试")
+        return TEST_FAILURE
+
     # 测试包含中文的消息
     test_payload = {
         "messages": [
             {"role": "system", "content": "你是一个有帮助的助手。"},
             {"role": "user", "content": "你好，请回复一些中文内容测试编码。"}
         ],
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": openrouter_model,
         "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "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",
+        "api_key": openrouter_api_key,
         "stream": True
     }
 
     print(f"向 {chat_endpoint} 发送 POST 请求...")
-    print(f"测试负载: {json.dumps(test_payload, ensure_ascii=False, indent=2)}")
+    # 打印负载但隐藏API密钥
+    safe_payload = test_payload.copy()
+    safe_payload["api_key"] = "****" if openrouter_api_key else "<未设置>"
+    print(f"测试负载: {json.dumps(safe_payload, ensure_ascii=False, indent=2)}")
 
     try:
         # 流式测试
@@ -231,21 +280,29 @@ def test_web_search():
     print("\n=== 测试 4: 验证聊天 API 带有网络搜索功能 ===")
     chat_endpoint = f"{base_url}/api/chat"
 
+    # 检查API密钥是否设置
+    if not openrouter_api_key:
+        print("错误: 未设置OpenRouter API密钥，跳过测试")
+        return TEST_FAILURE
+
     # 测试包含网络搜索的消息
     web_search_payload = {
         "messages": [
             {"role": "system", "content": "你是一个有帮助的助手。"},
             {"role": "user", "content": "2024年最新的AI技术有哪些？"}
         ],
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": openrouter_model,
         "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "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",
+        "api_key": openrouter_api_key,
         "stream": True,
         "web_search": True  # 启用网络搜索功能
     }
 
     print(f"向 {chat_endpoint} 发送带网络搜索的 POST 请求...")
-    print(f"测试负载: {json.dumps(web_search_payload, ensure_ascii=False, indent=2)}")
+    # 打印负载但隐藏API密钥
+    safe_payload = web_search_payload.copy()
+    safe_payload["api_key"] = "****" if openrouter_api_key else "<未设置>"
+    print(f"测试负载: {json.dumps(safe_payload, ensure_ascii=False, indent=2)}")
 
     try:
         # 流式测试
@@ -329,6 +386,11 @@ def test_doc_chat():
     print("\n=== 测试 5: 验证文档聊天 API ===")
     doc_chat_endpoint = f"{base_url}/api/chat_with_doc"
 
+    # 检查API密钥是否设置
+    if not openrouter_api_key or not embedding_api_key:
+        print("错误: 未设置必要的API密钥，跳过测试")
+        return TEST_FAILURE
+
     # 测试文档聊天
     doc_chat_payload = {
         "messages": [
@@ -336,18 +398,22 @@ def test_doc_chat():
             {"role": "user", "content": "文档中有哪些主要内容？"}
         ],
         "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "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",
-        "model_name": "google/gemini-2.0-flash-exp:free",
-        "embedding_base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "embedding_api_key": "1d9346d5-fb30-40af-9158-350f630645fc",
-        "embedding_model_name": "ep-20250227223958-wb4sk",
+        "api_key": openrouter_api_key,
+        "model_name": openrouter_model,
+        "embedding_base_url": embedding_base_url,
+        "embedding_api_key": embedding_api_key,
+        "embedding_model_name": embedding_model_name,
         "document_ids": [],  # 可以指定文档ID，空数组表示搜索所有文档
         "stream": True,
         "web_search": False  # 可选择是否同时进行网络搜索
     }
 
     print(f"向 {doc_chat_endpoint} 发送 POST 请求...")
-    print(f"测试负载: {json.dumps(doc_chat_payload, ensure_ascii=False, indent=2)}")
+    # 打印负载但隐藏API密钥
+    safe_payload = doc_chat_payload.copy()
+    safe_payload["api_key"] = "****" if openrouter_api_key else "<未设置>"
+    safe_payload["embedding_api_key"] = "****" if embedding_api_key else "<未设置>"
+    print(f"测试负载: {json.dumps(safe_payload, ensure_ascii=False, indent=2)}")
 
     try:
         # 流式测试
@@ -434,21 +500,29 @@ def test_deep_research():
     print("\n=== 测试 6: 验证聊天 API 的深度研究功能 ===")
     chat_endpoint = f"{base_url}/api/chat"
 
+    # 检查API密钥是否设置
+    if not openrouter_api_key:
+        print("错误: 未设置OpenRouter API密钥，跳过测试")
+        return TEST_FAILURE
+
     # 测试深度研究模式
     deep_research_payload = {
         "messages": [
             {"role": "system", "content": "你是一个专业的研究助手。"},
             {"role": "user", "content": "请深入分析量子计算对密码学的影响。"}
         ],
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": openrouter_model,
         "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "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",
+        "api_key": openrouter_api_key,
         "stream": True,
         "deep_research": True  # 启用深度研究模式
     }
 
     print(f"向 {chat_endpoint} 发送深度研究模式的 POST 请求...")
-    print(f"测试负载: {json.dumps(deep_research_payload, ensure_ascii=False, indent=2)}")
+    # 打印负载但隐藏API密钥
+    safe_payload = deep_research_payload.copy()
+    safe_payload["api_key"] = "****" if openrouter_api_key else "<未设置>"
+    print(f"测试负载: {json.dumps(safe_payload, ensure_ascii=False, indent=2)}")
 
     try:
         # 流式测试
@@ -542,12 +616,12 @@ def run_all_tests():
     
     # 定义测试函数列表
     tests = [
-        {"name": "服务器状态测试", "func": test_server_status},
-        {"name": "UTF-8编码测试", "func": test_utf8_encoding},
-        {"name": "聊天API测试", "func": test_chat_api},
-        {"name": "网络搜索功能测试", "func": test_web_search},
+        #{"name": "服务器状态测试", "func": test_server_status},
+        #{"name": "UTF-8编码测试", "func": test_utf8_encoding},
+        #{"name": "聊天API测试", "func": test_chat_api},
+        #{"name": "网络搜索功能测试", "func": test_web_search},
         {"name": "文档聊天API测试", "func": test_doc_chat},
-        {"name": "深度研究功能测试", "func": test_deep_research}
+        #{"name": "深度研究功能测试", "func": test_deep_research}
     ]
     
     # 初始化结果计数

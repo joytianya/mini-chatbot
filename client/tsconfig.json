@@ -18,8 +18,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true
   },
-  "include": ["src"],
+  "include": ["src", "src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 } 

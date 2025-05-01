@@ -84,7 +84,7 @@ export function MainLayout({ className }: MainLayoutProps): React.ReactElement {
 
   return (
     <div className={cn('flex h-screen', className)}>
-      <div className="w-80 border-r border-border/50">
+      <div className="w-80 border-r border-[hsl(var(--border))]/50">
         <ConversationList
           conversations={conversations}
           selectedId={selectedId}
@@ -104,7 +104,7 @@ export function MainLayout({ className }: MainLayoutProps): React.ReactElement {
             <button
               onClick={handleNewChat}
               className={cn(
-                'flex items-center gap-2 rounded-lg border border-border/50 px-6 py-3',
+                'flex items-center gap-2 rounded-lg border border-[hsl(var(--border))]/50 px-6 py-3',
                 'hover:bg-accent/50 transition-colors',
                 'text-lg font-medium'
               )}

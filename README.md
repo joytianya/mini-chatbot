@@ -270,11 +270,42 @@ python app.py
 
 ## 环境变量
 
-服务器端需要配置以下环境变量（在server/.env文件中）:
+服务器端需要配置环境变量，请在项目根目录或server目录下创建`.env`文件。可以参考`.env.example`模板文件进行配置：
 
-- `OPENAI_API_KEY`: 用于OpenAI API调用
-- `JINA_API_KEY`: 用于Jina嵌入（可选）
-- `SEARX_INSTANCES`: 用于web搜索功能（可选）
+```bash
+# API密钥
+OPENROUTER_API_KEY=your_openrouter_api_key_here      # OpenRouter API密钥（必需）
+DEEPSEEK_API_KEY=your_deepseek_api_key_here          # DeepSeek API密钥（浏览器代理功能需要）
+GOOGLE_API_KEY=your_google_api_key_here              # Google API密钥（使用Gemini模型时需要）
+
+# API配置
+OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free    # 默认模型
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1     # OpenRouter API基础URL
+
+# Ark Document Store 配置（文档处理功能需要）
+ARK_API_KEY=your_ark_api_key_here
+ARK_BASE_URL=your_ark_base_url_here
+ARK_EMBEDDING_MODEL=your_embedding_model_here
+
+# 服务器配置
+PORT=5001                # 服务器端口
+HOST=localhost           # 服务器主机
+DEBUG=False              # 调试模式开关
+```
+
+> 重要：请勿将包含API密钥的`.env`文件提交到版本控制系统。该文件已在`.gitignore`中添加。
+
+## 测试API连接
+
+项目提供了简单的测试脚本来验证API连接:
+
+```bash
+# 测试OpenRouter API连接
+python test_openrouter.py
+
+# 测试所有后端功能
+python test_backend.py
+```
 
 ## 技术栈
 

@@ -7,8 +7,14 @@ import { useState, useEffect } from 'react';
 function useUIState() {
   // 深色模式状态
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
+    try {
+      const saved = localStorage.getItem('darkMode');
+      // Check if saved exists and is a valid string before parsing
+      return saved && typeof saved === 'string' ? JSON.parse(saved) : false;
+    } catch (error) {
+      console.error('Error loading darkMode from localStorage:', error);
+      return false;
+    }
   });
   
   // 侧边栏展开状态
@@ -34,8 +40,12 @@ function useUIState() {
   
   // 深色模式变化时更新body类名
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    document.body.classList.toggle('dark-mode', darkMode);
+    try {
+      localStorage.setItem('darkMode', JSON.stringify(darkMode));
+      document.body.classList.toggle('dark-mode', darkMode);
+    } catch (error) {
+      console.error('Error saving darkMode to localStorage:', error);
+    }
   }, [darkMode]);
   
   // 切换深色模式
