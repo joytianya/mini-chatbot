@@ -6,15 +6,34 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from openai import OpenAI
 from langchain_community.vectorstores import FAISS
 import os
-from dotenv import load_dotenv
+import sys
+import json
+import faiss
 import numpy as np
+import requests
+import pickle
+from dotenv import load_dotenv
+import pathlib
+from typing import List, Dict, Any, Optional, Tuple
 import hashlib
 from pathlib import Path
-import json
 import logging
 
 # 加载环境变量
-load_dotenv()
+# 优先从项目根目录加载.env文件
+current_dir = pathlib.Path(__file__).parent.absolute()
+root_dir = current_dir.parent
+root_env_path = root_dir / ".env"
+server_env_path = current_dir / ".env"
+
+if root_env_path.exists():
+    load_dotenv(dotenv_path=root_env_path)
+    print(f"DocumentStore: 已从项目根目录加载环境变量")
+elif server_env_path.exists():
+    load_dotenv(dotenv_path=server_env_path)
+    print(f"DocumentStore: 已从server目录加载环境变量")
+else:
+    print("DocumentStore: 警告: 未找到.env文件")
 
 # 配置日志记录
 logger = logging.getLogger('document_store')

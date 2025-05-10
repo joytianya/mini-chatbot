@@ -4,9 +4,28 @@
 import os
 import sys
 from dotenv import load_dotenv, set_key
+import pathlib
+
+# 优先从项目根目录加载.env文件
+current_dir = pathlib.Path(__file__).parent.absolute()
+root_dir = current_dir.parent
+root_env_path = root_dir / ".env"
+server_env_path = current_dir / ".env"
+
+env_file = None
+if root_env_path.exists():
+    env_file = root_env_path
+    print(f"使用项目根目录的.env文件: {env_file}")
+elif server_env_path.exists():
+    env_file = server_env_path
+    print(f"使用server目录的.env文件: {env_file}")
+else:
+    # 如果不存在，则创建一个新的.env文件在项目根目录
+    env_file = root_env_path
+    print(f"创建新的.env文件在项目根目录: {env_file}")
 
 # 加载环境变量
-load_dotenv("server/.env")
+load_dotenv(dotenv_path=env_file)
 
 def update_jina_api_key(api_key):
     """
@@ -15,7 +34,8 @@ def update_jina_api_key(api_key):
     Args:
         api_key (str): 新的Jina API密钥
     """
-    env_file = "server/.env"
+    # 使用全局定义的env_file
+    global env_file
     
     # 确保文件存在
     if not os.path.exists(env_file):
@@ -25,7 +45,7 @@ def update_jina_api_key(api_key):
     try:
         # 更新环境变量文件
         set_key(env_file, "JINA_API_KEY", api_key)
-        print(f"成功更新JINA_API_KEY")
+        print(f"成功更新JINA_API_KEY到 {env_file}")
         return True
     except Exception as e:
         print(f"更新JINA_API_KEY失败: {str(e)}")

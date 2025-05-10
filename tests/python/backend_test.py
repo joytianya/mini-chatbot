@@ -31,16 +31,16 @@ except ImportError:
     print("警告: 无法导入searx_client_test模块，将跳过相关测试")
     SEARX_TESTS_AVAILABLE = False
 
-# 优先从server/.env加载环境变量
-server_env_path = script_dir / "server" / ".env"
+# 优先从项目根目录加载环境变量
 root_env_path = script_dir / ".env"
+server_env_path = script_dir / "server" / ".env"
 
-if server_env_path.exists():
-    load_dotenv(dotenv_path=server_env_path)
-    print(f"已从 {server_env_path} 加载环境变量")
-elif root_env_path.exists():
+if root_env_path.exists():
     load_dotenv(dotenv_path=root_env_path)
     print(f"已从 {root_env_path} 加载环境变量")
+elif server_env_path.exists():
+    load_dotenv(dotenv_path=server_env_path)
+    print(f"已从 {server_env_path} 加载环境变量")
 else:
     print(f"警告: 未找到环境变量文件")
 

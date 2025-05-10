@@ -12,7 +12,7 @@
 }
 
 .main-content.sidebar-open {
-    margin-left: 300px;
+    margin-left: 220px;
 }
 
 @media (max-width: 768px) {
@@ -58,14 +58,6 @@
     color: white;
 }
 
-.mode-toggle-button.direct-test-mode {
-    background-color: #e67e22;
-    color: white;
-}
-
-color: white;
-
-}
 .mode-toggle-button.direct-test-mode {
     background-color: #e67e22;
     color: white;

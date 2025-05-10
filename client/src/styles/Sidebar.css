@@ -2,7 +2,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 240px;
+    width: 220px;
     height: 100%;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
@@ -22,13 +22,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.8rem 1rem;
+    padding: 0.8rem 0.8rem;
     border-bottom: 1px solid var(--border-color);
     background-color: rgba(79, 70, 229, 0.05);
 }
 
 .sidebar-header h2 {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
     margin: 0;
     color: var(--primary-color);
@@ -37,12 +37,12 @@
 .new-chat-button {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.7rem;
+    gap: 0.3rem;
+    padding: 0.4rem 0.6rem;
     border-radius: var(--radius-sm);
     background-color: var(--primary-color);
     color: white;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -70,7 +70,7 @@
 .conversations-list {
     flex: 1;
     overflow-y: auto;
-    padding: 0.8rem;
+    padding: 0.7rem;
     background-color: rgba(255, 255, 255, 0.5);
 }
 
@@ -90,7 +90,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem;
+    padding: 0.5rem 0.3rem;
     border-radius: var(--radius-md);
     margin-bottom: 0.5rem;
     cursor: pointer;
@@ -111,12 +111,12 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 6px 8px;
+    padding: 6px 6px;
     overflow: hidden;
     cursor: pointer;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
-    margin-left: 5px;
+    margin-left: 3px;
 }
 
 .conversation-title.loading {
@@ -135,7 +135,7 @@
     text-overflow: ellipsis;
     font-size: 0.875rem;
     line-height: 1.4;
-    max-width: 160px;
+    max-width: 130px;
     font-weight: 500;
 }
 
@@ -148,7 +148,7 @@
 
 .conversation-actions {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.3rem;
     opacity: 0;
     transition: opacity 0.2s ease;
 }
@@ -195,15 +195,15 @@
 }
 
 .sidebar-footer {
-    padding: 12px;
+    padding: 10px;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     background-color: rgba(255, 255, 255, 0.6);
 }
 
 .feature-toggles {
-    margin-bottom: 1rem;
+    margin-bottom: 0.8rem;
     background-color: rgba(255, 255, 255, 0.5);
-    padding: 8px;
+    padding: 6px;
     border-radius: 8px;
 }
 
@@ -211,8 +211,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.7rem;
-    padding: 5px;
+    margin-bottom: 0.6rem;
+    padding: 4px;
 }
 
 .toggle-item:hover {
@@ -221,7 +221,7 @@
 }
 
 .toggle-item label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #444;
     font-weight: 500;
     cursor: pointer;
@@ -279,13 +279,13 @@ input:checked+.toggle-slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     width: 100%;
-    padding: 0.7rem;
+    padding: 0.6rem;
     border-radius: 8px;
     background-color: rgba(79, 70, 229, 0.1);
     color: var(--primary-color);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     transition: all 0.2s;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -443,10 +443,10 @@ input:checked+.toggle-slider:before {
 /* 新增的维护操作区域 */
 
 .maintenance-actions {
-    padding: 8px 12px;
+    padding: 6px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     background-color: rgba(255, 255, 255, 0.5);
 }
@@ -455,12 +455,12 @@ input:checked+.toggle-slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 12px;
+    padding: 7px 10px;
     border-radius: 6px;
     background-color: rgba(255, 255, 255, 0.2);
     color: #444;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     border: none;
     transition: all 0.2s;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);

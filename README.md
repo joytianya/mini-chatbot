@@ -42,13 +42,25 @@
 
 ### 3. 配置
 
-在项目根目录创建 `.env` 文件，配置API密钥（参考 `.env.example`）：
+在项目根目录创建 `.env` 文件，配置必要的API密钥和URL。你可以复制 `.env.example` 文件并进行修改：
+
+```bash
+# 复制示例配置文件
+cp .env.example .env
+
+# 编辑配置文件，填入你的API密钥
+nano .env  # 或使用你喜欢的文本编辑器
+```
+
+配置文件中必需的设置：
 
 ```
-OPENROUTER_API_KEY=your_api_key_here
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_MODEL_NAME=model_name_here
+OPENROUTER_API_KEY=your_api_key_here     # 在OpenRouter.ai获取API密钥
+OPENROUTER_BASE_URL=https://openrouter.ai/api  # 注意：不要在末尾添加 /v1
+OPENROUTER_MODEL_NAME=qwen/qwen3-1.7b    # 或其他你想使用的模型名称
 ```
+
+如果你遇到API连接问题（如404错误），请检查`OPENROUTER_BASE_URL`是否正确。OpenRouter的API结构可能会变更，最新的URL格式应该是`https://openrouter.ai/api`（不带v1）。
 
 ## 测试
 
@@ -84,6 +96,19 @@ OPENROUTER_MODEL_NAME=model_name_here
 1. 验证API密钥是否正确设置
 2. 检查环境变量是否正确加载
 3. 使用测试工具检查具体错误信息
+
+### 问题: OpenRouter API返回404错误
+
+这通常表示API端点路径有问题。请检查：
+
+1. 确认`.env`文件中的`OPENROUTER_BASE_URL`设置为`https://openrouter.ai/api`（不要在末尾添加`/v1`）
+2. 运行测试工具验证连接：`python tests/python/fix_openrouter_test.py`
+3. 如果错误仍然存在，请查看OpenRouter官方文档，确认最新的API端点
+
+错误日志示例：
+```
+2025-05-10 18:15:51,978 - openrouter_test - ERROR - Request failed: 404 Client Error: Not Found for url: https://openrouter.ai/api/v1/chat/completions
+```
 
 ### 问题: 前端请求收到404/403错误
 

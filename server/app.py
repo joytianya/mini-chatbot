@@ -49,7 +49,21 @@ from routes.doc_chat_routes import register_doc_chat_routes
 from routes.test_routes import register_test_routes  # 添加新的导入
 
 # 加载环境变量
-load_dotenv()
+# 优先从项目根目录加载.env文件
+import pathlib
+current_dir = pathlib.Path(__file__).parent.absolute()
+root_dir = current_dir.parent
+root_env_path = root_dir / ".env"
+server_env_path = current_dir / ".env"
+
+if root_env_path.exists():
+    load_dotenv(dotenv_path=root_env_path)
+    print(f"已从项目根目录加载环境变量: {root_env_path}")
+elif server_env_path.exists():
+    load_dotenv(dotenv_path=server_env_path)
+    print(f"已从server目录加载环境变量: {server_env_path}")
+else:
+    print("警告: 未找到.env文件")
 
 # 配置日志
 logger = setup_logger()
