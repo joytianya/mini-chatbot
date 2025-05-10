@@ -63,11 +63,14 @@ CORS(app,
         r"/*": {
             "origins": [
                 "http://localhost:5173", 
+                "http://192.168.1.11:5173",  # 添加本地IP
                 "https://joytianya.github.io",
                 "https://mini-chatbot-backend.onrender.com"
             ],
             "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-            "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept", "X-Requested-With", "Origin", 
+                             "X-Title", "HTTP-Referer", "x-title", "http-referer",
+                             "content-type", "authorization", "accept", "x-requested-with", "origin"],
             "supports_credentials": True,
             "expose_headers": ["Content-Type", "X-CSRFToken"],
             "max_age": 3600
@@ -184,12 +187,38 @@ def after_request(response):
     # 检查是否已经设置了 CORS 头
     if 'Access-Control-Allow-Origin' not in response.headers:
         origin = request.headers.get('Origin')
-        allowed_origins = ["http://localhost:5173", "https://joytianya.github.io", "https://mini-chatbot-backend.onrender.com"]
+        allowed_origins = ["http://localhost:5173", "http://192.168.1.11:5173", "https://joytianya.github.io", "https://mini-chatbot-backend.onrender.com"]
         if origin in allowed_origins:
             response.headers.add('Access-Control-Allow-Origin', origin)
             response.headers.add('Access-Control-Allow-Credentials', 'true')
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,X-Requested-With,Origin,X-Title,HTTP-Referer,x-title,http-referer,content-type,authorization,accept,x-requested-with,origin')
             response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    
+    # 记录CORS响应头
+    cors_headers = {}
+    for header in response.headers:
+        if header[0].lower().startswith('access-control'):
+            cors_headers[header[0]] = header[1]
+    
+    if cors_headers:
+        logger.debug(f"CORS响应头: {cors_headers}")
+    
+    # 对于OPTIONS请求，确保返回正确的状态码和头部
+    if request.method == 'OPTIONS':
+        logger.info("处理OPTIONS请求，添加CORS响应头")
+        # 确保即使客户端发送的是自定义头部名称的小写版本，我们也能正确处理
+        headers_lower = [h.lower() for h in request.headers.keys()]
+        
+        # 记录客户端实际的请求头
+        logger.debug(f"OPTIONS请求头: {dict(request.headers)}")
+        
+        # 总是添加所有可能的头部变种，确保兼容性
+        if 'Access-Control-Allow-Headers' not in response.headers:
+            all_headers = 'Content-Type,Authorization,Accept,X-Requested-With,Origin,X-Title,HTTP-Referer,http-referer,x-title,content-type,authorization,accept,x-requested-with,origin'
+            response.headers.add('Access-Control-Allow-Headers', all_headers)
+        
+        response.headers.add('Access-Control-Max-Age', '3600')  # 缓存预检请求结果1小时
+    
     return response
 
 # 配置调度器

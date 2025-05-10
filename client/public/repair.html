@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini-Chatbot 存储修复工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+        
+        h2 {
+            color: #3498db;
+            margin-top: 2rem;
+        }
+        
+        .card {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .warning {
+            color: #e67e22;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .info {
+            color: #3498db;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        .result-box {
+            background-color: #f1f2f6;
+            border-left: 4px solid #3498db;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0 4px 4px 0;
+            overflow-wrap: break-word;
+            font-family: monospace;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .steps {
+            list-style-type: decimal;
+            padding-left: 2rem;
+        }
+        
+        .steps li {
+            margin-bottom: 0.8rem;
+        }
+        
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Mini-Chatbot 本地存储修复工具</h1>
+
+    <div class="card">
+        <h2>修复功能说明</h2>
+        <p>此工具用于修复Mini-Chatbot前端本地存储中可能存在的问题，包括以下功能：</p>
+        <ul>
+            <li>检查和修复对话数据完整性</li>
+            <li>验证API设置的有效性</li>
+            <li>检查UI状态配置</li>
+            <li>创建会话数据备份</li>
+            <li>重置无效的当前会话ID</li>
+        </ul>
+        <p>使用此工具可能会<span class="warning">重置部分或全部设置</span>，但不会删除有效的对话记录。</p>
+    </div>
+
+    <div class="card">
+        <h2>问题症状</h2>
+        <p>如果您遇到以下问题，可以尝试使用此修复工具：</p>
+        <ul>
+            <li>聊天记录无法保存或加载</li>
+            <li>新建对话后历史记录丢失</li>
+            <li>切换对话时显示错误或空白</li>
+            <li>API设置无法正常保存</li>
+            <li>收到"localStorage错误"相关提示</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>使用方法</h2>
+        <ol class="steps">
+            <li>在使用修复工具前，建议先尝试<span class="warning">刷新页面</span>或<span class="warning">清除浏览器缓存</span></li>
+            <li>点击下方的"执行修复"按钮开始修复流程</li>
+            <li>修复完成后将显示详细结果</li>
+            <li>如果修复成功，点击"返回应用"按钮回到主页面</li>
+            <li>如果问题仍未解决，可以尝试"完全重置"彻底清除所有数据</li>
+        </ol>
+
+        <button id="repairBtn">执行修复</button>
+        <button id="resetBtn" class="warning" style="background-color: #e74c3c;">完全重置</button>
+        <a href="./"><button style="background-color: #27ae60;">返回应用</button></a>
+
+        <div id="resultBox" class="result-box hidden">
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Mini-Chatbot Storage Repair Tool v1.0
+    </div>
+
+    <script src="./fix_storage.js"></script>
+    <script>
+        document.getElementById('repairBtn').addEventListener('click', function() {
+            try {
+                const resultBox = document.getElementById('resultBox');
+                const resultContent = document.getElementById('resultContent');
+
+                // 执行修复
+                const result = StorageRepairTool.repairAll();
+
+                // 显示结果
+                resultBox.classList.remove('hidden');
+
+                let resultHTML = '<h3>修复结果</h3>';
+
+                // 对话结果
+                if (result.conversations) {
+                    const convClass = result.conversations.fixed ? 'warning' : 'success';
+                    resultHTML += `<p class="${convClass}">对话存储: ${result.conversations.message}</p>`;
+                    if (result.conversations.conversations !== undefined) {
+                        resultHTML += `<p class="info">共 ${result.conversations.conversations} 个对话，${result.conversations.messages} 条消息</p>`;
+                    }
+                }
+
+                // API设置结果
+                if (result.apiSettings) {
+                    const apiClass = result.apiSettings.fixed ? 'warning' : 'success';
+                    resultHTML += `<p class="${apiClass}">API设置: ${result.apiSettings.message}</p>`;
+                }
+
+                // UI状态结果
+                if (result.uiState) {
+                    const uiClass = result.uiState.fixed ? 'warning' : 'success';
+                    resultHTML += `<p class="${uiClass}">UI状态: ${result.uiState.message}</p>`;
+                }
+
+                // 总结
+                if (result.allFixed) {
+                    resultHTML += '<p class="warning">已修复一个或多个问题，请刷新页面并重新测试</p>';
+                } else {
+                    resultHTML += '<p class="success">没有发现需要修复的问题，您的数据看起来很正常</p>';
+                }
+
+                resultContent.innerHTML = resultHTML;
+            } catch (error) {
+                console.error('执行修复时出错:', error);
+                const resultBox = document.getElementById('resultBox');
+                const resultContent = document.getElementById('resultContent');
+
+                resultBox.classList.remove('hidden');
+                resultContent.innerHTML = `<h3>修复出错</h3><p class="error">执行修复时发生错误: ${error.message}</p>`;
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            if (confirm('警告：这将删除所有本地存储的数据，包括所有对话记录和设置。此操作无法撤销！确定要继续吗？')) {
+                localStorage.clear();
+                sessionStorage.clear();
+
+                const resultBox = document.getElementById('resultBox');
+                const resultContent = document.getElementById('resultContent');
+
+                resultBox.classList.remove('hidden');
+                resultContent.innerHTML = '<h3>重置完成</h3><p class="warning">所有本地存储数据已被清除！</p><p>请刷新页面或返回应用来开始全新的使用。</p>';
+            }
+        });
+    </script>
+</body>
+
+</html>

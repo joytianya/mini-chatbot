@@ -1,0 +1,279 @@
+import { useState } from 'react';
+import useChatCore from './useChatCore';
+import useConversations from './useConversations';
+import useMessageSubmission from './useMessageSubmission';
+import { exportConversation } from '../utils/messageUtils';
+import { v4 as uuidv4 } from 'uuid';
+import storageService from '../services/storageService';
+import apiService from '../services/apiService';
+
+/**
+ * 聊天逻辑的主Hook，组合其他Hook
+ * @returns {Object} 聊天相关的所有状态和函数
+ */
+function useChatLogic() {
+    // 主题相关状态
+    const [darkMode, setDarkMode] = useState(() => {
+        const saved = localStorage.getItem('darkMode');
+        return saved ? JSON.parse(saved) : false;
+    });
+
+    // 模型相关状态
+    const [selectedModel, setSelectedModel] = useState(() => {
+        // 从 localStorage 获取用户配置的模型
+        const savedConfigs = localStorage.getItem('modelConfigs');
+        if (savedConfigs) {
+            const configs = JSON.parse(savedConfigs);
+            if (configs.length > 0 && configs[0].model_name) {
+                return configs[0].model_name;
+            }
+        }
+        // 如果没有配置,返回空字符串
+        return '';
+    });
+
+    const [availableModels, setAvailableModels] = useState(() => {
+        const saved = localStorage.getItem('availableModels');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const [modelConfigs, setModelConfigs] = useState(() => {
+        const saved = localStorage.getItem('modelConfigs');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const [embeddingConfig, setEmbeddingConfig] = useState(() => {
+        const saved = localStorage.getItem('embeddingConfigs');
+        return saved ? JSON.parse(saved)[0] : null;
+    });
+
+    // 活动文档
+    const [activeDocuments, setActiveDocuments] = useState(() => {
+        // 从当前活动会话中获取活动文档
+        const saved = localStorage.getItem('conversations');
+        if (saved) {
+            const parsedConversations = JSON.parse(saved);
+            const activeConv = parsedConversations.find(conv => conv.active);
+            if (activeConv && activeConv.activeDocuments) {
+                console.log('从活动会话中恢复活动文档:', activeConv.activeDocuments);
+                return activeConv.activeDocuments;
+            }
+        }
+        return [];
+    });
+
+    // 核心聊天功能
+    const chatCore = useChatCore();
+    const {
+        displayMessages,
+        setDisplayMessages,
+        requestMessages,
+        setRequestMessages,
+        streaming,
+        setStreaming,
+        currentResponse,
+        setCurrentResponse,
+        reasoningText,
+        setReasoningText,
+        isReasoning,
+        setIsReasoning,
+        sessionHash,
+        setSessionHash,
+        highlightedMessageId,
+        chatContainerRef,
+        userHasScrolled,
+        currentTurns,
+        scrollToBottom,
+        handleScroll,
+        handleStop,
+        processStreamResponse,
+        getConfigForModel
+    } = chatCore;
+
+    // 会话管理功能
+    const conversationManagement = useConversations({
+        setDisplayMessages,
+        setRequestMessages,
+        setSessionHash,
+        setActiveDocuments,
+        setStreaming,
+        setCurrentResponse,
+        setReasoningText,
+        setUserHasScrolled: chatCore.setUserHasScrolled
+    });
+
+    const {
+        conversations,
+        setConversations,
+        isSidebarExpanded,
+        handleNewChat,
+        handleConversationClick,
+        handleDeleteConversation,
+        handleClearAll,
+        handleToggleSidebar
+    } = conversationManagement;
+
+    // 消息提交和处理功能
+    const messageSubmission = useMessageSubmission({
+        displayMessages,
+        setDisplayMessages,
+        requestMessages,
+        setRequestMessages,
+        streaming,
+        setStreaming,
+        setCurrentResponse,
+        setReasoningText,
+        setIsReasoning,
+        sessionHash,
+        activeDocuments,
+        processStreamResponse,
+        getConfigForModel,
+        conversations,
+        setConversations
+    });
+
+    const {
+        input,
+        setInput,
+        sensitiveInfoProtectionEnabled,
+        handleSubmit,
+        handleRetry,
+        handleEdit,
+        toggleSensitiveInfoProtection
+    } = messageSubmission;
+
+    // 处理复制
+    const handleCopy = async(text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            console.log('文本已复制到剪贴板');
+
+            // 显示成功提示（由上层组件处理）
+        } catch (error) {
+            console.error('复制文本时出错:', error);
+        }
+    };
+
+    // 处理导出
+    const handleExport = () => {
+        const activeConversation = conversations.find(conv => conv.active);
+        if (!activeConversation) return;
+
+        exportConversation(activeConversation.messages, activeConversation.title);
+    };
+
+    // 切换暗黑模式
+    const toggleDarkMode = () => {
+        setDarkMode(prev => {
+            const newValue = !prev;
+            localStorage.setItem('darkMode', JSON.stringify(newValue));
+            document.body.classList.toggle('dark-mode', newValue);
+            return newValue;
+        });
+    };
+
+    // 处理模型设置保存
+    const handleSettingsSave = (settings) => {
+        const { configs, modelNames } = settings;
+        setModelConfigs(configs);
+
+        // 更新可用模型列表
+        const updatedModels = [...new Set([...modelNames])];
+        setAvailableModels(updatedModels);
+
+        // 如果当前选中的模型不在更新后的列表中，选择第一个可用模型
+        if (!updatedModels.includes(selectedModel)) {
+            setSelectedModel(updatedModels[0]);
+        }
+    };
+
+    // 处理嵌入模型设置
+    const handleEmbeddingSettingsSave = (embeddingConfigs) => {
+        setEmbeddingConfig(embeddingConfigs[0]);
+        localStorage.setItem('embeddingConfigs', JSON.stringify(embeddingConfigs));
+    };
+
+    // Add user message to the local state and prepare for API call
+    const addUserMessage = (messageContent, targetConversationId, overrideSettings) => {
+        const newUserMessage = {
+            id: uuidv4(),
+            role: 'user',
+            content: messageContent,
+            timestamp: new Date().toISOString()
+        };
+
+        // 更新本地状态以立即显示用户消息
+        setDisplayMessages(prevMessages => {
+            console.log(`useChatLogic: 添加用户消息，当前消息数: ${prevMessages.length}`);
+            // 新消息列表将包含旧消息加新用户消息
+            const updatedMessages = [...prevMessages, newUserMessage];
+            // 保存到localStorage确保用户消息立即可见
+            storageService.saveConversationMessages(targetConversationId, updatedMessages);
+            return updatedMessages;
+        });
+
+        // 通过apiService发送请求
+        const settings = overrideSettings || apiSettings;
+
+        // 处理逻辑...
+    };
+
+    return {
+        // 状态
+        displayMessages,
+        input,
+        selectedModel,
+        streaming,
+        currentResponse,
+        reasoningText,
+        isReasoning,
+        darkMode,
+        conversations,
+        isSidebarExpanded,
+        highlightedMessageId,
+        currentTurns,
+        availableModels,
+        modelConfigs,
+        activeDocuments,
+        sensitiveInfoProtectionEnabled,
+        sessionHash,
+
+        // 函数
+        setDisplayMessages,
+        setInput,
+        setSelectedModel,
+        setDarkMode,
+        setConversations,
+        setAvailableModels,
+        setModelConfigs,
+        setActiveDocuments,
+
+        // Refs
+        chatContainerRef,
+
+        // 处理函数
+        handleSubmit,
+        handleStop,
+        handleNewChat,
+        handleConversationClick,
+        handleDeleteConversation,
+        handleClearAll,
+        handleRetry,
+        handleCopy,
+        handleEdit,
+        handleExport,
+        handleScroll,
+        handleToggleSidebar,
+        toggleDarkMode,
+        toggleSensitiveInfoProtection,
+        handleSettingsSave,
+        handleEmbeddingSettingsSave,
+
+        // 工具函数
+        scrollToBottom,
+        getConfigForModel,
+        addUserMessage
+    };
+}
+
+export default useChatLogic;

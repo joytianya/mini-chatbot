@@ -1,400 +1,329 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import ChatInterface from './components/ChatInterface';
 import Sidebar from './components/Sidebar';
+import PasteTest from './components/PasteTest';
+import { useUIState } from './hooks/useUIState';
+import { useChatLogic } from './hooks/useChatLogic';
+import './styles/App.css';
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import ChatArea from './components/ChatArea';
-import { useConversationManagement } from './hooks/useConversationManagement';
-import { useMessageHandling } from './hooks/useMessageHandling';
+import TestBackendConnection from './components/TestBackendConnection';
+import DirectOpenRouterTest from './components/DirectOpenRouterTest';
+import storageService from './services/storageService';
+// 导入消息显示测试工具
+import messageTools from './test-messages';
 
-const App = () => {
-  // 添加chatContainerRef
-  const chatContainerRef = useRef(null);
-
-  const [conversations, setConversations] = useState([]);
-  const [currentSessionHash, setCurrentSessionHash] = useState('');
-  const [darkMode, setDarkMode] = useState(false);
-  const [displayMessages, setDisplayMessages] = useState([]);
-  const [requestMessages, setRequestMessages] = useState([]);
-  const [currentResponse, setCurrentResponse] = useState('');
-  const [reasoningText, setReasoningText] = useState('');
-  const [streaming, setStreaming] = useState(false);
-  const [activeDocuments, setActiveDocuments] = useState([]);
-  const [userHasScrolled, setUserHasScrolled] = useState(false);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
-
-  // 修改scrollToBottom函数使用ref并用useCallback包裹
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatContainerRef]); // 依赖项是 chatContainerRef
-
-  // 使用不同的名称实现保存对话函数并用useCallback包裹
-  const saveCompletedReply = useCallback((assistantMessage) => {
-    console.log('App.jsx中的saveCompletedReply被调用', assistantMessage?.id);
+function App() {
+  // 添加测试模式状态
+  const [isTestMode, setIsTestMode] = useState(false);
+  // 添加直接API测试模式状态
+  const [isDirectAPITestMode, setIsDirectAPITestMode] = useState(false);
+  // 添加组件已加载状态
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // DEBUG：启动时检查 localStorage 中的数据
+  useEffect(() => {
+    console.log('===== DEBUG：启动时检查 localStorage =====');
     
-    // 防御性检查：确保assistantMessage是对象且有必要属性
-    if (!assistantMessage || typeof assistantMessage !== 'object') {
-      console.error('保存AI回复失败：无效的消息对象', assistantMessage);
-      return false;
-    }
+    // 检查原始 localStorage 数据
+    const rawConversations = localStorage.getItem('mini-chatbot-conversations');
+    const rawUIState = localStorage.getItem('mini-chatbot-ui-state');
+    const rawAPISettings = localStorage.getItem('mini-chatbot-api-settings');
     
-    // 确保消息有内容
-    if (!assistantMessage.content) {
-      console.warn('AI回复无内容，不保存');
-      return false;
-    }
+    console.log('原始 localStorage 数据:', { 
+      conversationsExists: !!rawConversations, 
+      uiStateExists: !!rawUIState, 
+      apiSettingsExists: !!rawAPISettings 
+    });
     
-    try {
-      // 严格检查此消息是否已存在于displayMessages中
-      const messageExists = displayMessages.some(msg => 
-        // 1. ID匹配
-        (msg.id === assistantMessage.id) || 
-        // 2. 角色和内容都匹配的消息
-        (msg.role === 'assistant' && msg.content === assistantMessage.content)
-      );
-      
-      // 如果消息已存在，不再添加
-      if (messageExists) {
-        console.log('App.jsx: 该AI回复已存在于displayMessages中，跳过保存');
-        return true; // 返回true表示处理成功
-      }
-      
-      // 双重保险：直接从localStorage中读取最新的对话历史
-      let latestConversations;
-      try {
-        const storedHistory = localStorage.getItem('conversations');
-        if (storedHistory) {
-          latestConversations = JSON.parse(storedHistory);
-        } else {
-          latestConversations = [...conversations];
-        }
-      } catch (error) {
-        console.error('读取localStorage中的对话历史失败:', error);
-        latestConversations = [...conversations];
-      }
-      
-      // 找到当前活动对话
-      const activeConv = latestConversations.find(conv => conv.active);
-      if (activeConv) {
-        // 再次检查此消息是否已存在于对话中
-        const messageExistsInConv = activeConv.messages.some(msg => 
-          (msg.id === assistantMessage.id) || 
-          (msg.role === 'assistant' && msg.content === assistantMessage.content)
-        );
-        
-        if (messageExistsInConv) {
-          console.log('App.jsx: 该AI回复已存在于对话历史中，跳过保存');
-          return true; // 返回true表示处理成功
-        }
-      }
-      
-      console.log('App.jsx: 消息检查完毕，开始保存AI回复');
-      
-      // 使用函数式更新确保原子性
-      setDisplayMessages(prev => {
-        // 再检查一次消息是否已存在
-        if (prev.some(msg => 
-          (msg.id === assistantMessage.id) || 
-          (msg.role === 'assistant' && msg.content === assistantMessage.content)
-        )) {
-          console.log('App.jsx: 最终检查 - 消息已存在，跳过添加');
-          return prev;
-        }
-        return [...prev, assistantMessage];
-      });
-      
-      // 如果没有活动对话或对话列表为空，不进行进一步处理
-      if (!activeConv) {
-        console.warn('App.jsx: 找不到活动对话，只更新UI不保存到localStorage');
-        return true;
-      }
-      
-      // 更新当前对话历史
-      const updatedConversations = latestConversations.map(conv => {
-        if (conv.active) {
-          // 最后一次检查这条消息是否已经存在于对话历史中
-          const msgExists = conv.messages.some(msg => 
-            msg.id === assistantMessage.id ||
-            (msg.role === 'assistant' && msg.content === assistantMessage.content)
-          );
-          
-          // 如果消息已存在，不添加
-          if (msgExists) {
-            return conv;
-          }
-          
-          return {
-            ...conv,
-            messages: [...conv.messages, assistantMessage],
-            timestamp: Date.now()
-          };
-        }
-        return conv;
-      });
-      
-      // 保存到本地存储
-      console.log('App.jsx: 保存更新后的对话历史到localStorage');
-      localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-      setConversations(updatedConversations);
-      
-      return true;
-    } catch (error) {
-      console.error('App.jsx: 保存AI回复时发生错误:', error);
-      return false;
-    }
-  }, [displayMessages, conversations, setConversations, setDisplayMessages]); // 添加依赖项
-
-  // 使用对话管理钩子
+    // 使用 storageService 解析数据
+    const conversations = storageService.getConversations();
+    console.log('解析后的对话数据:', { 
+      count: Object.keys(conversations).length,
+      ids: Object.keys(conversations)
+    });
+    
+    const uiState = storageService.getUIState();
+    console.log('解析后的UI状态:', uiState);
+    
+    console.log('===== DEBUG 结束 =====');
+  }, []);
+  
   const {
-    handleNewChat,
-    handleConversationClick,
-    handleDeleteConversation,
-    handleClearAll,
-    handleTitleEdit,
-    handleTitleChange,
-    handleTitleSave,
-    handleTitleCancel
-  } = useConversationManagement(
     conversations,
-    setConversations,
-    setDisplayMessages,
-    setRequestMessages,
-    setCurrentResponse,
-    setReasoningText,
-    setStreaming,
-    setActiveDocuments,
-    setUserHasScrolled,
-    scrollToBottom
+    currentConversationId,
+    setCurrentConversationId,
+    createNewConversation,
+    deleteConversation,
+    renameConversation,
+    isSidebarOpen,
+    toggleSidebar,
+    webSearchEnabled,
+    toggleWebSearch,
+    deepResearchEnabled,
+    toggleDeepResearch,
+    directRequestEnabled,
+    toggleDirectRequest,
+    setConversations
+  } = useUIState();
+  
+  // 组件加载完成后标记为已加载
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
+  // 使用useRef保存错误和加载状态，避免无限循环
+  const lastErrorRef = React.useRef(null);
+  const handleError = React.useCallback((error) => {
+    if (error !== lastErrorRef.current) {
+      console.error('聊天错误:', error);
+      lastErrorRef.current = error;
+    }
+  }, []);
+
+  const chatLogic = useChatLogic(
+    currentConversationId,
+    webSearchEnabled,
+    deepResearchEnabled,
+    directRequestEnabled,
+    handleError,
+    null // 移除loading回调函数，避免不必要的日志
   );
 
-  // 消息处理相关钩子
-  const {
-    input,
-    setInput,
-    displayMessages: messageHandlingDisplayMessages,
-    setDisplayMessages: setMessageHandlingDisplayMessages,
-    requestMessages: messageHandlingRequestMessages,
-    setRequestMessages: setMessageHandlingRequestMessages,
-    streaming: messageHandlingStreaming,
-    setStreaming: setMessageHandlingStreaming,
-    currentResponse: messageHandlingCurrentResponse,
-    setCurrentResponse: setMessageHandlingCurrentResponse,
-    reasoningText: messageHandlingReasoningText,
-    setReasoningText: setMessageHandlingReasoningText,
-    isReasoning,
-    setIsReasoning,
-    sendChatRequest,
-    handleSubmit: originalHandleSubmit,
-    handleResponse,
-    handleStop,
-    handleReplyComplete
-  } = useMessageHandling(
-    displayMessages, 
-    setDisplayMessages,
-    requestMessages,
-    setRequestMessages,
-    conversations,
-    setConversations,
-    '', // selectedModel - 暂时使用空字符串
-    [], // modelConfigs - 暂时使用空数组
-    {}, // embeddingConfig - 暂时使用空对象
-    false, // sensitiveInfoProtectionEnabled - 暂时禁用
-    scrollToBottom // 使用之前定义的scrollToBottom函数
-  );
+  const { 
+    messages, 
+    sendMessage, 
+    isLoading, 
+    apiSettings, 
+    updateApiSettings,
+    streamingResponse,
+    forceReloadConversation,
+    clearAllConversations,
+    stopGenerating
+  } = chatLogic;
 
-  // 包装handleSubmit函数，确保消息发送后清空输入框，并用useCallback包裹
-  const handleSubmit = useCallback(async (e, isDeepResearch = false, isWebSearch = false) => {
-    // 保存当前输入值用于创建用户消息
-    const currentInput = input.trim();
-    
-    // 如果输入为空，不处理
-    if (!currentInput) {
-      console.warn('不能发送空消息');
-      return;
+  // 切换测试模式
+  const toggleTestMode = () => {
+    setIsTestMode(prev => !prev);
+    // 切换到测试模式时，关闭直接API测试模式
+    if (!isTestMode) {
+      setIsDirectAPITestMode(false);
     }
-    
-    console.log('准备发送消息:', currentInput);
-    
-    // 立即清空输入框，提高用户体验
-    setInput('');
-    
-    // 调用原始的handleSubmit函数并传入当前输入值
-    return await originalHandleSubmit(e, isDeepResearch, isWebSearch, null, currentInput);
-  }, [input, setInput, originalHandleSubmit]); // 添加依赖项
-
-  const handleFileUpload = (file) => {
-    // Implementation of handleFileUpload
   };
 
-  // 处理编辑消息，并用useCallback包裹
-  const handleEdit = useCallback((message, newContent = null) => {
-    console.log('处理编辑消息:', message, newContent);
+  // 切换直接API测试模式
+  const toggleDirectAPITestMode = () => {
+    setIsDirectAPITestMode(prev => !prev);
+    // 切换到直接API测试模式时，关闭普通测试模式
+    if (!isDirectAPITestMode) {
+      setIsTestMode(false);
+    }
+  };
+
+  // 记录状态变化用于调试，但减少刷新次数
+  useEffect(() => {
+    console.log('App组件状态更新:', { 
+      conversationId: currentConversationId,
+      messagesCount: messages?.length || 0
+    });
+  }, [currentConversationId, messages?.length]);
+
+  // 处理对话选择
+  const handleSelectConversation = (conversationId) => {
+    if (!conversationId) {
+      console.error('App.jsx: 尝试选择会话但ID为空');
+      return;
+    }
     
-    // 如果只传递了一个参数，且是字符串，则视为新内容
-    if (typeof message === 'string' && newContent === null) {
-      console.log('传入的是编辑内容字符串，查找最后一条用户消息');
-      const lastUserMessage = displayMessages.findLast(msg => msg.role === 'user');
-      if (!lastUserMessage) {
-        console.error('无法编辑：找不到用户消息');
+    if (conversationId === currentConversationId) {
+      console.log('App.jsx: 已经是当前对话，尝试强制重新加载消息');
+      // 即使是当前对话，也尝试重新加载一次消息，解决可能的消息显示问题
+      chatLogic.forceReloadConversation(conversationId);
+      return;
+    }
+    
+    try {
+      console.log(`App.jsx: 切换到对话 ${conversationId}`);
+      
+      // 1. 验证目标对话是否存在
+      const targetConversation = storageService.getConversation(conversationId);
+      if (!targetConversation) {
+        console.error(`App.jsx: 目标对话 ${conversationId} 不存在`);
+        toast.error('该对话已不存在');
         return;
       }
-      return handleEdit(lastUserMessage, message);
-    }
-
-    // 检查消息对象有效性
-    if (!message || !message.id) {
-      console.error('无效的消息对象:', message);
-      return;
-    }
-
-    // 更新消息内容
-    const updatedDisplayMessages = displayMessages.map(msg => {
-      if (msg.id === message.id) {
-        return {
-          ...msg,
-          content: newContent || message.content,
-          timestamp: Date.now(),
-          edited: true
-        };
-      }
-      return msg;
-    });
-
-    // 更新显示消息
-    setDisplayMessages(updatedDisplayMessages);
-
-    // 更新对话历史
-    const updatedConversations = conversations.map(conv => {
-      if (conv.active) {
-        return {
-          ...conv,
-          messages: updatedDisplayMessages,
-          timestamp: Date.now()
-        };
-      }
-      return conv;
-    });
-
-    // 更新状态并保存到本地存储
-    setConversations(updatedConversations);
-    localStorage.setItem('conversations', JSON.stringify(updatedConversations));
-
-    // 找到被编辑的消息
-    const editedMessage = updatedDisplayMessages.find(msg => msg.id === message.id);
-    if (!editedMessage) {
-      console.error('无法找到编辑后的消息');
-      return;
-    }
-
-    // 触发AI响应，使用带有editedMessage参数的handleSubmit
-    try {
-      console.log('提交编辑后的消息给AI:', editedMessage);
-      originalHandleSubmit(null, false, false, editedMessage);
+      
+      // 2. 更新currentConversationId状态
+      console.log(`App.jsx: 设置当前对话ID从 ${currentConversationId} 到 ${conversationId}`);
+      setCurrentConversationId(conversationId);
+      
+      // 3. 更新localStorage中的UI状态以保持一致性
+      storageService.saveUIState({
+        currentConversationId: conversationId,
+        isSidebarOpen,
+        webSearchEnabled,
+        deepResearchEnabled,
+        directRequestEnabled
+      });
+      
+      // 4. 额外确认 - 先清空消息数组，然后在短暂延时后强制重新加载一次消息
+      chatLogic.setMessages([]); // 先清空消息，避免显示上一个对话的内容
+      
+      setTimeout(() => {
+        console.log(`App.jsx: 尝试强制重新加载对话 ${conversationId} 的消息`);
+        chatLogic.forceReloadConversation(conversationId);
+      }, 300);
+      
+      console.log(`App.jsx: 已完成对话切换到 ${conversationId}`);
     } catch (error) {
-      console.error('处理编辑消息时出错:', error);
-      alert('处理编辑消息失败，请重试');
+      console.error('切换对话时出错:', error);
+      toast.error('切换对话时出错');
     }
-  }, [displayMessages, setDisplayMessages, conversations, setConversations, originalHandleSubmit]); // 添加依赖项
+  };
 
-  // 组件渲染前确保saveCompletedReply函数有效
-  console.log('App组件渲染，saveCompletedReply函数类型:', typeof saveCompletedReply);
+  // 处理新建对话
+  const handleNewConversation = () => {
+    console.log('App.jsx: 处理新建对话请求');
+    
+    // 创建新对话并获取新ID
+    const newId = createNewConversation();
+    
+    // 确保立即清空消息数组，避免显示旧消息
+    chatLogic.setMessages([]);
+    
+    // 强制重新加载确保UI更新，传入新ID确保加载正确的对话
+    setTimeout(() => {
+      if (chatLogic.forceReloadConversation) {
+        console.log(`App.jsx: 强制重新加载新对话 ${newId}`);
+        chatLogic.forceReloadConversation(newId);
+      }
+    }, 200); // 增加延迟时间确保UI更新完毕
+    
+    console.log(`App.jsx: 新对话创建完成，ID: ${newId}`);
+    
+    return newId;
+  };
+
+  // 处理删除对话
+  const handleDeleteConversation = (conversationId) => {
+    if (window.confirm('确定要删除这个对话吗？')) {
+      deleteConversation(conversationId);
+    }
+  };
+
+  // 处理重命名对话
+  const handleRenameConversation = (conversationId, newTitle) => {
+    renameConversation(conversationId, newTitle);
+  };
 
   return (
-    // Add app-layout class and remove inline styles for layout
-    <div className="app-layout"> 
-      {/* Add sidebar-column class */}
-      <div className="sidebar-column"> 
-        <Sidebar
-          conversations={conversations}
-          currentSessionHash={currentSessionHash}
-          handleConversationClick={handleConversationClick}
-          handleNewChat={handleNewChat}
-          handleDeleteConversation={handleDeleteConversation}
-          handleClearAll={handleClearAll}
-          onUploadSuccess={handleFileUpload}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          streaming={streaming}
-          isSidebarExpanded={isSidebarExpanded}
-          // Pass the actual toggle function to Sidebar if it needs it, 
-          // otherwise remove or keep placeholder
-          handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} 
-        />
+    <div className="app-container">
+      <Toaster position="top-right" />
+      
+      <div className="mode-toggle-container">
+        <button 
+          className={`mode-toggle-button ${isTestMode ? 'test-mode' : 'chat-mode'}`}
+          onClick={toggleTestMode}
+        >
+          {isTestMode ? '返回聊天' : '后端测试'}
+        </button>
+        <button 
+          className={`mode-toggle-button ${isDirectAPITestMode ? 'direct-test-mode' : 'chat-mode'}`}
+          onClick={toggleDirectAPITestMode}
+        >
+          {isDirectAPITestMode ? '返回聊天' : '直连API测试'}
+        </button>
       </div>
-      {/* Add chat-column class */}
-      <div className="chat-column"> 
-        {/* Ensure only one ChatArea is rendered */}
-        <ChatArea
-          // Pass props from useMessageHandling hook
-          input={input} 
-          setInput={setInput}
-          handleSubmit={handleSubmit} // Use the wrapped handleSubmit
-          displayMessages={messageHandlingDisplayMessages || displayMessages} // Use state from hook or App
-          streaming={messageHandlingStreaming || streaming} // Use state from hook or App
-          currentResponse={messageHandlingCurrentResponse || currentResponse} // Use state from hook or App
-          reasoningText={messageHandlingReasoningText || reasoningText} // Use state from hook or App
-          isReasoning={isReasoning} // Pass isReasoning
-          handleStop={handleStop} // Pass handleStop
-          handleReplyComplete={handleReplyComplete} // Pass handleReplyComplete
+      
+      {isTestMode ? (
+        <TestBackendConnection />
+      ) : isDirectAPITestMode ? (
+        <DirectOpenRouterTest />
+      ) : (
+        <>
+          <Sidebar
+            conversations={conversations}
+            setConversations={setConversations}
+            currentConversationId={currentConversationId}
+            onSelectConversation={handleSelectConversation}
+            onNewConversation={handleNewConversation}
+            onDeleteConversation={handleDeleteConversation}
+            onRenameConversation={handleRenameConversation}
+            isOpen={isSidebarOpen}
+            apiSettings={apiSettings}
+            onUpdateApiSettings={updateApiSettings}
+            webSearchEnabled={webSearchEnabled}
+            onToggleWebSearch={toggleWebSearch}
+            deepResearchEnabled={deepResearchEnabled}
+            onToggleDeepResearch={toggleDeepResearch}
+            directRequestEnabled={directRequestEnabled}
+            onToggleDirectRequest={toggleDirectRequest}
+            chatLogicProps={chatLogic}
+          />
           
-          // Pass props from useConversationManagement hook or App state
-          conversations={conversations} // Pass conversations if needed inside ChatArea (e.g., for header info)
-          currentSessionHash={currentSessionHash} // Pass sessionHash
-          activeDocuments={activeDocuments} // Pass activeDocuments
-          setActiveDocuments={setActiveDocuments} // Pass setActiveDocuments
-          
-          // Pass general App state and handlers
-          darkMode={darkMode}
-          setDarkMode={setDarkMode} // Pass setDarkMode if needed inside ChatArea
-          chatContainerRef={chatContainerRef} // Pass the ref
-          handleScroll={() => {}} // Placeholder for scroll handling if needed
-          handleEdit={handleEdit} // Pass handleEdit
-          setDisplayMessages={setMessageHandlingDisplayMessages || setDisplayMessages} // Pass setDisplayMessages
-          
-          // Props specifically for ChatHeader (passed down through ChatArea)
-          handleNewChat={handleNewChat} // Pass handleNewChat for header button
-          handleExport={handleExport} // Pass handleExport for header button
-          handleToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)} // Pass toggle for header button
-          toggleDarkMode={toggleDarkMode} // Pass toggleDarkMode for header button
-          setShowFileUpload={setShowFileUpload} // Pass setShowFileUpload for header button
-          openSettings={openSettings} // Pass openSettings for header button
-          currentTurns={currentTurns} // Pass currentTurns for header display
-          
-          // Props specifically for MessageList (passed down through ChatArea)
-          handleRetry={handleRetry} // Pass handleRetry (ensure it's defined, likely from useMessageHandling)
-          handleCopy={handleCopy} // Pass handleCopy (ensure it's defined)
-          formatTime={formatTime} // Pass formatTime (ensure it's defined)
-          highlightedMessageId={highlightedMessageId} // Pass highlightedMessageId (ensure it's defined)
-          loadingHistory={loadingHistory} // Pass loadingHistory (ensure it's defined)
-          
-          // Props specifically for MessageInput (passed down through ChatArea)
-          selectedModel={selectedModel} // Pass selectedModel (ensure it's defined)
-          setSelectedModel={setSelectedModel} // Pass setSelectedModel (ensure it's defined)
-          modelOptions={modelOptions} // Pass modelOptions (ensure it's defined)
-          maxHistoryLength={maxHistoryLength} // Pass maxHistoryLength if needed by input/validation
-        displayMessages={messageHandlingDisplayMessages || displayMessages}
-        streaming={messageHandlingStreaming || streaming}
-        currentResponse={messageHandlingCurrentResponse || currentResponse}
-        reasoningText={messageHandlingReasoningText || reasoningText}
-        isReasoning={isReasoning}
-        handleStop={handleStop}
-        darkMode={darkMode}
-        activeDocuments={activeDocuments}
-        sessionHash={currentSessionHash}
-        chatContainerRef={chatContainerRef}
-        handleScroll={() => {}} // Placeholder, might need actual implementation
-        handleEdit={handleEdit}
-        setDisplayMessages={setDisplayMessages} // Pass setDisplayMessages
-        // Pass other necessary props from ChatArea's definition
-        handleRetry={handleRetry} // Assuming handleRetry comes from useMessageHandling or similar
-        handleCopy={handleCopy} // Assuming handleCopy comes from useMessageHandling or similar
-        formatTime={formatTime} // Assuming formatTime comes from somewhere
-        highlightedMessageId={highlightedMessageId} // Assuming highlightedMessageId exists
-        loadingHistory={loadingHistory} // Assuming loadingHistory exists
-        setActiveDocuments={setActiveDocuments}
-        />
-      </div>
+          <ChatArea
+            messages={messages}
+            onSendMessage={(content) => {
+              let targetConversationId = currentConversationId;
+              
+              // 如果没有当前会话ID，先创建一个新会话，并使用消息内容作为标题
+              if (!targetConversationId) {
+                console.log('App.jsx: 没有当前对话ID，正在创建新对话');
+                targetConversationId = createNewConversation(content);
+                console.log(`App.jsx: 已创建新对话，ID: ${targetConversationId}, 使用内容作为标题`);
+                
+                // 确保UI状态更新，将新创建的对话ID设置为当前对话ID
+                setCurrentConversationId(targetConversationId);
+                
+                // 不再使用 messageTools.ensureMessagesVisible，直接让 sendMessage 处理消息显示
+                console.log('App.jsx: 将由sendMessage函数处理消息显示');
+              } else {
+                console.log(`App.jsx: 使用现有对话，ID: ${targetConversationId}`);
+              }
+              
+              // 显示检查本地存储中是否存在该对话
+              const existingConversation = storageService.getConversation(targetConversationId);
+              console.log(`App.jsx: 发送消息前检查本地存储中的对话: `, 
+                existingConversation ? `找到对话 ${targetConversationId}` : `对话 ${targetConversationId} 不存在`);
+              
+              // 使用获取到的（可能是新的）会话ID发送消息
+              console.log(`App.jsx: 发送消息到对话 ${targetConversationId}，消息长度: ${content.length}`);
+              sendMessage(content, null, {
+                webSearchEnabled,
+                deepResearchEnabled,
+                directRequest: directRequestEnabled,
+                // 确保将消息保存到正确的（可能是新建的）对话中
+                conversationIdToSave: targetConversationId 
+              });
+            }}
+            isLoading={isLoading}
+            streamingResponse={streamingResponse}
+            onToggleSidebar={toggleSidebar}
+            onClearMessages={() => {
+              if (messages.length > 0 && window.confirm('确定要清空当前对话吗？')) {
+                // 获取当前对话以保留其标题和其他元数据
+                const currentConversation = storageService.getConversation(currentConversationId);
+                // 保留ID和标题，但清空消息
+                const updatedConversation = {
+                  id: currentConversationId,
+                  title: currentConversation?.title || '新对话', // 保留原始标题
+                  messages: [],
+                  createdAt: currentConversation?.createdAt || new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+                chatLogic.setMessages([]);
+                storageService.saveConversationNow(currentConversationId, updatedConversation);
+                console.log(`App.jsx: 已清空对话 ${currentConversationId} 的所有消息，保留原标题: "${updatedConversation.title}"`);
+              }
+            }}
+            webSearchEnabled={webSearchEnabled}
+            onStopGenerating={stopGenerating}
+          />
+        </>
+      )}
     </div>
   );
-};
+}
 
-export default App; 
+export default App;

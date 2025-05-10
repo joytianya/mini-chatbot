@@ -162,8 +162,8 @@ async def get_web_kg(query, num_results=3, offset=0):
         except Exception as e:
             print(f"生成摘要失败: {e}")
             continue
-    search_results_str = "\n\n".join(search_results)
-    search_result_urls_str = "\n\n".join(search_result_urls)
+    search_results_str = "\n".join(search_results)
+    search_result_urls_str = "\n".join(search_result_urls)
     return combined_results, search_results_str, search_result_urls_str
 
     # 显示组合后的结构化数据

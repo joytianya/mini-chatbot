@@ -1,0 +1,27 @@
+.message-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+
+/* 确保消息容器始终居中显示 */
+
+@media (max-width: 900px) {
+    .message-list {
+        max-width: 100%;
+    }
+}
+
+
+/* 确保消息容器始终居中显示 */
+
+@media (max-width: 900px) {
+    .message-list {
+        max-width: 100%;
+    }
+}

@@ -1,0 +1,72 @@
+.app {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    height: 100%;
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-open {
+    margin-left: 300px;
+}
+
+@media (max-width: 768px) {
+    .main-content.sidebar-open {
+        margin-left: 0;
+    }
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    position: relative;
+}
+
+
+/* 添加模式切换按钮样式 */
+
+.mode-toggle-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+
+.mode-toggle-button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.mode-toggle-button.chat-mode {
+    background-color: #4a90e2;
+    color: white;
+}
+
+.mode-toggle-button.test-mode {
+    background-color: #f44336;
+    color: white;
+}
+
+.mode-toggle-button.direct-test-mode {
+    background-color: #e67e22;
+    color: white;
+}
+
+color: white;
+
+}
+.mode-toggle-button.direct-test-mode {
+    background-color: #e67e22;
+    color: white;
+}

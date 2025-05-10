@@ -12,14 +12,11 @@ class CustomFormatter(Formatter):
         original_msg = record.msg
         separator = record.__dict__.get('separator', '')
         
-        # 如果是错误日志，添加堆栈信息
-        if record.levelno >= logging.ERROR:
-            tb = traceback.extract_stack()
-            # 获取调用日志的文件名和行号
-            filename, line_no, func_name, _ = tb[-2]
-            location_info = f"[{os.path.basename(filename)}:{line_no}] "
-        else:
-            location_info = ""
+        # 获取调用日志的文件名和行号（为所有日志级别添加）
+        tb = traceback.extract_stack()
+        # 获取调用日志的文件名和行号（通常是倒数第二个堆栈帧）
+        filename, line_no, func_name, _ = tb[-2]
+        location_info = f"[{os.path.basename(filename)}:{line_no}] "
         
         # 设置基本格式
         record.msg = f"{location_info}{original_msg}\n{separator}" if separator else f"{location_info}{original_msg}"

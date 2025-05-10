@@ -51,6 +51,28 @@ class MultiSearXClient:
             except Exception as e:
                 print(f"Failed to initialize client for {instance['url']}: {e}")
     
+    def verify_clients(self):
+        """验证所有客户端的会话有效性，必要时重新初始化"""
+        valid_clients = []
+        for i, client in enumerate(self.clients):
+            try:
+                # 确保会话有效
+                client.ensure_valid_session()
+                valid_clients.append(client)
+            except Exception as e:
+                print(f"客户端 {i+1} ({client.base_url}) 验证失败: {e}")
+                try:
+                    # 尝试重新创建客户端
+                    print(f"重新创建客户端 {i+1}...")
+                    new_client = SearXNGSeleniumClient(base_url=client.base_url)
+                    valid_clients.append(new_client)
+                except Exception as e2:
+                    print(f"无法重新创建客户端 {i+1}: {e2}")
+        
+        # 更新客户端列表
+        self.clients = valid_clients
+        print(f"验证完成，有效客户端数量: {len(self.clients)}")
+    
     def multi_search(self, query: str, group_size: int = 2, **kwargs) -> List[Dict]:
         """
         按组执行搜索,每组有指定数量的搜索引擎实例。如果一组有结果就返回,否则继续下一组。
@@ -63,6 +85,13 @@ class MultiSearXClient:
         Returns:
             去重后的搜索结果列表
         """
+        # 搜索前验证所有客户端
+        self.verify_clients()
+        
+        if not self.clients:
+            print("警告: 没有可用的搜索客户端")
+            return []
+        
         results = []
         self.search_stats = {client.base_url: 0 for client in self.clients}  # 重置统计
         print(f"搜索{len(self.clients)}个实例")
@@ -86,6 +115,7 @@ class MultiSearXClient:
                         group_results.extend(client_results)
                     except Exception as e:
                         print(f"Error with client {client.base_url}: {e}")
+                        self.search_stats[client.base_url] = -1  # 标记为出错
             
             # 如果当前组有结果,就不再继续搜索下一组
             if group_results:
@@ -98,18 +128,30 @@ class MultiSearXClient:
         # 打印每个实例的结果统计
         print("\n各搜索引擎结果统计:")
         for url, count in self.search_stats.items():
-            print(f"- {url}: {count} 个结果")
+            status = f"{count} 个结果" if count >= 0 else "搜索失败"
+            print(f"- {url}: {status}")
         
         return self._deduplicate_results(results)
     
     def _search_with_client(self, client: 'SearXNGSeleniumClient', query: str, **kwargs) -> List[Dict]:
         """Perform search with a single client."""
         try:
+            # 确保会话有效
+            client.ensure_valid_session()
+            
             soup_results = client.search(query, **kwargs)
             return client.parse_results(soup_results)
         except Exception as e:
             print(f"Search failed for {client.base_url}: {e}")
-            return []
+            # 尝试重新初始化并重试一次
+            try:
+                print(f"尝试重新初始化客户端 {client.base_url} 并重试...")
+                client.init_driver()
+                soup_results = client.search(query, **kwargs)
+                return client.parse_results(soup_results)
+            except Exception as retry_error:
+                print(f"重试失败: {retry_error}")
+                return []
     
     def _deduplicate_results(self, results: List[Dict]) -> List[Dict]:
         """Remove duplicate results based on URL."""
@@ -129,8 +171,8 @@ class MultiSearXClient:
         for client in self.clients:
             try:
                 client.close()
-            except:
-                pass
+            except Exception as e:
+                print(f"关闭客户端 {client.base_url} 时出错: {e}")
 
 class SearXNGSeleniumClient:
     """
@@ -171,6 +213,9 @@ class SearXNGSeleniumClient:
         options.add_experimental_option('useAutomationExtension', False)
         
         try:
+            # 关闭之前的driver实例（如果存在）
+            self.close()
+            
             self.driver = webdriver.Chrome(options=options)
             self.driver.set_page_load_timeout(self.timeout)
         except Exception as e:
@@ -200,6 +245,21 @@ class SearXNGSeleniumClient:
                 pass
             self.driver = None
     
+    def ensure_valid_session(self):
+        """确保WebDriver会话有效，如果无效则重新初始化"""
+        if not self.driver:
+            print("WebDriver不存在，正在初始化...")
+            self.init_driver()
+            return
+        
+        try:
+            # 尝试访问一个属性来检查会话是否有效
+            _ = self.driver.current_url
+        except Exception as e:
+            print(f"检测到无效会话: {e}")
+            print("正在重新初始化WebDriver...")
+            self.init_driver()
+    
     def visit_homepage(self):
         """
         Visit the homepage to establish cookies and session.
@@ -207,6 +267,8 @@ class SearXNGSeleniumClient:
         Returns:
             bool: True if successful, False otherwise
         """
+        self.ensure_valid_session()
+        
         try:
             self.driver.get(self.base_url)
             
@@ -231,7 +293,13 @@ class SearXNGSeleniumClient:
             return False
         except WebDriverException as e:
             print(f"Error while visiting homepage: {e}")
-            return False
+            # 尝试重新初始化WebDriver并重试
+            try:
+                self.init_driver()
+                self.driver.get(self.base_url)
+                return "SearXNG" in self.driver.title or "Search" in self.driver.title
+            except:
+                return False
     
     def search(self, query, category='general', language='auto', time_range='', page=1):
         """
@@ -247,6 +315,9 @@ class SearXNGSeleniumClient:
         Returns:
             BeautifulSoup object with the parsed HTML results
         """
+        # 确保会话有效
+        self.ensure_valid_session()
+        
         try:
             # Construct the search URL
             search_params = {
@@ -303,11 +374,21 @@ class SearXNGSeleniumClient:
             
         except Exception as e:
             print(f"Error during search: {e}")
+            # 如果是会话无效错误，尝试重新初始化并重试一次
+            if "invalid session id" in str(e).lower():
+                print("检测到无效会话ID，尝试重新初始化并重试...")
+                try:
+                    self.init_driver()
+                    return self.search(query, category, language, time_range, page)
+                except Exception as retry_error:
+                    print(f"重试失败: {retry_error}")
+            
             # Take a screenshot if possible
             try:
-                screenshot_path = "search_error.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"Error screenshot saved to {os.path.abspath(screenshot_path)}")
+                if self.driver:
+                    screenshot_path = "search_error.png"
+                    self.driver.save_screenshot(screenshot_path)
+                    print(f"Error screenshot saved to {os.path.abspath(screenshot_path)}")
             except:
                 pass
             raise

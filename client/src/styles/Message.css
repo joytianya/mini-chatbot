@@ -1,0 +1,230 @@
+.message {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    /* animation: fadeIn 0.3s ease; */
+    /* 暂时移除动画以排查跳动问题 */
+    max-width: 100%;
+    width: 100%;
+    /* 确保消息宽度稳定 */
+    box-sizing: border-box;
+    /* 包含padding和border在宽度内 */
+}
+
+.user-message {
+    background-color: var(--user-message-bg);
+}
+
+.bot-message {
+    background-color: var(--bot-message-bg);
+}
+
+.message-avatar {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar {
+    background-color: #6366f1;
+    color: white;
+    font-weight: 600;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bot-avatar {
+    background-color: #3b82f6;
+    color: white;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.message-content {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: break-word;
+    /* 可以为用户和机器人消息设置不同的最大宽度 */
+    max-width: 85%;
+    /* 限制内容最大宽度，避免太宽 */
+}
+
+.user-message .message-content {
+    /* 用户消息可以稍微宽一点 */
+    max-width: 90%;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.message-sender {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.message-time {
+    color: var(--text-light);
+    font-size: 0.75rem;
+}
+
+.message-text {
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.message-text a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+.message-text pre {
+    margin: 1rem 0;
+    white-space: pre-wrap;
+}
+
+.message-text code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.message-text img {
+    max-width: 100%;
+    border-radius: var(--radius-md);
+    margin: 0.5rem 0;
+}
+
+@media (max-width: 768px) {
+    .message {
+        padding: 0.75rem;
+    }
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+.reasoning-section {
+    margin: 0.5rem 0;
+}
+
+.toggle-reasoning {
+    background: transparent;
+    border: 1px solid #ddd;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.toggle-reasoning:hover {
+    background-color: #f0f0f0;
+    border-color: #ccc;
+}
+
+.reasoning-content {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f7f7f7;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    border-left: 3px solid #ddd;
+}
+
+.reasoning-text {
+    white-space: pre-wrap;
+    font-family: monospace;
+    color: #555;
+}
+
+
+/* 暗色模式 */
+
+@media (prefers-color-scheme: dark) {
+    .toggle-reasoning {
+        border-color: #444;
+        color: #aaa;
+    }
+    .toggle-reasoning:hover {
+        background-color: #333;
+        border-color: #555;
+    }
+    .reasoning-content {
+        background-color: #252525;
+        border-left-color: #444;
+    }
+    .reasoning-text {
+        color: #bbb;
+    }
+}
+
+.reasoning-section {
+    margin: 0.5rem 0;
+}
+
+.toggle-reasoning {
+    background: transparent;
+    border: 1px solid #ddd;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.toggle-reasoning:hover {
+    background-color: #f0f0f0;
+    border-color: #ccc;
+}
+
+.reasoning-content {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f7f7f7;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    border-left: 3px solid #ddd;
+}
+
+.reasoning-text {
+    white-space: pre-wrap;
+    font-family: monospace;
+    color: #555;
+}
+
+
+/* 暗色模式 */
+
+@media (prefers-color-scheme: dark) {
+    .toggle-reasoning {
+        border-color: #444;
+        color: #aaa;
+    }
+    .toggle-reasoning:hover {
+        background-color: #333;
+        border-color: #555;
+    }
+    .reasoning-content {
+        background-color: #252525;
+        border-left-color: #444;
+    }
+    .reasoning-text {
+        color: #bbb;
+    }
+}

@@ -1,748 +1,408 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Settings } from './Settings';
-import './Sidebar.css';
-import DocumentUploader from './DocumentUploader.jsx';
+import React, { useState, useEffect } from 'react';
+import '../styles/Sidebar.css';
+import { Modal } from '../common/Modal';
+import storageService from '../services/storageService';
+import toast from 'react-hot-toast';
 
 const Sidebar = ({
-  isSidebarExpanded,
-  handleNewChat,
   conversations,
-  handleConversationClick,
-  handleDeleteConversation,
-  streaming,
-  handleClearAll,
-  handleExport,
-  formatTime,
-  darkMode,
-  setDarkMode,
-  availableModels,
-  selectedModel,
-  setSelectedModel,
-  handleSettingsSave,
-  sensitiveInfoProtectionEnabled,
-  toggleSensitiveInfoProtection,
-  handleToggleSidebar,
-  currentSessionHash,
-  onConversationClick,
-  onCreateNewChat,
+  setConversations,
+  currentConversationId,
+  onSelectConversation,
+  onNewConversation,
   onDeleteConversation,
-  onUploadSuccess
+  onRenameConversation,
+  isOpen,
+  apiSettings,
+  onUpdateApiSettings,
+  webSearchEnabled,
+  onToggleWebSearch,
+  deepResearchEnabled,
+  onToggleDeepResearch,
+  directRequestEnabled,
+  onToggleDirectRequest,
+  chatLogicProps
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats' 或 'documents'
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const modelSelectorRef = useRef(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [localApiSettings, setLocalApiSettings] = useState(apiSettings);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
-  // 点击外部关闭模型选择下拉菜单
+  // Handle conversation renaming
+  const startEditing = (id, title) => {
+    setEditingId(id);
+    setEditingTitle(title);
+  };
+
+  const saveEdit = () => {
+    if (editingTitle.trim()) {
+      onRenameConversation(editingId, editingTitle);
+    }
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  // Handle API settings changes
+  const handleSettingsChange = (e) => {
+    const { name, value } = e.target;
+    setLocalApiSettings(prev => ({ ...prev, [name]: value }));
+    console.log(`设置已更新: ${name} = ${value.substring(0, 3)}...`);
+  };
+  
+  // 处理粘贴事件，不需要特殊处理，因为默认粘贴会触发onChange事件
+
+  const saveSettings = () => {
+    onUpdateApiSettings(localApiSettings);
+    setIsSettingsOpen(false);
+  };
+
+  // Format conversation date
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  // 确保侧边栏始终显示对话历史
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target)) {
-        setShowModelDropdown(false);
+    // 当conversations变化时，确保侧边栏内容更新
+    console.log('对话历史已更新，当前会话数:', Object.keys(conversations).length);
+  }, [conversations]);
+
+  // 清空对话历史功能
+  const handleClearAllConversations = () => {
+    if (chatLogicProps?.clearAllConversations) {
+      if (window.confirm('确定要删除所有对话历史记录吗？此操作不可撤销，所有对话记录将被永久删除。')) {
+        if (chatLogicProps.clearAllConversations()) {
+          // 清空对话列表状态
+          setConversations({});
+          onNewConversation();
+          toast.success('已清除所有对话历史记录');
+        }
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // 生成随机颜色函数
-  const getRandomColor = (seed) => {
-    const colors = [
-      '#1976d2', '#388e3c', '#d32f2f', '#7b1fa2', 
-      '#c2185b', '#f57c00', '#0288d1', '#689f38'
-    ];
-    // 使用对话ID作为种子来选择颜色
-    const index = seed.toString().split('').reduce((a, b) => a + b.charCodeAt(0), 0) % colors.length;
-    return colors[index];
-  };
-
-  // 获取对话标题的第一个字符
-  const getFirstChar = (title) => {
-    return title && title.length > 0 ? title.charAt(0) : '对';
-  };
-
-  // 标签页样式
-  const getTabStyle = (tabName) => ({
-    padding: '10px 20px',
-    cursor: 'pointer',
-    backgroundColor: activeTab === tabName ? (darkMode ? '#2d2d2d' : '#f0f0f0') : 'transparent',
-    color: darkMode ? '#e0e0e0' : '#333',
-    border: 'none',
-    borderBottom: activeTab === tabName ? `2px solid ${darkMode ? '#4a9eff' : '#1976d2'}` : 'none',
-    flex: 1,
-    textAlign: 'center',
-    transition: 'all 0.3s ease'
-  });
-
-  // 模型选择处理函数
-  const handleModelChange = (e) => {
-    if (setSelectedModel) {
-      setSelectedModel(e.target.value);
-      localStorage.setItem('selectedModel', e.target.value);
+    } else {
+      toast.error('无法清除对话历史记录');
     }
-  };
-
-  // 直接选择模型处理函数
-  const handleModelSelect = (model) => {
-    if (setSelectedModel) {
-      setSelectedModel(model);
-      localStorage.setItem('selectedModel', model);
-      setShowModelDropdown(false);
-    }
-  };
-
-  // 获取简短的模型名称
-  const getShortModelName = (modelName) => {
-    if (!modelName) return '';
-    
-    // 如果含有 "-" 或 "/" 取最后一部分
-    const parts = modelName.split(/[-\/]/);
-    if (parts.length > 1) {
-      return parts[parts.length - 1];
-    }
-    
-    // 如果太长就截取
-    return modelName.length > 12 ? modelName.substring(0, 10) + '...' : modelName;
   };
 
   return (
     <>
-      <div className="sidebar-container" style={{
-        width: isSidebarExpanded ? '260px' : '48px',
-        height: '100vh',
-        borderRight: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
-        backgroundColor: darkMode ? '#2d2d2d' : '#fff',
-        transition: 'width 0.3s linear',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative'
-      }}>
-        {/* 标签页导航 */}
-        <div style={{
-          display: 'flex',
-          borderBottom: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
-          backgroundColor: darkMode ? '#1a1a1a' : '#fff'
-        }}>
-          <button
-            className={`tab-button ${activeTab === 'chats' ? 'active' : ''}`}
-            onClick={() => setActiveTab('chats')}
-            style={getTabStyle('chats')}
-          >
-            {isSidebarExpanded ? '对话列表' : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-            )}
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'documents' ? 'active' : ''}`}
-            onClick={() => setActiveTab('documents')}
-            style={getTabStyle('documents')}
-          >
-            {isSidebarExpanded ? '文档管理' : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {/* 标题区域 */}
-        <div 
-          className="title-area" 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isSidebarExpanded ? 'space-between' : 'center',
-            padding: isSidebarExpanded ? '12px 16px' : '10px',
-            borderBottom: `1px solid ${darkMode ? '#333' : '#e0e0e0'}`,
-            height: '56px',
-            boxSizing: 'border-box',
-            overflow: 'hidden',
-            transition: 'all 0.3s linear',
-            cursor: 'pointer'
-          }}
-          onClick={handleToggleSidebar}
-          title={isSidebarExpanded ? "收起侧边栏" : "展开侧边栏"}
-        >
-          <div 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '10px',
-              minWidth: isSidebarExpanded ? 'auto' : '32px',
-              transition: 'all 0.3s linear',
-              height: '32px',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="app-icon" style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              backgroundColor: darkMode ? '#304254' : '#1976d2',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: '18px',
-              flexShrink: 0,
-              transition: 'transform 0.3s linear',
-              transform: isSidebarExpanded ? 'scale(1)' : 'scale(1)'
-            }}>
-              <svg 
-                width="20" 
-                height="20" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-              >
-                <rect x="4" y="4" width="16" height="12" rx="2" />
-                <circle cx="9" cy="10" r="1" />
-                <circle cx="12" cy="10" r="1" />
-                <circle cx="15" cy="10" r="1" />
-                <line x1="12" y1="16" x2="12" y2="20" />
-              </svg>
-            </div>
-            
-            {isSidebarExpanded && (
-              <h1 style={{
-                margin: 0,
-                fontSize: '20px',
-                fontWeight: 'bold',
-                color: darkMode ? '#b0c4de' : '#2c3e50',
-                whiteSpace: 'nowrap',
-                transition: 'opacity 0.3s linear',
-              }}>
-                Mini Chatbot
-              </h1>
-            )}
-          </div>
-        </div>
-
-        {/* 内容区域 */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '10px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          {activeTab === 'chats' ? (
-            // 对话列表
-            <>
-              <button
-                className="new-chat-btn"
-                onClick={handleNewChat}
-                style={{
-                  width: isSidebarExpanded ? '100%' : '32px',
-                  padding: isSidebarExpanded ? '10px' : '6px 0',
-                  marginBottom: '6px',
-                  backgroundColor: darkMode ? '#3a3a3a' : '#f5f5f5',
-                  border: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
-                  borderRadius: '6px',
-                  color: darkMode ? '#e0e0e0' : '#333',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  margin: isSidebarExpanded ? '0 0 6px 0' : '0 auto 6px auto'
-                }}
-              >
-                <svg width={isSidebarExpanded ? "20" : "24"} height={isSidebarExpanded ? "20" : "24"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="16"></line>
-                  <line x1="8" y1="12" x2="16" y2="12"></line>
-                </svg>
-                {isSidebarExpanded && <span>新建对话</span>}
-              </button>
-
-              {/* 对话列表区域标识 - 当侧边栏缩小且没有对话时显示 */}
-              {!isSidebarExpanded && conversations.length === 0 && (
-                <div 
-                  className="empty-conversations-indicator"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    margin: '8px auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                    borderRadius: '6px',
-                    color: darkMode ? '#aaa' : '#888'
-                  }}
-                  title="暂无对话，点击上方按钮新建"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="9" y1="9" x2="15" y2="9"></line>
-                    <line x1="9" y1="15" x2="15" y2="15"></line>
-                  </svg>
-                </div>
-              )}
-
-              {/* 对话列表 */}
-              <div className="conversation-list" style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                width: isSidebarExpanded ? '100%' : '40px',
-                margin: isSidebarExpanded ? '0' : '0 auto'
-              }}>
-                {conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    className={`conversation-item ${conv.active ? 'active' : ''}`}
-                    onClick={() => handleConversationClick(conv)}
-                    onMouseEnter={(e) => {
-                      const deleteButton = e.currentTarget.querySelector('.delete-button');
-                      if (deleteButton) {
-                        deleteButton.style.opacity = '1';
-                        deleteButton.style.visibility = 'visible';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      const deleteButton = e.currentTarget.querySelector('.delete-button');
-                      if (deleteButton) {
-                        deleteButton.style.opacity = '0';
-                        deleteButton.style.visibility = 'hidden';
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: isSidebarExpanded ? '8px 10px' : '6px 0',
-                      backgroundColor: conv.active ? (darkMode ? '#444' : '#e3f2fd') : 'transparent',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      gap: isSidebarExpanded ? '10px' : '0',
-                      transition: 'background-color 0.2s ease',
-                      justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
-                      width: isSidebarExpanded ? '100%' : '40px'
-                    }}
-                    title={!isSidebarExpanded ? conv.title : ""}
-                  >
-                    {/* 对话图标 */}
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      backgroundColor: getRandomColor(conv.id),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      fontSize: '14px',
-                      flexShrink: 0,
-                      margin: isSidebarExpanded ? '0' : '0 auto'
-                    }}>
-                      {getFirstChar(conv.title)}
-                    </div>
-
-                    {/* 对话标题 */}
-                    {isSidebarExpanded && (
-                      <div style={{
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        color: darkMode ? '#e0e0e0' : '#333',
-                        fontSize: '14px'
-                      }}>
-                        {conv.title}
-                      </div>
-                    )}
-
-                    {/* 删除按钮 */}
-                    {isSidebarExpanded && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation(); // 阻止事件冒泡
-                          handleDeleteConversation(conv.sessionHash);
-                        }}
-                        style={{
-                          padding: '4px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          borderRadius: '4px',
-                          color: darkMode ? '#888' : '#666',
-                          cursor: 'pointer',
-                          opacity: '0',
-                          visibility: 'hidden',
-                          transition: 'all 0.2s ease',
-                          position: 'absolute',
-                          right: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '24px',
-                          height: '24px'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                        className="delete-button"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            // 文档管理
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              alignItems: isSidebarExpanded ? 'stretch' : 'center'
-            }}>
-              {/* 缩小状态下显示上传文件图标 */}
-              {!isSidebarExpanded ? (
-                <div
-                  className="upload-icon"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: darkMode ? '#e0e0e0' : '#555',
-                    transition: 'transform 0.2s ease'
-                  }}
-                  title="上传文件"
-                  onClick={() => {
-                    // 触发隐藏的文件上传输入
-                    const fileInput = document.getElementById('file-upload-input');
-                    if (fileInput) fileInput.click();
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                  </svg>
-                </div>
-              ) : (
-                <DocumentUploader
-                  onUploadSuccess={onUploadSuccess}
-                  darkMode={darkMode}
-                />
-              )}
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2>对话列表</h2>
+          <button 
+            className="new-chat-button" 
+            onClick={(e) => {
+              e.preventDefault();
+              console.log('Sidebar: 点击新对话按钮');
+              // 先触发动画效果
+              e.currentTarget.classList.add('active');
               
-              {/* 文件上传说明提示文本 - 仅在缩小模式下显示 */}
-              {!isSidebarExpanded && (
-                <div 
-                  className="doc-hint"
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: darkMode ? '#888' : '#999'
-                  }}
-                  title="上传文件后可用于知识库查询"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                  </svg>
-                </div>
-              )}
+              // 延时处理，给用户视觉反馈
+              setTimeout(() => {
+                // 创建新对话，获取新ID
+                const newId = onNewConversation();
+                console.log(`Sidebar: 新对话已创建，ID: ${newId}`);
+                
+                // 移除成功提示
+                // toast.success('已创建新对话');
+                
+                // 恢复按钮状态
+                e.currentTarget.classList.remove('active');
+              }, 200);
+            }}
+            aria-label="New conversation"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            新对话
+          </button>
+        </div>
+
+        <div className="conversations-list">
+          {Object.entries(conversations).length === 0 ? (
+            <div className="empty-conversations">
+              <p>没有对话历史</p>
+              <p>点击"新对话"开始聊天</p>
             </div>
+          ) : (
+            Object.entries(conversations)
+              .sort(([, a], [, b]) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+              .map(([id, conversation]) => (
+                <div 
+                  key={id} 
+                  className={`conversation-item ${currentConversationId === id ? 'active' : ''}`}
+                >
+                  {editingId === id ? (
+                    <div className="edit-conversation">
+                      <input
+                        type="text"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onPaste={(e) => {
+                          // 不阻止默认粘贴行为
+                          console.log('粘贴到对话标题输入框');
+                        }}
+                        className="paste-enabled"
+                        autoFocus
+                        onBlur={saveEdit}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                      />
+                      <small className="input-tip">支持粘贴内容</small>
+                      <div className="edit-buttons">
+                        <button onClick={saveEdit} aria-label="Save">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        </button>
+                        <button onClick={cancelEdit} aria-label="Cancel">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div 
+                        className="conversation-title"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // 先置灰条目，视觉上表明已响应点击
+                          if (e && e.currentTarget) {
+                            e.currentTarget.classList.add('loading');
+                          }
+                          toast.dismiss(); // 清除可能存在的提示
+                          
+                          try {
+                            // 延时调用选择对话，给UI时间完成状态转换
+                            setTimeout(() => {
+                              console.log(`Sidebar: 选择对话 ${id}, 当前活动对话: ${currentConversationId}`);
+                              
+                              // 触发选择事件
+                              onSelectConversation(id);
+                              
+                              // 移除切换成功提示
+                              // if (id !== currentConversationId) {
+                              //   toast.success(`已切换到对话: ${conversation.title || '新对话'}`);
+                              // }
+                              
+                              // 200ms后恢复样式
+                              setTimeout(() => {
+                                if (e && e.currentTarget) {
+                                  e.currentTarget.classList.remove('loading');
+                                }
+                              }, 200);
+                            }, 50);
+                          } catch (error) {
+                            console.error('选择对话时出错:', error);
+                            toast.error('切换对话失败');
+                            if (e && e.currentTarget) {
+                              e.currentTarget.classList.remove('loading');
+                            }
+                          }
+                        }}
+                      >
+                        <span>{conversation.title || '新对话'}</span>
+                        <small>{formatDate(conversation.updatedAt)}</small>
+                      </div>
+                      <div className="conversation-actions">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditing(id, conversation.title || '新对话');
+                          }}
+                          aria-label="Edit conversation"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteConversation(id);
+                          }}
+                          aria-label="Delete conversation"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
           )}
         </div>
 
-        {/* 模型选择区域 */}
-        {availableModels && availableModels.length > 0 && (
-          <div 
-            ref={modelSelectorRef}
-            className="model-selector-container"
-            style={{
-              padding: isSidebarExpanded ? '10px 12px' : '8px',
-              borderTop: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
-              backgroundColor: darkMode ? '#333' : '#f7f7f7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
-              gap: '8px',
-              position: 'relative'
-            }}
+        <div className="maintenance-actions">
+          <button 
+            className="clear-all-button action-button"
+            onClick={handleClearAllConversations}
+            title="删除所有对话历史记录，此操作不可恢复，所有对话数据将被永久删除"
           >
-            {/* 模型图标按钮 */}
-            <div 
-              className="model-icon"
-              onClick={() => setShowModelDropdown(!showModelDropdown)}
-              style={{
-                color: darkMode ? '#aaa' : '#666',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                backgroundColor: isSidebarExpanded ? 'transparent' : (darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
-                transition: 'background-color 0.2s ease, transform 0.2s ease',
-                position: 'relative'
-              }}
-              title={`${selectedModel ? '当前模型: ' + selectedModel : '选择模型'}`}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2a10 10 0 0 1 10 10c0 5.5-4.5 10-10 10S2 17.5 2 12 6.5 2 12 2z"/>
-                <path d="M12 8v4l3 3"/>
-              </svg>
+            🗑️ 清除所有历史记录
+          </button>
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="feature-toggles">
+            <div className="toggle-item">
+              <label htmlFor="web-search-toggle">联网搜索</label>
+              <div className="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="web-search-toggle"
+                  checked={webSearchEnabled}
+                  onChange={onToggleWebSearch}
+                />
+                <span className="toggle-slider"></span>
+              </div>
             </div>
-            
-            {/* 展开状态下的选择器 */}
-            {isSidebarExpanded && !showModelDropdown && (
-              <div className="model-selector" style={{ flex: 1 }}>
-                <select
-                  value={selectedModel || ''}
-                  onChange={handleModelChange}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    backgroundColor: darkMode ? '#444' : '#fff',
-                    color: darkMode ? '#e0e0e0' : '#333',
-                    border: `1px solid ${darkMode ? '#555' : '#ddd'}`,
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {availableModels.map(model => {
-                    // 对过长的模型名进行处理
-                    const displayName = model.length > 20 ? model.substring(0, 18) + '...' : model;
-                    return (
-                      <option key={model} value={model} title={model}>
-                        {displayName}
-                      </option>
-                    );
-                  })}
-                </select>
+            <div className="toggle-item">
+              <label htmlFor="deep-research-toggle">深度研究</label>
+              <div className="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="deep-research-toggle"
+                  checked={deepResearchEnabled}
+                  onChange={onToggleDeepResearch}
+                />
+                <span className="toggle-slider"></span>
               </div>
-            )}
-            
-            {/* 模型选择下拉菜单 - 在缩小状态下点击图标或者展开状态下点击图标时显示 */}
-            {showModelDropdown && (
-              <div 
-                className="compact-model-dropdown"
-                style={{
-                  position: 'absolute',
-                  left: isSidebarExpanded ? '40px' : '50px',
-                  bottom: '100%',
-                  zIndex: 9999,
-                  backgroundColor: darkMode ? '#444' : '#fff',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  width: '180px',
-                  padding: '6px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  border: `1px solid ${darkMode ? '#555' : '#e0e0e0'}`
+            </div>
+            <div className="toggle-item">
+              <label htmlFor="direct-request-toggle">直接请求API</label>
+              <div className="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="direct-request-toggle"
+                  checked={directRequestEnabled}
+                  onChange={onToggleDirectRequest}
+                />
+                <span className="toggle-slider"></span>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            className="settings-button" 
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            API 设置
+          </button>
+        </div>
+      </aside>
+
+      {isSettingsOpen && (
+        <div className="settings-panel">
+          <div className="settings-header">
+            <h3>API 设置</h3>
+            <button onClick={() => setIsSettingsOpen(false)} aria-label="Close settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div className="settings-form">
+            <div className="form-group">
+              <label htmlFor="base_url">API 基础 URL</label>
+              <input
+                type="text"
+                id="base_url"
+                name="base_url"
+                value={localApiSettings.base_url}
+                onChange={handleSettingsChange}
+                onPaste={(e) => {
+                  // 不阻止默认粘贴行为
+                  console.log('粘贴到 API URL 输入框');
                 }}
-              >
-                <div style={{
-                  fontSize: '12px',
-                  padding: '4px 8px',
-                  color: darkMode ? '#aaa' : '#888',
-                  borderBottom: `1px solid ${darkMode ? '#555' : '#eee'}`,
-                  marginBottom: '4px'
-                }}>
-                  选择模型
-                </div>
-                {availableModels.map(model => (
-                  <div
-                    key={model}
-                    onClick={() => handleModelSelect(model)}
-                    style={{
-                      padding: '8px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                      color: darkMode ? '#e0e0e0' : '#333',
-                      backgroundColor: model === selectedModel 
-                        ? (darkMode ? 'rgba(77, 171, 247, 0.2)' : 'rgba(25, 118, 210, 0.1)')
-                        : 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'background-color 0.15s ease'
-                    }}
-                    title={model}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = model === selectedModel
-                        ? (darkMode ? 'rgba(77, 171, 247, 0.25)' : 'rgba(25, 118, 210, 0.15)')
-                        : (darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)');
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = model === selectedModel
-                        ? (darkMode ? 'rgba(77, 171, 247, 0.2)' : 'rgba(25, 118, 210, 0.1)')
-                        : 'transparent';
-                    }}
-                  >
-                    <span style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {model.length > 20 ? model.substring(0, 18) + '...' : model}
-                    </span>
-                    {model === selectedModel && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* 底部操作区域 */}
-        <div style={{
-          display: 'flex',
-          flexDirection: isSidebarExpanded ? 'row' : 'column',
-          alignItems: 'center',
-          justifyContent: isSidebarExpanded ? 'space-around' : 'center',
-          padding: isSidebarExpanded ? '12px' : '8px',
-          borderTop: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
-          gap: isSidebarExpanded ? '12px' : '8px'
-        }}>
-          {/* 深色模式切换 */}
-          <div
-            className="action-button"
-            onClick={() => setDarkMode(!darkMode)}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-              color: darkMode ? '#ffc107' : '#777',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-            title={darkMode ? "切换到浅色模式" : "切换到深色模式"}
-          >
-            {darkMode ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-              </svg>
-            )}
-          </div>
-
-          {/* 清空所有对话按钮 */}
-          <div
-            className="action-button"
-            onClick={handleClearAll}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(244, 67, 54, 0.1)',
-              color: '#f44336',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-            title="清空所有对话"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18"/>
-              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-            </svg>
-          </div>
-
-          {/* 设置按钮 */}
-          <div
-            className="action-button"
-            onClick={() => setIsSettingsOpen(true)}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-              color: darkMode ? '#e0e0e0' : '#555',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-            title="设置"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
+                placeholder="https://openrouter.ai/api/v1"
+                className="paste-enabled"
+              />
+              <small className="input-tip">支持粘贴内容</small>
+            </div>
+            <div className="form-group">
+              <label htmlFor="api_key">API 密钥</label>
+              <input
+                type="password"
+                id="api_key"
+                name="api_key"
+                value={localApiSettings.api_key}
+                onChange={handleSettingsChange}
+                onPaste={(e) => {
+                  // 不阻止默认粘贴行为
+                  console.log('粘贴到 API 密钥输入框');
+                }}
+                placeholder="sk-..."
+                className="paste-enabled"
+              />
+              <small className="input-tip">支持粘贴内容</small>
+            </div>
+            <div className="form-group">
+              <label htmlFor="model_name">模型名称</label>
+              <input
+                type="text"
+                id="model_name"
+                name="model_name"
+                value={localApiSettings.model_name}
+                onChange={handleSettingsChange}
+                onPaste={(e) => {
+                  // 不阻止默认粘贴行为
+                  console.log('粘贴到模型名称输入框');
+                }}
+                placeholder="gpt-3.5-turbo"
+                className="paste-enabled"
+              />
+              <small className="input-tip">支持粘贴内容</small>
+            </div>
+            <button 
+              className="save-settings-button" 
+              onClick={saveSettings}
+            >
+              保存设置
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 创建一个隐藏的文件上传输入 - 供缩小状态下的文档管理使用 */}
-      <input
-        type="file"
-        id="file-upload-input"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          if (e.target.files && e.target.files[0] && onUploadSuccess) {
-            onUploadSuccess(e.target.files[0]);
-          }
-        }}
-      />
-
-      <Settings
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        darkMode={darkMode}
-        onSave={handleSettingsSave}
-        sensitiveInfoProtectionEnabled={sensitiveInfoProtectionEnabled}
-        toggleSensitiveInfoProtection={toggleSensitiveInfoProtection}
-      />
+      {/* 重命名对话弹窗 */}
+      {renameModalVisible && (
+        <Modal onClose={() => setRenameModalVisible(false)}>
+          <h2>重命名对话</h2>
+          <input 
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="对话标题"
+            autoFocus
+          />
+          <div className="modal-actions">
+            <button onClick={() => setRenameModalVisible(false)}>取消</button>
+            <button onClick={() => {
+              onRenameConversation(editingId, renameValue);
+              setRenameModalVisible(false);
+            }}>保存</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 };

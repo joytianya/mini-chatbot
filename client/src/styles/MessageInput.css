@@ -1,0 +1,187 @@
+.message-input-container {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+}
+
+.message-input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    background-color: var(--secondary-color);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1rem;
+    transition: var(--transition);
+    max-width: 900px;
+    margin: 0 auto;
+    border: 1px solid transparent;
+}
+
+.message-input-wrapper:focus-within {
+    border-color: rgba(79, 70, 229, 0.3);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.message-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    resize: none;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    /* 抵消padding带来的额外空间 */
+    outline: none;
+    font-size: 1rem;
+    line-height: 1.5;
+    max-height: 150px;
+    overflow-y: auto;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-md);
+    color: var(--text-color);
+}
+
+.message-input:focus {
+    background-color: transparent;
+    /* 保持透明背景 */
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2) inset;
+    /* 内发光效果替代背景色变化 */
+}
+
+
+/* 粘贴时的视觉反馈 */
+
+.message-input.pasting {
+    background-color: rgba(79, 70, 229, 0.05);
+    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3) inset;
+    transition: all 0.1s ease;
+}
+
+.send-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+
+.send-button:disabled {
+    background-color: var(--text-light);
+    cursor: not-allowed;
+}
+
+.send-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.stop-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--error-color);
+    /* Use error color for stop */
+    color: white;
+    transition: var(--transition);
+    flex-shrink: 0;
+    border: none;
+}
+
+.stop-button:hover {
+    background-color: #cc2f3c;
+    /* Darker red on hover */
+}
+
+.stop-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.loading-spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+}
+
+.input-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.5rem 0 0;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.input-tip {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 768px) {
+    .message-input-container {
+        padding: 0.75rem;
+    }
+    .message-input-wrapper {
+        padding: 0.5rem 0.75rem;
+    }
+    .send-button {
+        width: 32px;
+        height: 32px;
+    }
+    .stop-button {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+max-width: 900px;
+margin: 0 auto;
+
+}
+.input-tip {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@media (max-width: 768px) {
+    .message-input-container {
+        padding: 0.75rem;
+    }
+    
+    .message-input-wrapper {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .send-button {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .stop-button {
+        width: 32px;
+        height: 32px;
+    }
+}

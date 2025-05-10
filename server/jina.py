@@ -1,8 +1,21 @@
 import json
 import time
 import requests
+import os
 from typing import List, Dict, Generator, Any
 from dataclasses import dataclass
+from dotenv import load_dotenv
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("jina_api")
+
+# 加载环境变量
+load_dotenv()
 
 @dataclass
 class Delta:
@@ -29,6 +42,12 @@ class JinaChatAPI:
         self.request_count = 0
         self.last_request_time = 0
         
+        # 获取API密钥（优先从环境变量获取）
+        self.api_key = os.getenv("JINA_API_KEY")
+        
+        # 保持会话的session对象
+        self.session = requests.Session()
+        
         # 浏览器请求头
         self.headers = {
             "Content-Type": "application/json",
@@ -37,6 +56,13 @@ class JinaChatAPI:
             "Referer": "https://search.jina.ai/",
             "Accept": "text/event-stream"
         }
+        
+        # 如果有API密钥，添加到请求头
+        if self.api_key and self.api_key != "YOUR_JINA_API_KEY_HERE":
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
+            logger.info("使用API密钥进行认证")
+        else:
+            logger.info("未使用API密钥认证，将使用默认头信息")
 
     def _check_rate_limit(self) -> bool:
         """检查请求频率限制"""
@@ -86,6 +112,9 @@ class JinaChatAPI:
                                 ])
                     except json.JSONDecodeError:
                         continue
+                    except Exception as e:
+                        logger.error(f"处理响应块时出错: {str(e)}")
+                        continue
 
         # 保存助手回复到历史
         if assistant_message:
@@ -115,7 +144,9 @@ class JinaChatAPI:
         })
 
         try:
-            response = requests.post(
+            logger.info(f"发送请求到: {self.base_url}")
+            
+            response = self.session.post(
                 self.base_url,
                 headers=self.headers,
                 json={
@@ -123,20 +154,30 @@ class JinaChatAPI:
                     "stream": True,
                     "reasoning_effort": "medium"
                 },
-                stream=True  # 启用流式传输
+                stream=True,  # 启用流式传输
+                timeout=30  # 设置超时
             )
 
             if response.status_code != 200:
                 if response.status_code == 429:
                     raise Exception("请求过于频繁,请稍后再试")
                 error_text = response.text
+                logger.error(f"请求失败，状态码: {response.status_code}, 响应: {error_text}")
                 raise Exception(f"请求失败: {error_text}")
 
             self.request_count += 1
             yield from self._process_stream_response(response)
 
+        except requests.RequestException as e:
+            logger.error(f"请求异常: {str(e)}")
+            yield ChatChunk(choices=[
+                Choice(delta=Delta(content=f"抱歉，服务连接失败: {str(e)}"))
+            ])
         except Exception as e:
-            raise Exception(f"发送消息失败: {str(e)}")
+            logger.error(f"发送消息失败: {str(e)}")
+            yield ChatChunk(choices=[
+                Choice(delta=Delta(content=f"发送消息失败: {str(e)}"))
+            ])
 
     def stream_chat(self, messages: List[Dict[str, str]]) -> Generator[ChatChunk, None, None]:
         """
@@ -161,7 +202,10 @@ class JinaChatAPI:
             }
         ] + messages
         try:
-            response = requests.post(
+            logger.info(f"发送聊天请求到: {self.base_url}")
+            logger.info(f"请求头: {self.headers}")
+            
+            response = self.session.post(
                 self.base_url,
                 headers=self.headers,
                 json={
@@ -169,21 +213,31 @@ class JinaChatAPI:
                     "stream": True,
                     "reasoning_effort": "medium"
                 },
-                stream=True
+                stream=True,
+                timeout=30  # 设置超时
             )
 
             if response.status_code != 200:
                 if response.status_code == 429:
                     raise Exception("请求过于频繁,请稍后再试")
                 error_text = response.text
+                logger.error(f"请求失败，状态码: {response.status_code}, 响应: {error_text}")
                 raise Exception(f"请求失败: {error_text}")
 
             self.request_count += 1
             self.messages = messages.copy()  # 更新历史消息
             yield from self._process_stream_response(response)
 
+        except requests.RequestException as e:
+            logger.error(f"请求异常: {str(e)}")
+            yield ChatChunk(choices=[
+                Choice(delta=Delta(content=f"抱歉，服务连接失败: {str(e)}"))
+            ])
         except Exception as e:
-            raise Exception(f"发送消息失败: {str(e)}")
+            logger.error(f"发送消息失败: {str(e)}")
+            yield ChatChunk(choices=[
+                Choice(delta=Delta(content=f"发送消息失败: {str(e)}"))
+            ])
 
     def get_history(self) -> List[Dict[str, str]]:
         """获取对话历史"""

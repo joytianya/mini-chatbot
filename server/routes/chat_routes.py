@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 from datetime import datetime
+from httpx import stream
 from openai import OpenAI
 from jina import JinaChatAPI
 from web_kg import get_web_kg
@@ -119,9 +120,14 @@ def register_chat_routes(app):
         # 处理 OPTIONS 预检请求
         if request.method == 'OPTIONS':
             logger.debug("处理 OPTIONS 请求")
+            logger.debug(f"请求头: {dict(request.headers)}")
             return ('', 204, headers)
 
         try:
+            # 记录请求详情
+            logger.info(f"开始处理POST请求: /api/chat")
+            logger.debug(f"请求头: {dict(request.headers)}")
+            
             data = request.json
             logger.info(f"收到的请求数据: {json.dumps(data, ensure_ascii=False)}")
             
@@ -143,7 +149,7 @@ def register_chat_routes(app):
             model_name = data.get('model_name', data.get('model', 'google/gemini-2.0-flash-exp:free'))  # 设置为有效的默认模型ID
             is_deep_research = data.get('deep_research', False)  # 获取深度研究模式标志
             is_web_search = data.get('web_search', False)  # 获取联网搜索标志
-
+            is_stream = data.get("stream", True)
             logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}, 联网搜索: {'开启' if is_web_search else '关闭'}")
             if api_key and base_url:
                 # 检查是否为 OpenRouter 请求
@@ -159,14 +165,15 @@ def register_chat_routes(app):
                 completion_args = {
                     "model": model_name,  # 使用处理后的模型名称
                     "messages": messages,
-                    "stream": True
+                    "stream": is_stream,
                 }
                 
                 # 添加 OpenRouter 所需的额外请求头
                 if is_openrouter:
-                    # 获取请求头信息
-                    referer = request.headers.get('HTTP-Referer', 'https://mini-chatbot.example.com')
-                    title = request.headers.get('X-Title', 'Mini-Chatbot')
+                    # 获取请求头信息，支持大小写混合的情况
+                    headers_lower = {k.lower(): v for k, v in request.headers.items()}
+                    referer = headers_lower.get('http-referer') or headers_lower.get('x-forwarded-for', 'https://mini-chatbot.example.com')
+                    title = headers_lower.get('x-title', 'Mini-Chatbot')
                     
                     # 添加到 extra_headers
                     completion_args["extra_headers"] = {
@@ -175,6 +182,7 @@ def register_chat_routes(app):
                     }
                     
                     logger.info(f"使用 OpenRouter API，模型: {model_name}")
+                    logger.debug(f"OpenRouter 额外请求头: {completion_args['extra_headers']}")
             else:
                 client = None
 
@@ -213,6 +221,42 @@ def register_chat_routes(app):
                     )
                 else:
                     response = None
+
+            # 处理非流式响应
+            if not is_stream and client:
+                try:
+                    if response and hasattr(response, 'choices') and len(response.choices) > 0:
+                        content = response.choices[0].message.content
+                        response_data = {
+                            "success": True,
+                            "choices": [
+                                {
+                                    "message": {
+                                        "content": content
+                                    }
+                                }
+                            ]
+                        }
+                        
+                        # 如果启用了联网搜索，添加网页链接
+                        if is_web_search and search_result_urls_str:
+                            response_data["web_search_results"] = search_result_urls_str
+                        
+                        # 如果响应中有 usage 信息，也包含它
+                        if hasattr(response, 'usage'):
+                            response_data["usage"] = {
+                                "prompt_tokens": response.usage.prompt_tokens,
+                                "completion_tokens": response.usage.completion_tokens,
+                                "total_tokens": response.usage.total_tokens
+                            }
+                        
+                        CustomLogger.response_complete(messages[-1]['content'], content)
+                        return jsonify(response_data)
+                    else:
+                        return jsonify({"error": "未收到有效的响应"}), 500
+                except Exception as e:
+                    logger.error(f"处理非流式响应时出错: {str(e)}")
+                    return jsonify({"error": str(e)}), 500
 
             # 生成流式响应
             def generate():

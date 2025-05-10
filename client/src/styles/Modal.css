@@ -1,0 +1,119 @@
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    width: 280px;
+    max-width: 90%;
+    margin: 60px 0 0 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+    color: #333;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    height: 26px;
+    width: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.modal-close-button:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.modal-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.modal-actions button:first-child {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.modal-actions button:last-child {
+    background-color: #0066cc;
+    color: white;
+}
+
+.modal-actions button:hover {
+    opacity: 0.9;
+}
+
+
+/* 针对深色模式的样式 */
+
+@media (prefers-color-scheme: dark) {
+    .modal-content {
+        background-color: #222;
+        color: #e0e0e0;
+    }
+    .modal-close-button {
+        color: #aaa;
+    }
+    .modal-close-button:hover {
+        background-color: #333;
+        color: #fff;
+    }
+    .modal-content input {
+        background-color: #333;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    .modal-actions button:first-child {
+        background-color: #444;
+        color: #e0e0e0;
+    }
+}

@@ -1,0 +1,488 @@
+.direct-openrouter-test {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: var(--bg-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.direct-openrouter-test h1 {
+    margin-bottom: 0.5rem;
+    color: var(--primary-color);
+    font-size: 1.8rem;
+}
+
+.description {
+    margin-bottom: 2rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+.test-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.test-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.test-button:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+
+.test-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    color: var(--text-color);
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.test-result {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+
+.test-result.success {
+    background-color: rgba(46, 204, 113, 0.1);
+    border-left-color: #2ecc71;
+}
+
+.test-result.error {
+    background-color: rgba(231, 76, 60, 0.1);
+    border-left-color: #e74c3c;
+}
+
+.test-result h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.2rem;
+}
+
+.response-content {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.reasoning-section {
+    margin-bottom: 1rem;
+}
+
+.toggle-button {
+    padding: 0.3rem 0.8rem;
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.toggle-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.reasoning-box {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+    border-left: 3px solid #f39c12;
+}
+
+.reasoning-content {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0;
+    padding: 0.5rem;
+}
+
+.content-box {
+    margin-top: 0.75rem;
+}
+
+.custom-chat-section {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.chat-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
+.send-button {
+    align-self: flex-end;
+    padding: 0.75rem 1.5rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.send-button:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+
+.send-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.chat-loading {
+    margin-bottom: 1rem;
+}
+
+.chat-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.chat-response.success {
+    background-color: rgba(46, 204, 113, 0.05);
+    border-left: 4px solid #2ecc71;
+}
+
+.chat-response.error {
+    background-color: rgba(231, 76, 60, 0.05);
+    border-left: 4px solid #e74c3c;
+}
+
+.error-message {
+    color: #e74c3c;
+}
+
+.streaming-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: rgba(52, 152, 219, 0.05);
+    border-left: 4px solid #3498db;
+    border-radius: 6px;
+}
+
+.streaming-content {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+}
+
+
+/* 深色模式 */
+
+@media (prefers-color-scheme: dark) {
+    .test-result.success {
+        background-color: rgba(46, 204, 113, 0.15);
+    }
+    .test-result.error {
+        background-color: rgba(231, 76, 60, 0.15);
+    }
+    .response-content {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    .reasoning-box {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    .reasoning-content {
+        color: #bbb;
+    }
+    .chat-input {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: #444;
+        color: inherit;
+    }
+    .chat-response.success {
+        background-color: rgba(46, 204, 113, 0.15);
+    }
+    .chat-response.error {
+        background-color: rgba(231, 76, 60, 0.15);
+    }
+    .streaming-response {
+        background-color: rgba(52, 152, 219, 0.15);
+    }
+}
+
+max-width: 900px;
+margin: 0 auto;
+padding: 2rem;
+background-color: var(--bg-color);
+border-radius: 8px;
+box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+
+}
+.direct-openrouter-test h1 {
+    margin-bottom: 0.5rem;
+    color: var(--primary-color);
+    font-size: 1.8rem;
+}
+.description {
+    margin-bottom: 2rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+.test-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+.test-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.test-button:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+.test-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+.loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    color: var(--text-color);
+}
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.test-result {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+.test-result.success {
+    background-color: rgba(46, 204, 113, 0.1);
+    border-left-color: #2ecc71;
+}
+.test-result.error {
+    background-color: rgba(231, 76, 60, 0.1);
+    border-left-color: #e74c3c;
+}
+.test-result h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.2rem;
+}
+.response-content {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+.reasoning-section {
+    margin-bottom: 1rem;
+}
+.toggle-button {
+    padding: 0.3rem 0.8rem;
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.toggle-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+.reasoning-box {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+    border-left: 3px solid #f39c12;
+}
+.reasoning-content {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0;
+    padding: 0.5rem;
+}
+.content-box {
+    margin-top: 0.75rem;
+}
+.custom-chat-section {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+.chat-input-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.chat-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+.send-button {
+    align-self: flex-end;
+    padding: 0.75rem 1.5rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.send-button:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+.send-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+.chat-loading {
+    margin-bottom: 1rem;
+}
+.chat-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+}
+.chat-response.success {
+    background-color: rgba(46, 204, 113, 0.05);
+    border-left: 4px solid #2ecc71;
+}
+.chat-response.error {
+    background-color: rgba(231, 76, 60, 0.05);
+    border-left: 4px solid #e74c3c;
+}
+.error-message {
+    color: #e74c3c;
+}
+.streaming-response {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: rgba(52, 152, 219, 0.05);
+    border-left: 4px solid #3498db;
+    border-radius: 6px;
+}
+.streaming-content {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+    .test-result.success {
+        background-color: rgba(46, 204, 113, 0.15);
+    }
+    
+    .test-result.error {
+        background-color: rgba(231, 76, 60, 0.15);
+    }
+    
+    .response-content {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .reasoning-box {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .reasoning-content {
+        color: #bbb;
+    }
+    
+    .chat-input {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: #444;
+        color: inherit;
+    }
+    
+    .chat-response.success {
+        background-color: rgba(46, 204, 113, 0.15);
+    }
+    
+    .chat-response.error {
+        background-color: rgba(231, 76, 60, 0.15);
+    }
+    
+    .streaming-response {
+        background-color: rgba(52, 152, 219, 0.15);
+    }
+}
