@@ -11,38 +11,12 @@ import traceback
 # 添加utils目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.openrouter_test import OpenRouterTest
+from utils.text_utils import clean_messages
 
 logger = logging.getLogger(__name__)
 
 # 全局变量，但会在每次请求时重新初始化
 openrouter_tester = None
-
-def clean_messages(messages):
-    """
-    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
-    
-    Args:
-        messages: 原始消息数组
-    
-    Returns:
-        list: 清理后的消息数组
-    """
-    if not messages or not isinstance(messages, list):
-        return messages
-    
-    cleaned_messages = []
-    for msg in messages:
-        if isinstance(msg, dict):
-            # 只保留必要的字段
-            cleaned_msg = {
-                "role": msg.get("role", "user"),
-                "content": msg.get("content", "")
-            }
-            cleaned_messages.append(cleaned_msg)
-        else:
-            logger.warning(f"非法消息格式: {type(msg)}")
-    
-    return cleaned_messages
 
 def register_test_routes(app):
     """注册测试相关路由"""
@@ -375,33 +349,3 @@ def register_test_routes(app):
                 "success": False,
                 "error": str(e)
             }), 500
-    
-    @app.route('/api/config/openrouter', methods=['GET'])
-    def get_openrouter_config():
-        """获取OpenRouter配置信息，用于前端初始化API设置
-        
-        Returns:
-            JSON: 包含OpenRouter API配置的JSON对象
-        """
-        try:
-            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
-            openrouter_tester = OpenRouterTest()
-            logger.info(f"获取OpenRouter配置，模型: {openrouter_tester.model_name}")
-            
-            # 返回配置信息（注意：这里会暴露API密钥，确保仅在受信任的环境中使用）
-            config = {
-                "api_key": openrouter_tester.api_key,
-                "base_url": openrouter_tester.base_url,
-                "model_name": openrouter_tester.model_name
-            }
-            
-            return jsonify({
-                "success": True,
-                "config": config
-            })
-        except Exception as e:
-            logger.error(f"获取OpenRouter配置时出错: {str(e)}")
-            return jsonify({
-                "success": False,
-                "error": str(e)
-            }), 500 

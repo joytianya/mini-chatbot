@@ -63,21 +63,17 @@ export const storageService = {
             const backup = this.safelyParseJSON(backupJson);
 
             if (backup && typeof backup === 'object') {
-                console.log('storageService.getConversations: 从sessionStorage成功恢复对话数据');
                 conversations = backup;
 
                 // 立即保存回localStorage
                 this.saveConversations(conversations);
             } else {
-                console.warn('storageService.getConversations: 无法从备份恢复，使用空对象');
                 conversations = {};
             }
         } else {
             // 成功读取，创建备份
             sessionStorage.setItem(CONVERSATIONS_KEY + '_backup', conversationsJson);
         }
-
-        console.log('storageService.getConversations: 解析后的对话数据，对话数量:', Object.keys(conversations).length);
 
         return conversations;
     },
@@ -90,8 +86,6 @@ export const storageService = {
         }
 
         const doSave = () => {
-            console.log('storageService.saveConversations: 保存全部对话到localStorage，对话数量:', Object.keys(conversations).length);
-
             // 数据验证，确保有效的对话格式
             const validatedConversations = {};
             for (const id in conversations) {
@@ -118,8 +112,6 @@ export const storageService = {
 
                 // 更新上次保存时间
                 this.setLastSaveTime();
-
-                console.log('storageService.saveConversations: 对话数据已保存到localStorage，并创建备份');
 
                 // 验证保存结果
                 const verificationJson = localStorage.getItem(CONVERSATIONS_KEY);
@@ -156,7 +148,6 @@ export const storageService = {
     // Get a specific conversation by ID with improved error handling
     getConversation(conversationId) {
         if (!conversationId) {
-            console.warn('storageService.getConversation: 尝试获取对话但conversationId为空');
             return null;
         }
 
@@ -170,13 +161,9 @@ export const storageService = {
 
             const conversation = conversations[conversationId];
 
-            console.log(`storageService.getConversation: 获取对话 ${conversationId}:`,
-                conversation ? `标题: ${conversation.title}, 消息数: ${conversation.messages?.length || 0}` : '不存在');
-
             if (conversation && typeof conversation === 'object') {
                 // 确保消息数组是有效的
                 if (!Array.isArray(conversation.messages)) {
-                    console.warn(`storageService.getConversation: 对话 ${conversationId} 的消息不是数组，已修复`);
                     conversation.messages = [];
                 }
                 return conversation;
@@ -191,25 +178,19 @@ export const storageService = {
     // Save a specific conversation with improved reliability
     saveConversation(conversationId, conversation, immediate = false) {
         if (!conversationId) {
-            console.warn('storageService.saveConversation: 尝试保存对话但conversationId为空');
             return false;
         }
 
         if (!conversation || typeof conversation !== 'object') {
-            console.warn(`storageService.saveConversation: 尝试保存对话 ${conversationId} 但对话数据不是有效对象`);
             return false;
         }
 
         try {
             // 确保ID一致性
             if (conversation.id && conversation.id !== conversationId) {
-                console.warn(`storageService.saveConversation: 对话ID不匹配，参数ID: ${conversationId}, 对话ID: ${conversation.id}，使用参数ID`);
                 // 强制使用传入的ID
                 conversation.id = conversationId;
             }
-
-            console.log(`storageService.saveConversation: 保存单个对话 ${conversationId}:`,
-                `标题: ${conversation.title}, 消息数: ${conversation.messages?.length || 0}, 立即保存: ${immediate}`);
 
             // 数据验证，确保有效的对话格式
             const validConversation = {
@@ -237,14 +218,12 @@ export const storageService = {
                 if (!savedConv) {
                     console.error(`storageService.saveConversation: 验证失败，对话 ${conversationId} 未成功保存`);
                     // 尝试再次保存
-                    console.log(`storageService.saveConversation: 尝试再次保存对话 ${conversationId}`);
                     conversations[conversationId] = validConversation;
                     localStorage.setItem(CONVERSATIONS_KEY, this.safelyStringifyJSON(conversations));
                     // 创建备份
                     sessionStorage.setItem(CONVERSATIONS_KEY + '_backup', this.safelyStringifyJSON(conversations));
                     return false;
                 } else {
-                    console.log(`storageService.saveConversation: 对话 ${conversationId} 保存成功，验证消息数: ${savedConv.messages?.length || 0}`);
                 }
             }
 
@@ -264,7 +243,6 @@ export const storageService = {
     deleteConversation(conversationId) {
         const conversations = this.getConversations();
         if (conversations[conversationId]) {
-            console.log(`删除对话 ${conversationId}`);
             delete conversations[conversationId];
             this.saveConversations(conversations);
             return true;
@@ -275,7 +253,6 @@ export const storageService = {
     // 保存指定对话的消息列表
     saveConversationMessages(conversationId, messages, immediate = false) {
         if (!conversationId) {
-            console.warn('storageService.saveConversationMessages: 尝试保存消息但conversationId为空');
             return false;
         }
 
@@ -291,7 +268,6 @@ export const storageService = {
 
             // 如果对话不存在，创建新对话
             if (!conversation) {
-                console.warn(`storageService.saveConversationMessages: 对话 ${conversationId} 不存在，创建新对话`);
                 conversation = {
                     id: conversationId, // 确保ID一致
                     title: '新对话',
@@ -300,8 +276,6 @@ export const storageService = {
                     updatedAt: new Date().toISOString()
                 };
             }
-
-            console.log(`storageService.saveConversationMessages: 更新对话 ${conversationId} 的消息列表，新消息数: ${messages.length}`);
 
             // 设置新消息并更新时间戳
             conversation.messages = messages;
@@ -312,13 +286,11 @@ export const storageService = {
             if (firstUserMessage && firstUserMessage.content) {
                 const firstMsg = firstUserMessage.content.trim();
                 conversation.title = firstMsg.substring(0, 30) + (firstMsg.length > 30 ? '...' : '');
-                console.log(`storageService.saveConversationMessages: 对话 ${conversationId} 标题已设置为用户第一条消息: ${conversation.title}`);
             } else if (!conversation.title || conversation.title === '新对话') {
                 // 如果找不到用户消息且标题为默认值，尝试使用第一条任意消息
                 if (messages.length > 0 && messages[0] && messages[0].content) {
                     const firstMsg = messages[0].content.trim();
                     conversation.title = firstMsg.substring(0, 30) + (firstMsg.length > 30 ? '...' : '');
-                    console.log(`storageService.saveConversationMessages: 对话 ${conversationId} 标题已自动更新为: ${conversation.title}`);
                 }
             }
 
@@ -374,7 +346,6 @@ export const storageService = {
     getUIState() {
         const stateJson = localStorage.getItem(UI_STATE_KEY);
         const state = this.safelyParseJSON(stateJson);
-        console.log('storageService.getUIState: 从localStorage加载的原始UI状态:', state);
 
         // 默认值
         const defaultState = {
@@ -402,13 +373,11 @@ export const storageService = {
             isSidebarOpen: isSidebarOpenValue,
         };
 
-        console.log('storageService.getUIState: 返回的最终UI状态:', finalState);
         return finalState;
     },
 
     // Save UI state to localStorage
     saveUIState(state) {
-        console.log('storageService.saveUIState: 准备保存的UI状态:', state);
         if (typeof state !== 'object' || state === null) {
             console.error('storageService.saveUIState: 尝试保存无效的UI状态 (非对象或null):', state);
             return;
@@ -416,7 +385,6 @@ export const storageService = {
         const stateJson = this.safelyStringifyJSON(state);
         if (stateJson) {
             localStorage.setItem(UI_STATE_KEY, stateJson);
-            console.log('storageService.saveUIState: UI状态已保存:', state);
         } else {
             console.error('storageService.saveUIState: 无法保存UI状态，JSON转换失败');
         }
@@ -430,7 +398,6 @@ export const storageService = {
             if (conversationsJson) {
                 const conversations = this.safelyParseJSON(conversationsJson);
                 if (!conversations || typeof conversations !== 'object') {
-                    console.warn('修复存储: 对话数据无效，重置');
                     localStorage.removeItem(CONVERSATIONS_KEY);
                 }
             }
@@ -440,7 +407,6 @@ export const storageService = {
             if (settingsJson) {
                 const settings = this.safelyParseJSON(settingsJson);
                 if (!settings || typeof settings !== 'object') {
-                    console.warn('修复存储: API设置无效，重置');
                     localStorage.removeItem(API_SETTINGS_KEY);
                 }
             }
@@ -450,12 +416,10 @@ export const storageService = {
             if (stateJson) {
                 const state = this.safelyParseJSON(stateJson);
                 if (!state || typeof state !== 'object') {
-                    console.warn('修复存储: UI状态无效，重置');
                     localStorage.removeItem(UI_STATE_KEY);
                 }
             }
 
-            console.log('存储修复检查完成');
             return true;
         } catch (error) {
             console.error('修复存储时出错:', error);
@@ -469,7 +433,6 @@ export const storageService = {
         localStorage.removeItem(API_SETTINGS_KEY);
         localStorage.removeItem(UI_STATE_KEY);
         sessionStorage.removeItem(CONVERSATIONS_KEY + '_backup');
-        console.log('已清除所有本地存储数据');
     }
 };
 

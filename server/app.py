@@ -136,16 +136,6 @@ def init_doc_store():
     else:
         logger.warning("ARK_API_KEY 未配置")
 
-def update_doc_store(api_key, base_url, model_name):
-    """更新全局DocumentStore实例的配置"""
-    global doc_store
-    logger.info(f"更新DocumentStore配置，使用嵌入模型: {model_name}")
-    doc_store = DocumentStore(
-        api_key=api_key,
-        base_url=base_url,
-        model_name=model_name
-    )
-
 # 注册路由
 def register_routes():
     # 注册上传相关路由

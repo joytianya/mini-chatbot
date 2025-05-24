@@ -5,38 +5,13 @@ import asyncio
 from datetime import datetime
 from openai import OpenAI
 from web_kg import get_web_kg
-from utils.text_utils import is_chinese
+from utils.text_utils import is_chinese, clean_messages
 from utils.logger_utils import CustomLogger
+from utils.sse_utils import stream_sse_response
+from utils.llm_api_utils import call_llm_api
 from system_prompts import search_answer_zh_template, search_answer_en_template
 
 logger = logging.getLogger(__name__)
-
-def clean_messages(messages):
-    """
-    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
-    
-    Args:
-        messages: 原始消息数组
-    
-    Returns:
-        list: 清理后的消息数组
-    """
-    if not messages or not isinstance(messages, list):
-        return messages
-    
-    cleaned_messages = []
-    for msg in messages:
-        if isinstance(msg, dict):
-            # 只保留必要的字段
-            cleaned_msg = {
-                "role": msg.get("role", "user"),
-                "content": msg.get("content", "")
-            }
-            cleaned_messages.append(cleaned_msg)
-        else:
-            logger.warning(f"非法消息格式: {type(msg)}")
-    
-    return cleaned_messages
 
 def register_doc_chat_routes(app, doc_store):
     """注册文档聊天相关路由"""
@@ -60,8 +35,7 @@ def register_doc_chat_routes(app, doc_store):
             CustomLogger.request(request.method, request.path, data)
             
             # 检查必要参数
-            required_params = ['messages', 'base_url', 'api_key', 'model_name', 
-                             'embedding_base_url', 'embedding_api_key', 'embedding_model_name']
+            required_params = ['messages', 'base_url', 'api_key', 'model_name']
             for param in required_params:
                 if not data.get(param):
                     raise ValueError(f'Missing required parameter: {param}')
@@ -74,9 +48,6 @@ def register_doc_chat_routes(app, doc_store):
             base_url = data['base_url']
             api_key = data['api_key']
             model_name = data['model_name']
-            embedding_base_url = data['embedding_base_url']
-            embedding_api_key = data['embedding_api_key']
-            embedding_model_name = data['embedding_model_name']
             document_ids = [doc_id for doc_id in data.get('document_ids', []) if doc_id]  # 过滤掉None和空值
             # 兼容旧版本，如果提供了单个document_id且有效，将其添加到document_ids列表中
             if data.get('document_id') and data.get('document_id') not in document_ids:
@@ -90,9 +61,6 @@ def register_doc_chat_routes(app, doc_store):
             logger.info(f"base_url: {base_url}")
             logger.info(f"api_key: {api_key[:5]}***") # 只显示前5位
             logger.info(f"model_name: {model_name}")
-            logger.info(f"embedding_base_url: {embedding_base_url}")
-            logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
-            logger.info(f"embedding_model_name: {embedding_model_name}")
             logger.info(f"document_ids: {document_ids}")
             logger.info(f"消息数量: {len(cleaned_messages)}")
             logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
@@ -125,13 +93,6 @@ def register_doc_chat_routes(app, doc_store):
             if doc_store is None:
                 logger.error("doc_store为空，无法处理文档聊天请求")
                 return jsonify({'error': 'DocumentStore未初始化'}), 500
-            
-            # 更新doc_store配置
-            doc_store.update_config(
-                api_key=embedding_api_key,
-                base_url=embedding_base_url,
-                model_name=embedding_model_name
-            )
             
             # 获取相关文档内容
             context = ""
@@ -188,72 +149,32 @@ def register_doc_chat_routes(app, doc_store):
             for msg in cleaned_messages[1:]:  # 跳过原始系统消息，使用清理后的消息
                 request_messages.append(msg)
             
-            # 创建客户端
-            client = OpenAI(
+            # 调用新的LLM API工具函数
+            logger.info(f"发送请求到模型: {model_name} (via llm_api_utils)")
+            response_iterator = call_llm_api(
                 api_key=api_key,
-                base_url=base_url
+                base_url=base_url,
+                model_name=model_name,
+                messages=request_messages,
+                stream=True,
+                request_headers=request.headers,
+                logger=logger,
+                temperature=0.7  # Explicitly pass temperature
             )
             
-            # 检查是否为 OpenRouter 请求
-            is_openrouter = "openrouter.ai" in base_url
-            
-            # 创建请求参数
-            completion_args = {
-                "model": model_name,
-                "messages": request_messages,  # 使用处理后的消息
-                "stream": True,
-                "temperature": 0.7,
-            }
-            
-            # 添加 OpenRouter 所需的额外请求头
-            if is_openrouter:
-                # 获取请求头信息
-                referer = request.headers.get('HTTP-Referer', 'https://mini-chatbot.example.com')
-                title = request.headers.get('X-Title', 'Mini-Chatbot')
-                
-                # 添加到 extra_headers
-                completion_args["extra_headers"] = {
-                    "HTTP-Referer": referer,
-                    "X-Title": title
-                }
-                
-                logger.info(f"使用 OpenRouter API，模型: {model_name}")
-            
-            # 发送请求
-            logger.info(f"发送请求到模型: {model_name}")
-            response = client.chat.completions.create(**completion_args)
-            
-            # 生成流式响应
-            def generate():
-                full_response = []
-                try:
-                    for chunk in response:
-                        logger.debug("收到 chunk: %s", chunk)
-                        if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                            if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                                content = chunk.choices[0].delta.reasoning_content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'reasoning_content': chunk.choices[0].delta.reasoning_content}}]})}\n\n".encode('utf-8')
-                                full_response.append(content)
-                            elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                                content = chunk.choices[0].delta.content
-                                yield f"data: {json.dumps({'choices': [{'delta': {'content': chunk.choices[0].delta.content}}]})}\n\n".encode('utf-8')
-                                full_response.append(content)
-                        else:
-                            logger.error("收到 chunk 中没有 choices 字段")
-                    
-                    # 如果启用了联网搜索，添加网页链接
-                    if is_web_search and search_result_urls_str:
-                        yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\n\n相关网页链接：{search_result_urls_str}\n'}}]})}\n\n".encode('utf-8')
-
-                    yield b"data: [DONE]\n\n"
-                    CustomLogger.response_complete(cleaned_messages[-1]['content'], ''.join(full_response))
-                except Exception as e:
-                    logger.error("生成响应流时出错: %s", str(e))
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
-                    yield b"data: [DONE]\n\n"
+            # 使用新的SSE流式响应函数
+            final_web_search_results_str = None
+            if is_web_search and search_result_urls_str:
+                final_web_search_results_str = f'\n\n相关网页链接：{search_result_urls_str}\n'
 
             return Response(
-                stream_with_context(generate()),
+                stream_with_context(stream_sse_response(
+                    response_iterator=response_iterator,
+                    logger=logger,
+                    web_search_results_str=final_web_search_results_str,
+                    custom_logger=CustomLogger,
+                    original_query=user_query # user_query is already defined and holds cleaned_messages[-1]['content']
+                )),
                 mimetype='text/event-stream',
                 headers=headers,
                 direct_passthrough=True

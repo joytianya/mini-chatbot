@@ -17,25 +17,8 @@ def register_upload_routes(app, doc_store, upload_folder):
             logger.error("请求中未包含文件")
             return jsonify({'error': 'No file part'}), 400
         
-        # 获取embedding相关参数
-        embedding_base_url = request.form.get('embedding_base_url', '默认的embedding_base_url')
-        embedding_api_key = request.form.get('embedding_api_key', '默认的embedding_api_key') 
-        embedding_model_name = request.form.get('embedding_model_name', '默认的embedding_model_name')
         sensitive_info_protected = request.form.get('sensitive_info_protected', 'false') == 'true'
-        logger.info(f"接收到的embedding配置 - model: {embedding_model_name}, base_url: {embedding_base_url}")
         logger.info(f"敏感信息保护: {'启用' if sensitive_info_protected else '禁用'}")
-
-        # 更新全局DocumentStore实例
-        try:
-            doc_store.update_config(
-                api_key=embedding_api_key,
-                base_url=embedding_base_url,
-                model_name=embedding_model_name
-            )
-            logger.info("DocumentStore实例更新成功")
-        except Exception as e:
-            logger.error(f"更新DocumentStore实例失败: {str(e)}")
-            return jsonify({'error': '配置更新失败'}), 500
         
         file = request.files['documents']
         if file.filename == '':

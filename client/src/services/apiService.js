@@ -8,7 +8,6 @@ export const apiService = {
     // 获取OpenRouter配置
     async getOpenRouterConfig() {
         try {
-            console.log('从后端获取OpenRouter配置...');
             const response = await fetch(`${BACKEND_URL}/api/config/openrouter`);
 
             if (!response.ok) {
@@ -21,7 +20,6 @@ export const apiService = {
                 throw new Error(data.error || '获取配置失败');
             }
 
-            console.log('成功获取OpenRouter配置');
             return data.config;
         } catch (error) {
             console.error('获取OpenRouter配置错误:', error);
@@ -37,11 +35,6 @@ export const apiService = {
 
             if (directRequest) {
                 // 直接请求API
-                console.log('直接请求API:', {
-                    base_url: apiSettings.base_url,
-                    model_name: apiSettings.model_name
-                });
-
                 // 确保消息只包含role和content字段，移除id和timestamp字段
                 const apiMessages = messages.map(msg => ({
                     role: msg.role,
@@ -50,7 +43,6 @@ export const apiService = {
 
                 // 构建请求URL
                 const apiUrl = `${apiSettings.base_url}/chat/completions`;
-                console.log('API请求URL:', apiUrl);
 
                 // 构建请求头
                 const headers = {
@@ -72,11 +64,6 @@ export const apiService = {
                     stream: true // 启用流式输出
                 };
 
-                console.log('发送请求体:', {
-                    ...requestBody,
-                    messages: `${requestBody.messages.length}条消息`
-                });
-
                 response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: headers,
@@ -84,22 +71,8 @@ export const apiService = {
                     signal: signal // Pass the abort signal
                 });
 
-                // 详细记录响应状态
-                console.log('API响应状态:', {
-                    status: response.status,
-                    ok: response.ok,
-                    statusText: response.statusText,
-                    headers: Object.fromEntries([...response.headers.entries()])
-                });
             } else {
                 // 使用后端服务器
-                console.log('使用后端服务器发送请求:', {
-                    base_url: apiSettings.base_url,
-                    model_name: apiSettings.model_name,
-                    web_search: webSearchEnabled,
-                    deep_research: deepResearchEnabled
-                });
-
                 // 确保消息只包含role和content字段，移除id和timestamp字段
                 const apiMessages = messages.map(msg => ({
                     role: msg.role,
@@ -127,13 +100,6 @@ export const apiService = {
                     signal: signal // Pass the abort signal
                 });
 
-                // 详细记录响应状态
-                console.log('后端响应状态:', {
-                    status: response.status,
-                    ok: response.ok,
-                    statusText: response.statusText,
-                    headers: Object.fromEntries([...response.headers.entries()])
-                });
             }
 
             if (!response.ok) {
@@ -171,7 +137,6 @@ export const apiService = {
 
             // 检查是否是流式响应
             const contentType = response.headers.get('Content-Type') || '';
-            console.log('响应内容类型:', contentType);
 
             // 直接返回响应对象，由调用者处理流式响应
             if (contentType.includes('text/event-stream') || directRequest) {
@@ -184,7 +149,6 @@ export const apiService = {
                 // 如果响应不是JSON，尝试返回文本
                 console.error('解析JSON响应失败:', e);
                 const text = await response.text();
-                console.log('响应文本:', text.substring(0, 200) + (text.length > 200 ? '...' : ''));
                 return { text };
             }
         } catch (error) {

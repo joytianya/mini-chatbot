@@ -36,7 +36,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             try {
                 // 尝试从后端获取配置
                 const config = await apiService.getOpenRouterConfig();
-                console.log('从后端加载的OpenRouter配置:', config);
 
                 // 获取本地保存的设置
                 const savedSettings = storageService.getApiSettings();
@@ -50,12 +49,10 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                         model_name: config.model_name || 'qwen/qwen3-1.7b:free'
                     };
 
-                    console.log('使用后端OpenRouter配置');
                     setApiSettings(newSettings);
                     // 保存到本地存储
                     storageService.saveApiSettings(newSettings);
                 } else {
-                    console.log('保留本地OpenRouter配置');
                 }
 
                 setIsConfigLoaded(true);
@@ -74,25 +71,20 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
 
     // Load messages and settings when conversationId changes
     useEffect(() => {
-        console.log('对话ID变更', conversationId);
-
         // 在切换对话时先清空消息数组，避免显示前一个对话的消息
         setMessages([]);
 
         if (conversationId) {
             try {
                 // Load conversation messages
-                console.log('正在加载对话:', conversationId);
                 const conversation = storageService.getConversation(conversationId);
 
                 if (conversation && Array.isArray(conversation.messages)) {
-                    console.log(`从本地存储中加载对话 ${conversationId}，消息数量:`, conversation.messages.length);
                     // 设置定时器，确保UI更新
                     setTimeout(() => {
                         setMessages(conversation.messages);
                     }, 10);
                 } else {
-                    console.log(`对话 ${conversationId} 不存在或没有消息`);
                     setMessages([]);
                 }
 
@@ -108,7 +100,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                 if (onError) onError('加载对话数据时出错');
             }
         } else {
-            console.log('无对话ID，清空消息');
             setMessages([]);
         }
     }, [conversationId, onError]);
@@ -127,7 +118,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             };
 
             // Update conversation with latest messages and timestamp
-            console.log(`useChatLogic: 保存对话 ${conversationId} 的消息，数量: ${messages.length}`);
             conversation.messages = messages;
             conversation.updatedAt = new Date().toISOString();
 
@@ -136,19 +126,16 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             if (firstUserMessage && firstUserMessage.content) {
                 const firstMsg = firstUserMessage.content;
                 conversation.title = firstMsg.substring(0, 30) + (firstMsg.length > 30 ? '...' : '');
-                console.log(`useChatLogic: 使用第一条用户消息作为对话标题: "${conversation.title}"`);
             } else if (!conversation.title || conversation.title === '新对话') {
                 // 如果没有用户消息但有其他消息，且标题为默认值，则使用第一条消息
                 if (messages.length > 0 && messages[0] && messages[0].content) {
                     const firstMsg = messages[0].content;
                     conversation.title = firstMsg.substring(0, 30) + (firstMsg.length > 30 ? '...' : '');
-                    console.log(`useChatLogic: 更新对话标题为: "${conversation.title}"`);
                 }
             }
 
             // 保存对话
             storageService.saveConversation(conversationId, conversation);
-            console.log(`useChatLogic: 对话 ${conversationId} 已保存到存储`);
         } else {
             // 即使没有消息，也创建对话
             const conversation = {
@@ -159,7 +146,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                 messages: []
             };
             storageService.saveConversation(conversationId, conversation);
-            console.log(`useChatLogic: 创建了空对话 ${conversationId}`);
         }
     }, [conversationId, messages]);
 
@@ -196,13 +182,10 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             return null;
         }
 
-        console.log(`useChatLogic.sendMessage: 发送消息到对话 ${targetConversationId}，选项:`, { shouldSaveMessage, webSearchEnabled, deepResearchEnabled, directRequest });
-
         try {
             // 确保在发送之前对话在存储中存在
             let existingConversation = storageService.getConversation(targetConversationId);
             if (!existingConversation) {
-                console.log(`useChatLogic.sendMessage: 目标对话 ${targetConversationId} 不存在，创建新对话`);
                 existingConversation = {
                     id: targetConversationId,
                     title: messageContent.substring(0, 30) + (messageContent.length > 30 ? '...' : ''),
@@ -212,13 +195,11 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                 };
                 // 直接保存到本地存储，确保对话被创建
                 storageService.saveConversation(targetConversationId, existingConversation);
-                console.log(`useChatLogic.sendMessage: 已创建新对话 ${targetConversationId}，验证保存结果:`, storageService.getConversation(targetConversationId));
             }
 
             // 获取当前目标对话的消息列表，或如果不存在则为空数组
             const conversation = storageService.getConversation(targetConversationId);
             const currentTargetMessages = (conversation && conversation.messages) ? conversation.messages : [];
-            console.log(`useChatLogic: 当前目标对话消息数量:`, currentTargetMessages.length);
 
             // Add user message to the local state and prepare for API call
             const newUserMessage = {
@@ -240,12 +221,10 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
 
             // 直接保存更新后的对话
             storageService.saveConversation(targetConversationId, updatedConversation);
-            console.log(`useChatLogic: 已更新并保存对话 ${targetConversationId} 的消息，当前消息数:`, updatedMessages.length);
 
             // 确认保存结果
             const savedConversation = storageService.getConversation(targetConversationId);
             if (savedConversation && savedConversation.messages && savedConversation.messages.length === updatedMessages.length) {
-                console.log(`useChatLogic: 确认对话 ${targetConversationId} 已成功保存，消息数:`, savedConversation.messages.length);
             } else {
                 console.warn(`useChatLogic: 对话 ${targetConversationId} 保存可能不完整，预期消息数 ${updatedMessages.length}，实际消息数:`,
                     savedConversation ? savedConversation.messages ? savedConversation.messages.length : 0 : 0);
@@ -255,12 +234,10 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             setMessages(prevMessages => {
                 // 如果之前没有消息，直接设置用户消息作为第一条
                 if (prevMessages.length === 0) {
-                    console.log(`useChatLogic: 添加首条用户消息到空对话: ${targetConversationId}`);
                     return [newUserMessage];
                 } else {
                     // 否则添加到现有消息列表
                     const updatedUIMessages = [...prevMessages, newUserMessage];
-                    console.log(`useChatLogic: 添加用户消息到现有对话: ${targetConversationId}, 消息数量: ${updatedUIMessages.length}`);
                     return updatedUIMessages;
                 }
             });
@@ -331,11 +308,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
 
                         const chunk = decoder.decode(value, { stream: true });
 
-                        // 优化日志输出
-                        if (chunk.length > 0 && chunk !== '\n') { // 避免记录空行
-                            // console.log('收到数据块:', chunk.substring(0, 50) + (chunk.length > 50 ? '...' : ''));
-                        }
-
                         // 解析SSE数据 (适用于直接API和后端代理)
                         const lines = chunk.split('\n');
                         for (const line of lines) {
@@ -393,12 +365,8 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                             msg.id === assistantMessageId ? updatedAssistantMessage : msg
                         );
 
-                        console.log(`流式响应完成 (对话 ${targetConversationId})，最终内容长度:`, tempChunkedResponse.length);
-                        console.log('更新后的消息数组长度:', updatedMessages.length);
-
                         // 确保消息保存到localStorage
                         storageService.saveConversationMessages(targetConversationId, updatedMessages);
-                        console.log(`useChatLogic.sendMessage: 对话 ${targetConversationId} 的完整消息已保存到localStorage`);
 
                         return updatedMessages;
                     });
@@ -406,7 +374,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                 } catch (streamError) {
                     // 处理流式解析过程中的错误
                     if (streamError.name === 'AbortError') {
-                        console.log('流式解析被中断');
                         // 中断时可以选择保留已生成的内容，或者移除占位符
                         if (tempChunkedResponse.length > 0) {
                             // 保留已生成的内容，标记为"已中断"
@@ -448,7 +415,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
 
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    console.log('Fetch aborted');
                     toast('请求已取消');
                     // Ensure loading state is reset if aborted before completion
                     setIsLoading(false);
@@ -496,7 +462,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
     const stopGenerating = useCallback(() => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
-            console.log('停止生成请求已发送');
 
             // 确保在中断后UI状态也被正确更新
             setIsLoading(false);
@@ -519,27 +484,21 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
         const idToLoad = targetId || conversationId;
 
         if (!idToLoad) {
-            console.log('强制重新加载失败：没有有效的对话ID');
             return;
         }
-
-        console.log(`强制重新加载对话: ${idToLoad}${targetId ? ' (指定ID)' : ' (当前ID)'}`);
 
         try {
             const conversation = storageService.getConversation(idToLoad);
 
             if (conversation && Array.isArray(conversation.messages)) {
-                console.log(`重新加载成功，对话ID: ${idToLoad}，消息数量: ${conversation.messages.length}`);
                 setMessages(conversation.messages);
                 // 移除成功提示，避免频繁弹出
                 // toast.success('对话已重新加载');
             } else {
-                console.log(`强制重新加载失败，对话 ${idToLoad} 不存在或没有消息`);
                 // 如果是新对话，应该清空消息数组
                 setMessages([]);
                 if (targetId) {
                     // 如果是指定ID但不存在，可能是新对话，不需要提示错误
-                    console.log(`对话 ${idToLoad} 可能是新创建的，已设置为空消息数组`);
                 } else {
                     toast.error('无法重新加载对话，可能不存在或已被删除');
                 }
@@ -556,7 +515,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
         if (window.confirm('确定要删除所有对话历史吗？此操作不可撤销。')) {
             storageService.clearAll();
             setMessages([]);
-            console.log('已清除所有对话历史');
             toast.success('所有对话历史已清除');
             return true;
         }
@@ -569,7 +527,6 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             setIsLoading(true);
             // 从后端获取配置
             const config = await apiService.getOpenRouterConfig();
-            console.log('重置为后端OpenRouter配置:', config);
 
             // 使用后端配置
             const newSettings = {

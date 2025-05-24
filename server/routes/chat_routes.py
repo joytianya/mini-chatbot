@@ -7,8 +7,10 @@ from httpx import stream
 from openai import OpenAI
 from jina import JinaChatAPI
 from web_kg import get_web_kg
-from utils.text_utils import is_chinese
+from utils.text_utils import is_chinese, clean_messages
 from utils.logger_utils import CustomLogger
+from utils.sse_utils import stream_sse_response
+from utils.llm_api_utils import call_llm_api
 from system_prompts import search_answer_zh_template, search_answer_en_template
 
 logger = logging.getLogger(__name__)
@@ -104,33 +106,6 @@ Output format:
         logger.error(f"获取搜索意图失败: {str(e)}, query: {query}")
         return query  # 如果失败则返回原始查询
 
-def clean_messages(messages):
-    """
-    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
-    
-    Args:
-        messages: 原始消息数组
-    
-    Returns:
-        list: 清理后的消息数组
-    """
-    if not messages or not isinstance(messages, list):
-        return messages
-    
-    cleaned_messages = []
-    for msg in messages:
-        if isinstance(msg, dict):
-            # 只保留必要的字段
-            cleaned_msg = {
-                "role": msg.get("role", "user"),
-                "content": msg.get("content", "")
-            }
-            cleaned_messages.append(cleaned_msg)
-        else:
-            logger.warning(f"非法消息格式: {type(msg)}")
-    
-    return cleaned_messages
-
 def register_chat_routes(app):
     """注册聊天相关路由"""
     
@@ -182,48 +157,19 @@ def register_chat_routes(app):
             is_web_search = data.get('web_search', False)  # 获取联网搜索标志
             is_stream = data.get("stream", True)
             logger.info(f"当前模式: {'深度研究' if is_deep_research else '普通对话'}, 联网搜索: {'开启' if is_web_search else '关闭'}")
+            
+            client_for_search_intent = None
             if api_key and base_url:
-                # 检查是否为 OpenRouter 请求
-                is_openrouter = "openrouter.ai" in base_url
-                
-                # 初始化 OpenAI 客户端
-                client = OpenAI(
-                    api_key=api_key,
-                    base_url=base_url
-                )
-                
-                # 创建请求参数
-                completion_args = {
-                    "model": model_name,  # 使用处理后的模型名称
-                    "messages": cleaned_messages,  # 使用清理后的消息
-                    "stream": is_stream,
-                }
-                
-                # 添加 OpenRouter 所需的额外请求头
-                if is_openrouter:
-                    # 获取请求头信息，支持大小写混合的情况
-                    headers_lower = {k.lower(): v for k, v in request.headers.items()}
-                    referer = headers_lower.get('http-referer') or headers_lower.get('x-forwarded-for', 'https://mini-chatbot.example.com')
-                    title = headers_lower.get('x-title', 'Mini-Chatbot')
-                    
-                    # 添加到 extra_headers
-                    completion_args["extra_headers"] = {
-                        "HTTP-Referer": referer,
-                        "X-Title": title
-                    }
-                    
-                    logger.info(f"使用 OpenRouter API，模型: {model_name}")
-                    logger.debug(f"OpenRouter 额外请求头: {completion_args['extra_headers']}")
-            else:
-                client = None
+                 # Initialize OpenAI client for search intent if needed (or pass to call_llm_api if it handles this)
+                client_for_search_intent = OpenAI(api_key=api_key, base_url=base_url)
 
             # 如果启用了联网搜索，获取web搜索结果
             search_result_urls_str = ""
-            if is_web_search and client:
+            if is_web_search and client_for_search_intent: # Use the client_for_search_intent
                 cur_date = datetime.now().strftime("%Y-%m-%d")
                 user_query = cleaned_messages[-1]['content']
 
-                expanded_query = get_search_intent(user_query, client, model_name)
+                expanded_query = get_search_intent(user_query, client_for_search_intent, model_name)
                 # 使用事件循环运行异步函数
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -243,19 +189,25 @@ def register_chat_routes(app):
             # 根据模式选择不同的API
             if is_deep_research:
                 # 使用 JinaChatAPI 进行深度研究
-                chat = JinaChatAPI()
-                response = chat.stream_chat(cleaned_messages)  # 使用清理后的消息
+                chat_api = JinaChatAPI() # Renamed to avoid conflict
+                response = chat_api.stream_chat(cleaned_messages)  # 使用清理后的消息
             else:
-                if client:
-                    print(completion_args)
-                    response = client.chat.completions.create(
-                        **completion_args  # 使用构建的参数
+                if api_key and base_url:
+                    response = call_llm_api(
+                        api_key=api_key,
+                        base_url=base_url,
+                        model_name=model_name,
+                        messages=cleaned_messages,
+                        stream=is_stream,
+                        request_headers=request.headers,
+                        logger=logger
+                        # temperature is not passed, so it will use the default in call_llm_api if any, or OpenAI's default
                     )
                 else:
-                    response = None
+                    response = None # No API key/URL, no call can be made
 
             # 处理非流式响应
-            if not is_stream and client:
+            if not is_stream and (api_key and base_url): # Check if API call was possible
                 try:
                     if response and hasattr(response, 'choices') and len(response.choices) > 0:
                         content = response.choices[0].message.content
@@ -290,47 +242,19 @@ def register_chat_routes(app):
                     logger.error(f"处理非流式响应时出错: {str(e)}")
                     return jsonify({"error": str(e)}), 500
 
-            # 生成流式响应
-            def generate():
-                full_response = []
-                try:
-                    for chunk in response:
-                        logger.debug("收到 chunk: %s", chunk)
-                        if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                            if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                                content = chunk.choices[0].delta.reasoning_content
-                                data = json.dumps({'choices': [{'delta': {'reasoning_content': content}}]}, ensure_ascii=False)
-                                yield f"data: {data}\n\n".encode('utf-8')
-                                full_response.append(content)
-                            elif hasattr(chunk.choices[0].delta, 'reasoning') and chunk.choices[0].delta.reasoning:
-                                content = chunk.choices[0].delta.reasoning
-                                data = json.dumps({'choices': [{'delta': {'reasoning_content': content}}]}, ensure_ascii=False)
-                                yield f"data: {data}\n\n".encode('utf-8')
-                                full_response.append(content)
-                            elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                                content = chunk.choices[0].delta.content
-                                data = json.dumps({'choices': [{'delta': {'content': content}}]}, ensure_ascii=False)
-                                yield f"data: {data}\n\n".encode('utf-8')
-                                full_response.append(content)
-                        else:
-                            logger.error("收到 chunk 中没有 choices 字段")
-                    
-                    # 如果启用了联网搜索，添加网页链接
-                    if is_web_search and search_result_urls_str:
-                        content_str = '\n\n相关网页链接：' + search_result_urls_str + '\n'
-                        data = json.dumps({'choices': [{'delta': {'content': content_str}}]}, ensure_ascii=False)
-                        yield f"data: {data}\n\n".encode('utf-8')
-
-                    yield b"data: [DONE]\n\n"
-                    CustomLogger.response_complete(cleaned_messages[-1]['content'], ''.join(full_response))
-                except Exception as e:
-                    logger.error("生成响应流时出错: %s", str(e))
-                    error_data = json.dumps({'error': str(e)}, ensure_ascii=False)
-                    yield f"data: {error_data}\n\n".encode('utf-8')
-                    yield b"data: [DONE]\n\n"
+            # 使用新的SSE流式响应函数
+            final_web_search_results_str = None
+            if is_web_search and search_result_urls_str:
+                final_web_search_results_str = '\n\n相关网页链接：' + search_result_urls_str + '\n'
 
             return Response(
-                stream_with_context(generate()),
+                stream_with_context(stream_sse_response(
+                    response_iterator=response,
+                    logger=logger,
+                    web_search_results_str=final_web_search_results_str,
+                    custom_logger=CustomLogger,
+                    original_query=cleaned_messages[-1]['content']
+                )),
                 mimetype='text/event-stream',
                 headers=headers,
                 direct_passthrough=True

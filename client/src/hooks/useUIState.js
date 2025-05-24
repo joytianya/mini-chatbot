@@ -16,17 +16,13 @@ export const useUIState = () => {
     // Load saved state from localStorage on component mount
     useEffect(() => {
         try {
-            console.log('useUIState: 开始从 localStorage 加载对话和UI状态');
-
             // Load conversations
             const savedConversations = storageService.getConversations();
             const conversationCount = Object.keys(savedConversations || {}).length;
-            console.log(`useUIState: 从 localStorage 加载了 ${conversationCount} 个对话`);
             setConversations(savedConversations || {});
 
             // Load UI state
             const savedUIState = storageService.getUIState();
-            console.log('useUIState: 加载的UI状态:', savedUIState);
 
             // 处理当前对话ID的情况
             let selectedConversationId = null;
@@ -35,7 +31,6 @@ export const useUIState = () => {
             if (savedUIState && savedUIState.currentConversationId &&
                 savedConversations && savedConversations[savedUIState.currentConversationId]) {
                 selectedConversationId = savedUIState.currentConversationId;
-                console.log(`useUIState: 使用已保存的当前对话ID: ${selectedConversationId}`);
             }
             // 情况2: 没有有效的当前对话ID，但有其他对话，则使用最近的对话
             else if (conversationCount > 0) {
@@ -43,11 +38,6 @@ export const useUIState = () => {
                     .sort(([, a], [, b]) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
                     .map(([id]) => id);
                 selectedConversationId = sortedIds[0];
-                console.log(`useUIState: 没有有效的当前对话ID，使用最近的对话: ${selectedConversationId}`);
-            }
-            // 情况3: 没有任何对话，currentConversationId保持为null
-            else {
-                console.log('useUIState: 没有找到任何已保存的对话');
             }
 
             // 设置当前对话ID (可能为null)
@@ -61,7 +51,6 @@ export const useUIState = () => {
             setDeepResearchEnabled(savedUIState && savedUIState.deepResearchEnabled === true);
             setDirectRequestEnabled(savedUIState && savedUIState.directRequestEnabled === true);
 
-            console.log('useUIState: 从 localStorage 加载完成');
         } catch (error) {
             console.error('useUIState: 加载UI状态时出错:', error);
             // Use defaults if there's an error
@@ -87,8 +76,6 @@ export const useUIState = () => {
 
     // Create a new conversation
     const createNewConversation = (firstMessageContent = null) => {
-        console.log('useUIState: 创建新对话', firstMessageContent ? `用户输入首条消息内容: ${firstMessageContent.substring(0, 20)}...` : '使用默认标题');
-
         // 生成新的唯一ID (UUID)
         const newId = uuidv4();
 
@@ -100,8 +87,6 @@ export const useUIState = () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-
-        console.log(`useUIState: 新对话对象已创建, ID: ${newId}`);
 
         // 添加到对话集合
         setConversations(prev => ({
@@ -123,8 +108,6 @@ export const useUIState = () => {
             deepResearchEnabled,
             directRequestEnabled
         });
-
-        console.log(`useUIState: 新对话已保存到存储并设为当前对话, ID: ${newId}`);
 
         return newId;
     };
