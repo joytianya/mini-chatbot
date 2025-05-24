@@ -11,6 +11,33 @@ from system_prompts import search_answer_zh_template, search_answer_en_template
 
 logger = logging.getLogger(__name__)
 
+def clean_messages(messages):
+    """
+    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
+    
+    Args:
+        messages: 原始消息数组
+    
+    Returns:
+        list: 清理后的消息数组
+    """
+    if not messages or not isinstance(messages, list):
+        return messages
+    
+    cleaned_messages = []
+    for msg in messages:
+        if isinstance(msg, dict):
+            # 只保留必要的字段
+            cleaned_msg = {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            }
+            cleaned_messages.append(cleaned_msg)
+        else:
+            logger.warning(f"非法消息格式: {type(msg)}")
+    
+    return cleaned_messages
+
 def register_doc_chat_routes(app, doc_store):
     """注册文档聊天相关路由"""
     
@@ -40,6 +67,10 @@ def register_doc_chat_routes(app, doc_store):
                     raise ValueError(f'Missing required parameter: {param}')
             
             messages = data['messages']
+            # 清理消息，确保只包含必要的字段
+            cleaned_messages = clean_messages(messages)
+            logger.info(f"清理后的消息数量: {len(cleaned_messages)}")
+            
             base_url = data['base_url']
             api_key = data['api_key']
             model_name = data['model_name']
@@ -63,12 +94,12 @@ def register_doc_chat_routes(app, doc_store):
             logger.info(f"embedding_api_key: {embedding_api_key[:5]}***")
             logger.info(f"embedding_model_name: {embedding_model_name}")
             logger.info(f"document_ids: {document_ids}")
-            logger.info(f"消息数量: {len(messages)}")
+            logger.info(f"消息数量: {len(cleaned_messages)}")
             logger.info(f"深度研究模式: {'开启' if is_deep_research else '关闭'}")
             logger.info(f"联网搜索: {'开启' if is_web_search else '关闭'}")
             
             # 获取用户最新的问题
-            user_query = messages[-1]['content']
+            user_query = cleaned_messages[-1]['content']
             logger.info(f"用户问题: {user_query}")
             
             # 如果启用了联网搜索，获取web搜索结果
@@ -87,7 +118,7 @@ def register_doc_chat_routes(app, doc_store):
                 else:
                     web_context = search_answer_en_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
                 
-                messages[-1]['content'] = web_context
+                cleaned_messages[-1]['content'] = web_context
                 logger.info(f"添加了联网搜索结果: {web_context}")
 
             # 检查doc_store是否为None，如果是则重新初始化
@@ -154,7 +185,7 @@ def register_doc_chat_routes(app, doc_store):
             
             # 构建请求消息
             request_messages = [system_message]
-            for msg in messages[1:]:  # 跳过原始系统消息
+            for msg in cleaned_messages[1:]:  # 跳过原始系统消息，使用清理后的消息
                 request_messages.append(msg)
             
             # 创建客户端
@@ -169,7 +200,7 @@ def register_doc_chat_routes(app, doc_store):
             # 创建请求参数
             completion_args = {
                 "model": model_name,
-                "messages": [m for m in request_messages],
+                "messages": request_messages,  # 使用处理后的消息
                 "stream": True,
                 "temperature": 0.7,
             }
@@ -215,7 +246,7 @@ def register_doc_chat_routes(app, doc_store):
                         yield f"data: {json.dumps({'choices': [{'delta': {'content': f'\n\n相关网页链接：{search_result_urls_str}\n'}}]})}\n\n".encode('utf-8')
 
                     yield b"data: [DONE]\n\n"
-                    CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
+                    CustomLogger.response_complete(cleaned_messages[-1]['content'], ''.join(full_response))
                 except Exception as e:
                     logger.error("生成响应流时出错: %s", str(e))
                     yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')

@@ -5,6 +5,30 @@ const BACKEND_URL =
     import.meta.env.VITE_SERVER_URL || 'http://localhost:5001';
 
 export const apiService = {
+    // 获取OpenRouter配置
+    async getOpenRouterConfig() {
+        try {
+            console.log('从后端获取OpenRouter配置...');
+            const response = await fetch(`${BACKEND_URL}/api/config/openrouter`);
+
+            if (!response.ok) {
+                throw new Error(`获取配置失败: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || '获取配置失败');
+            }
+
+            console.log('成功获取OpenRouter配置');
+            return data.config;
+        } catch (error) {
+            console.error('获取OpenRouter配置错误:', error);
+            throw error;
+        }
+    },
+
     // Send a chat message to the backend or directly to OpenRouter API
     async sendChatMessage(messages, apiSettings, webSearchEnabled, deepResearchEnabled, directRequest = false, signal = null) {
         try {
@@ -18,6 +42,7 @@ export const apiService = {
                     model_name: apiSettings.model_name
                 });
 
+                // 确保消息只包含role和content字段，移除id和timestamp字段
                 const apiMessages = messages.map(msg => ({
                     role: msg.role,
                     content: msg.content
@@ -75,6 +100,12 @@ export const apiService = {
                     deep_research: deepResearchEnabled
                 });
 
+                // 确保消息只包含role和content字段，移除id和timestamp字段
+                const apiMessages = messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                }));
+
                 // 使用完整的后端URL地址
                 response = await fetch(`${backendUrl}/api/chat`, {
                     method: 'POST',
@@ -85,7 +116,7 @@ export const apiService = {
                         'X-Title': 'Mini Chatbot' // 添加OpenRouter所需的请求头
                     },
                     body: JSON.stringify({
-                        messages,
+                        messages: apiMessages, // 使用处理过的消息
                         base_url: apiSettings.base_url,
                         api_key: apiSettings.api_key,
                         model_name: apiSettings.model_name,

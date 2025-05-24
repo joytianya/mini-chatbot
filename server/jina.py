@@ -58,7 +58,7 @@ class JinaChatAPI:
         
         # 获取API密钥（优先从环境变量获取）
         self.api_key = os.getenv("JINA_API_KEY")
-        
+        print(self.api_key)
         # 保持会话的session对象
         self.session = requests.Session()
         

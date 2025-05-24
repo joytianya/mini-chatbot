@@ -6,6 +6,7 @@ import logging
 import sys
 import os
 import time
+import traceback
 
 # 添加utils目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,25 +14,46 @@ from utils.openrouter_test import OpenRouterTest
 
 logger = logging.getLogger(__name__)
 
+# 全局变量，但会在每次请求时重新初始化
+openrouter_tester = None
+
+def clean_messages(messages):
+    """
+    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
+    
+    Args:
+        messages: 原始消息数组
+    
+    Returns:
+        list: 清理后的消息数组
+    """
+    if not messages or not isinstance(messages, list):
+        return messages
+    
+    cleaned_messages = []
+    for msg in messages:
+        if isinstance(msg, dict):
+            # 只保留必要的字段
+            cleaned_msg = {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            }
+            cleaned_messages.append(cleaned_msg)
+        else:
+            logger.warning(f"非法消息格式: {type(msg)}")
+    
+    return cleaned_messages
+
 def register_test_routes(app):
     """注册测试相关路由"""
     
-    # 创建OpenRouterTest实例
-    openrouter_tester = None
-    try:
-        openrouter_tester = OpenRouterTest()
-        logger.info("成功初始化OpenRouterTest实例")
-    except Exception as e:
-        logger.error(f"初始化OpenRouterTest失败: {str(e)}")
-    
     @app.route('/api/test', methods=['GET'])
     def test_api():
-        """测试API是否正常工作"""
+        """简单API测试接口"""
+        logger.info('处理API测试请求')
         return jsonify({
             "status": "success",
-            "message": "API服务正常运行",
-            "version": "1.0.0",
-            "timestamp": str(int(time.time()))
+            "message": "API working"
         })
     
     @app.route('/api/test_utf8', methods=['GET', 'POST'])
@@ -158,13 +180,11 @@ def register_test_routes(app):
     @app.route('/api/direct_openrouter/test', methods=['GET'])
     def test_direct_openrouter_connection():
         """测试与OpenRouter的直接连接，使用.env中的配置"""
-        if not openrouter_tester:
-            return jsonify({
-                "success": False,
-                "error": "OpenRouterTest实例未初始化，可能是缺少必要的环境变量"
-            }), 500
-        
         try:
+            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
+            openrouter_tester = OpenRouterTest()
+            logger.info(f"重新初始化OpenRouterTest，模型: {openrouter_tester.model_name}")
+            
             result = openrouter_tester.test_connection()
             return jsonify(result)
         except Exception as e:
@@ -177,13 +197,11 @@ def register_test_routes(app):
     @app.route('/api/direct_openrouter/test_chinese', methods=['GET'])
     def test_direct_openrouter_chinese():
         """测试OpenRouter的中文响应能力"""
-        if not openrouter_tester:
-            return jsonify({
-                "success": False,
-                "error": "OpenRouterTest实例未初始化，可能是缺少必要的环境变量"
-            }), 500
-        
         try:
+            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
+            openrouter_tester = OpenRouterTest()
+            logger.info(f"重新初始化OpenRouterTest，模型: {openrouter_tester.model_name}")
+            
             result = openrouter_tester.test_chinese()
             return jsonify(result)
         except Exception as e:
@@ -196,13 +214,11 @@ def register_test_routes(app):
     @app.route('/api/direct_openrouter/chat', methods=['POST'])
     def direct_openrouter_chat():
         """发送聊天请求到OpenRouter，使用.env中的配置"""
-        if not openrouter_tester:
-            return jsonify({
-                "success": False,
-                "error": "OpenRouterTest实例未初始化，可能是缺少必要的环境变量"
-            }), 500
-        
         try:
+            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
+            openrouter_tester = OpenRouterTest()
+            logger.info(f"重新初始化OpenRouterTest，模型: {openrouter_tester.model_name}")
+            
             data = request.json
             if not data:
                 return jsonify({"error": "请求体为空"}), 400
@@ -210,6 +226,10 @@ def register_test_routes(app):
             messages = data.get('messages', [])
             if not messages:
                 return jsonify({"error": "缺少消息内容"}), 400
+            
+            # 清理消息数组，确保只保留必要的字段
+            cleaned_messages = clean_messages(messages)
+            logger.info(f"清理后的消息数量: {len(cleaned_messages)}")
             
             temperature = float(data.get('temperature', 0.7))
             max_tokens = int(data.get('max_tokens', 1000))
@@ -220,9 +240,8 @@ def register_test_routes(app):
                 def generate():
                     try:
                         # 使用自定义流式请求
-                        messages_copy = messages.copy()
                         result = openrouter_tester.chat_completion(
-                            messages=messages_copy,
+                            messages=cleaned_messages,  # 使用清理后的消息
                             temperature=temperature,
                             max_tokens=max_tokens,
                             stream=True
@@ -276,7 +295,7 @@ def register_test_routes(app):
             else:
                 # 普通响应
                 result = openrouter_tester.chat_completion(
-                    messages=messages,
+                    messages=cleaned_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     stream=False
@@ -294,13 +313,11 @@ def register_test_routes(app):
     @app.route('/api/direct_openrouter/stream_test', methods=['GET'])
     def test_direct_openrouter_stream():
         """测试OpenRouter的流式响应能力"""
-        if not openrouter_tester:
-            return jsonify({
-                "success": False,
-                "error": "OpenRouterTest实例未初始化，可能是缺少必要的环境变量"
-            }), 500
-        
         try:
+            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
+            openrouter_tester = OpenRouterTest()
+            logger.info(f"重新初始化OpenRouterTest，模型: {openrouter_tester.model_name}")
+            
             # 使用流式响应
             def generate():
                 try:
@@ -354,6 +371,36 @@ def register_test_routes(app):
             
         except Exception as e:
             logger.error(f"测试OpenRouter流式响应时出错: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+    
+    @app.route('/api/config/openrouter', methods=['GET'])
+    def get_openrouter_config():
+        """获取OpenRouter配置信息，用于前端初始化API设置
+        
+        Returns:
+            JSON: 包含OpenRouter API配置的JSON对象
+        """
+        try:
+            # 每次请求都重新初始化OpenRouterTest，确保使用最新的环境变量
+            openrouter_tester = OpenRouterTest()
+            logger.info(f"获取OpenRouter配置，模型: {openrouter_tester.model_name}")
+            
+            # 返回配置信息（注意：这里会暴露API密钥，确保仅在受信任的环境中使用）
+            config = {
+                "api_key": openrouter_tester.api_key,
+                "base_url": openrouter_tester.base_url,
+                "model_name": openrouter_tester.model_name
+            }
+            
+            return jsonify({
+                "success": True,
+                "config": config
+            })
+        except Exception as e:
+            logger.error(f"获取OpenRouter配置时出错: {str(e)}")
             return jsonify({
                 "success": False,
                 "error": str(e)

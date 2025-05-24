@@ -32,7 +32,7 @@ const config = {
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
     backendUrl: process.env.BACKEND_URL || 'http://localhost:5001',
     apiKey: process.env.OPENROUTER_API_KEY,
-    modelName: process.env.MODEL_NAME || 'openai/gpt-3.5-turbo',
+    modelName: process.env.MODEL_NAME || 'openai/gpt-4o-mini',
     testMessage: '你好，这是一条测试消息',
     timeout: 30000,
     viewport: {

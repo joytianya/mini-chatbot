@@ -100,7 +100,9 @@ function App() {
     streamingResponse,
     forceReloadConversation,
     clearAllConversations,
-    stopGenerating
+    stopGenerating,
+    resetApiConfig,
+    isConfigLoaded
   } = chatLogic;
 
   // 切换测试模式
@@ -255,11 +257,10 @@ function App() {
             onUpdateApiSettings={updateApiSettings}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={toggleWebSearch}
-            deepResearchEnabled={deepResearchEnabled}
-            onToggleDeepResearch={toggleDeepResearch}
             directRequestEnabled={directRequestEnabled}
             onToggleDirectRequest={toggleDirectRequest}
             chatLogicProps={chatLogic}
+            resetApiConfig={resetApiConfig}
           />
           
           <ChatArea

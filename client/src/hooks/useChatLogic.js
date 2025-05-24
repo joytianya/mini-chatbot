@@ -15,17 +15,62 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
     const [error, setError] = useState(null);
     const [streamingResponse, setStreamingResponse] = useState('');
     const [apiSettings, setApiSettings] = useState(() => {
+        // 从本地存储获取保存的设置，作为初始值
         const savedSettings = storageService.getApiSettings();
+        // 返回保存的设置或默认值
         return savedSettings || {
             base_url: 'https://openrouter.ai/api/v1',
-            api_key: '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',
+            api_key: '',
             model_name: 'qwen/qwen3-1.7b:free'
         };
     });
+    const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
     // 上次加载状态的引用，用于避免重复触发
     const lastLoadingState = React.useRef(false);
     const abortControllerRef = useRef(null); // Ref to hold the AbortController
+
+    // 组件加载时从后端获取OpenRouter配置
+    useEffect(() => {
+        async function loadConfig() {
+            try {
+                // 尝试从后端获取配置
+                const config = await apiService.getOpenRouterConfig();
+                console.log('从后端加载的OpenRouter配置:', config);
+
+                // 获取本地保存的设置
+                const savedSettings = storageService.getApiSettings();
+
+                // 如果本地没有设置，或者明确要使用后端设置，则使用后端配置
+                if (!savedSettings || !savedSettings.api_key) {
+                    // 使用后端配置
+                    const newSettings = {
+                        base_url: config.base_url || 'https://openrouter.ai/api/v1',
+                        api_key: config.api_key || '',
+                        model_name: config.model_name || 'qwen/qwen3-1.7b:free'
+                    };
+
+                    console.log('使用后端OpenRouter配置');
+                    setApiSettings(newSettings);
+                    // 保存到本地存储
+                    storageService.saveApiSettings(newSettings);
+                } else {
+                    console.log('保留本地OpenRouter配置');
+                }
+
+                setIsConfigLoaded(true);
+            } catch (error) {
+                console.error('加载OpenRouter配置时出错:', error);
+                // 出错时不更新设置，继续使用本地保存的或默认的
+                setIsConfigLoaded(true);
+                // 可以选择是否显示通知
+                // toast.error('加载API配置失败，使用默认设置');
+            }
+        }
+
+        // 加载配置
+        loadConfig();
+    }, []);
 
     // Load messages and settings when conversationId changes
     useEffect(() => {
@@ -518,6 +563,36 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
         return false;
     }, []);
 
+    // 重置API配置，从后端重新加载
+    const resetApiConfig = useCallback(async() => {
+        try {
+            setIsLoading(true);
+            // 从后端获取配置
+            const config = await apiService.getOpenRouterConfig();
+            console.log('重置为后端OpenRouter配置:', config);
+
+            // 使用后端配置
+            const newSettings = {
+                base_url: config.base_url || 'https://openrouter.ai/api/v1',
+                api_key: config.api_key || '',
+                model_name: config.model_name || 'qwen/qwen3-1.7b:free'
+            };
+
+            // 更新状态和本地存储
+            setApiSettings(newSettings);
+            storageService.saveApiSettings(newSettings);
+
+            toast.success('API配置已重置为服务器配置');
+            return true;
+        } catch (error) {
+            console.error('重置API配置时出错:', error);
+            toast.error('重置API配置失败: ' + (error.message || '未知错误'));
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     return {
         messages,
         setMessages,
@@ -528,7 +603,9 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
         updateApiSettings,
         forceReloadConversation,
         clearAllConversations,
-        stopGenerating
+        stopGenerating,
+        resetApiConfig,
+        isConfigLoaded
     };
 };
 

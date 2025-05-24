@@ -104,6 +104,33 @@ Output format:
         logger.error(f"获取搜索意图失败: {str(e)}, query: {query}")
         return query  # 如果失败则返回原始查询
 
+def clean_messages(messages):
+    """
+    清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
+    
+    Args:
+        messages: 原始消息数组
+    
+    Returns:
+        list: 清理后的消息数组
+    """
+    if not messages or not isinstance(messages, list):
+        return messages
+    
+    cleaned_messages = []
+    for msg in messages:
+        if isinstance(msg, dict):
+            # 只保留必要的字段
+            cleaned_msg = {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", "")
+            }
+            cleaned_messages.append(cleaned_msg)
+        else:
+            logger.warning(f"非法消息格式: {type(msg)}")
+    
+    return cleaned_messages
+
 def register_chat_routes(app):
     """注册聊天相关路由"""
     
@@ -144,6 +171,10 @@ def register_chat_routes(app):
             if not messages:
                 raise ValueError("'messages' 数组不能为空")
 
+            # 清理消息数组，确保只保留必要的字段
+            cleaned_messages = clean_messages(messages)
+            logger.info(f"清理后的消息数量: {len(cleaned_messages)}")
+
             base_url = data.get('base_url', '默认的base_url')
             api_key = data.get('api_key', '默认的api_key')
             model_name = data.get('model_name', data.get('model', 'google/gemini-2.0-flash-exp:free'))  # 设置为有效的默认模型ID
@@ -164,7 +195,7 @@ def register_chat_routes(app):
                 # 创建请求参数
                 completion_args = {
                     "model": model_name,  # 使用处理后的模型名称
-                    "messages": messages,
+                    "messages": cleaned_messages,  # 使用清理后的消息
                     "stream": is_stream,
                 }
                 
@@ -190,7 +221,7 @@ def register_chat_routes(app):
             search_result_urls_str = ""
             if is_web_search and client:
                 cur_date = datetime.now().strftime("%Y-%m-%d")
-                user_query = messages[-1]['content']
+                user_query = cleaned_messages[-1]['content']
 
                 expanded_query = get_search_intent(user_query, client, model_name)
                 # 使用事件循环运行异步函数
@@ -205,7 +236,7 @@ def register_chat_routes(app):
                 else:
                     web_context = search_answer_en_template.format(search_results=search_results_str, question=user_query, cur_date=cur_date)
 
-                messages[-1]['content'] = web_context
+                cleaned_messages[-1]['content'] = web_context
                 logger.info(f"添加了联网搜索结果: {web_context}")
                 logger.info(f"添加了联网搜索结果urls: {search_result_urls_str}")
 
@@ -213,9 +244,10 @@ def register_chat_routes(app):
             if is_deep_research:
                 # 使用 JinaChatAPI 进行深度研究
                 chat = JinaChatAPI()
-                response = chat.stream_chat(messages)
+                response = chat.stream_chat(cleaned_messages)  # 使用清理后的消息
             else:
                 if client:
+                    print(completion_args)
                     response = client.chat.completions.create(
                         **completion_args  # 使用构建的参数
                     )
@@ -237,7 +269,7 @@ def register_chat_routes(app):
                                 }
                             ]
                         }
-                        
+                        print(response_data)
                         # 如果启用了联网搜索，添加网页链接
                         if is_web_search and search_result_urls_str:
                             response_data["web_search_results"] = search_result_urls_str
@@ -250,7 +282,7 @@ def register_chat_routes(app):
                                 "total_tokens": response.usage.total_tokens
                             }
                         
-                        CustomLogger.response_complete(messages[-1]['content'], content)
+                        CustomLogger.response_complete(cleaned_messages[-1]['content'], content)
                         return jsonify(response_data)
                     else:
                         return jsonify({"error": "未收到有效的响应"}), 500
@@ -290,7 +322,7 @@ def register_chat_routes(app):
                         yield f"data: {data}\n\n".encode('utf-8')
 
                     yield b"data: [DONE]\n\n"
-                    CustomLogger.response_complete(messages[-1]['content'], ''.join(full_response))
+                    CustomLogger.response_complete(cleaned_messages[-1]['content'], ''.join(full_response))
                 except Exception as e:
                     logger.error("生成响应流时出错: %s", str(e))
                     error_data = json.dumps({'error': str(e)}, ensure_ascii=False)

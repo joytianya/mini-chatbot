@@ -55,3 +55,4 @@ test-*
 browser-use
 .aider*
 logs*
+apikey_manage*

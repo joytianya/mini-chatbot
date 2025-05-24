@@ -17,11 +17,11 @@ const Sidebar = ({
   onUpdateApiSettings,
   webSearchEnabled,
   onToggleWebSearch,
-  deepResearchEnabled,
-  onToggleDeepResearch,
+
   directRequestEnabled,
   onToggleDirectRequest,
-  chatLogicProps
+  chatLogicProps,
+  resetApiConfig
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -272,18 +272,6 @@ const Sidebar = ({
               </div>
             </div>
             <div className="toggle-item">
-              <label htmlFor="deep-research-toggle">深度研究</label>
-              <div className="toggle-switch">
-                <input
-                  type="checkbox"
-                  id="deep-research-toggle"
-                  checked={deepResearchEnabled}
-                  onChange={onToggleDeepResearch}
-                />
-                <span className="toggle-slider"></span>
-              </div>
-            </div>
-            <div className="toggle-item">
               <label htmlFor="direct-request-toggle">直接请求API</label>
               <div className="toggle-switch">
                 <input
@@ -378,6 +366,39 @@ const Sidebar = ({
               onClick={saveSettings}
             >
               保存设置
+            </button>
+            <button 
+              className="reset-settings-button" 
+              onClick={async () => {
+                try {
+                  if (window.confirm('确定要重置为服务器配置吗？当前的API设置将被覆盖。')) {
+                    // 显示加载状态
+                    toast.loading('正在获取服务器配置...');
+                    
+                    // 调用重置函数
+                    const success = await resetApiConfig();
+                    
+                    if (success) {
+                      // 关闭设置面板
+                      setIsSettingsOpen(false);
+                      // 更新本地状态
+                      setLocalApiSettings(apiSettings);
+                      // 显示成功消息
+                      toast.dismiss();
+                      toast.success('已重置为服务器配置');
+                    } else {
+                      toast.dismiss();
+                      toast.error('重置配置失败');
+                    }
+                  }
+                } catch (error) {
+                  console.error('重置API配置时出错:', error);
+                  toast.dismiss();
+                  toast.error('重置配置失败: ' + (error.message || '未知错误'));
+                }
+              }}
+            >
+              重置为服务器配置
             </button>
           </div>
         </div>

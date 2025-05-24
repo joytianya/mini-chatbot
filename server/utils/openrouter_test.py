@@ -13,6 +13,7 @@ import requests
 from typing import Dict, List, Any, Optional, Union
 from dotenv import load_dotenv
 import logging
+import pathlib
 
 # Configure logging
 logging.basicConfig(
@@ -21,15 +22,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("openrouter_test")
 
-# Load environment variables
-load_dotenv()
-
 class OpenRouterTest:
     """OpenRouter.ai API test class"""
     
     def __init__(self):
         """Initialize OpenRouter test service"""
-        # Load config from .env
+        # 定位.env文件
+        current_file = pathlib.Path(__file__).resolve()
+        server_dir = current_file.parent.parent  # server目录
+        project_root = server_dir.parent  # 项目根目录
+        
+        # 优先从项目根目录加载.env
+        env_path = project_root / ".env"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path, override=True)
+            logger.info(f"从项目根目录加载环境变量: {env_path}")
+        else:
+            # 后备选项：从server目录加载
+            env_path = server_dir / ".env"
+            if env_path.exists():
+                load_dotenv(dotenv_path=env_path, override=True)
+                logger.info(f"从server目录加载环境变量: {env_path}")
+            else:
+                logger.warning("未找到.env文件，将使用系统环境变量")
+                
+        # 加载配置
         self.api_key = os.getenv('OPENROUTER_API_KEY')
         self.base_url = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
         self.model_name = os.getenv('OPENROUTER_MODEL_NAME', 'qwen/qwen3-1.7b')

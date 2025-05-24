@@ -109,7 +109,9 @@ async def crawl_single_page_jina(url):
         print(f"爬取页面失败: {url}, 错误: {str(e)}")
         return {'url': url, 'content': ''}
     
+# 移除模块级别的初始化
 multi_client = MultiSearXClient()
+
 # 主函数：搜索+抓取网页内容
 async def get_web_kg(query, num_results=3, offset=0):
     try:
