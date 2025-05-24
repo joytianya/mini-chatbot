@@ -10,6 +10,7 @@ def is_chinese(text):
 def clean_messages(messages):
     """
     清理消息数组，只保留role和content字段，删除id、timestamp等无关字段
+    确保最后一条消息是用户消息
     
     Args:
         messages: 原始消息数组
@@ -28,8 +29,16 @@ def clean_messages(messages):
                 "role": msg.get("role", "user"),
                 "content": msg.get("content", "")
             }
-            cleaned_messages.append(cleaned_msg)
+            # 过滤掉空内容的消息
+            if cleaned_msg["content"].strip():
+                cleaned_messages.append(cleaned_msg)
         else:
             logger.warning(f"非法消息格式: {type(msg)}")
+    
+    # 确保最后一条消息是用户消息
+    # 从后往前查找，移除尾部的非用户消息
+    while cleaned_messages and cleaned_messages[-1]["role"] != "user":
+        removed_msg = cleaned_messages.pop()
+        logger.info(f"移除尾部非用户消息: role={removed_msg['role']}, content={removed_msg['content'][:50]}...")
     
     return cleaned_messages

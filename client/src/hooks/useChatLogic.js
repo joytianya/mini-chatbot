@@ -286,8 +286,8 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
             setIsLoading(true);
             setStreamingResponse('');
 
-            // 准备发送到API的消息列表（包括新用户消息）
-            const messagesForApi = [...updatedMessages, assistantPlaceholder];
+            // 准备发送到API的消息列表（只包含用户消息，不包含占位符）
+            const messagesForApi = updatedMessages; // 只发送包含用户消息的列表，不包含占位符
 
             // Create a new AbortController for this request
             abortControllerRef.current = new AbortController();
