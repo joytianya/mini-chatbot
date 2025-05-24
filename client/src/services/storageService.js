@@ -223,8 +223,7 @@ export const storageService = {
                     // 创建备份
                     sessionStorage.setItem(CONVERSATIONS_KEY + '_backup', this.safelyStringifyJSON(conversations));
                     return false;
-                } else {
-                }
+                } else {}
             }
 
             return result;
@@ -433,6 +432,20 @@ export const storageService = {
         localStorage.removeItem(API_SETTINGS_KEY);
         localStorage.removeItem(UI_STATE_KEY);
         sessionStorage.removeItem(CONVERSATIONS_KEY + '_backup');
+    },
+
+    // 只清除对话历史，保留API配置和其他设置
+    clearConversationsOnly() {
+        localStorage.removeItem(CONVERSATIONS_KEY);
+        sessionStorage.removeItem(CONVERSATIONS_KEY + '_backup');
+
+        // 重置UI状态中的当前对话ID，但保留其他设置
+        const currentUIState = this.getUIState();
+        const updatedUIState = {
+            ...currentUIState,
+            currentConversationId: null
+        };
+        this.saveUIState(updatedUIState);
     }
 };
 

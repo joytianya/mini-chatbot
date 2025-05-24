@@ -13,8 +13,11 @@ def stream_sse_response(response_iterator, logger, web_search_results_str=None, 
         original_query (str, optional): Original query for CustomLogger. Defaults to None.
     """
     full_response_parts = []
+    chunk_count = 0
+    
     try:
         for chunk in response_iterator:
+            chunk_count += 1
             logger.debug("SSE util received chunk: %s", chunk)
             if hasattr(chunk, 'choices') and chunk.choices:
                 delta = chunk.choices[0].delta
@@ -37,6 +40,14 @@ def stream_sse_response(response_iterator, logger, web_search_results_str=None, 
                     full_response_parts.append(content)
             else:
                 logger.error("SSE util: Unexpected chunk structure or empty choices: %s", chunk)
+
+        # 检查是否收到了空响应
+        if chunk_count == 0 or len(full_response_parts) == 0:
+            logger.warning("SSE util: Empty response detected, providing fallback message")
+            fallback_message = "抱歉，模型暂时没有返回内容。这可能是由于免费模型的使用限制或网络问题。请稍后重试，或考虑使用其他模型。"
+            data = json.dumps({'choices': [{'delta': {'content': fallback_message}}]}, ensure_ascii=False)
+            yield f"data: {data}\n\n".encode('utf-8')
+            full_response_parts.append(fallback_message)
 
         if web_search_results_str:
             data = json.dumps({'choices': [{'delta': {'content': web_search_results_str}}]}, ensure_ascii=False)

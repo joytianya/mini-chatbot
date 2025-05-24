@@ -48,7 +48,40 @@ def call_llm_api(api_key: str, base_url: str, model_name: str, messages: list, s
 
         logger.debug(f"Calling LLM API with args: {completion_args}")
         response = client.chat.completions.create(**completion_args)
-        return response
+        
+        # 添加响应检查和日志
+        if stream:
+            logger.info(f"LLM API returned streaming response for model: {model_name}")
+            # 对于流式响应，我们需要包装迭代器来记录内容
+            def log_streaming_response(response_iter):
+                chunk_count = 0
+                content_received = False
+                for chunk in response_iter:
+                    chunk_count += 1
+                    if hasattr(chunk, 'choices') and chunk.choices:
+                        delta = chunk.choices[0].delta
+                        if hasattr(delta, 'content') and delta.content:
+                            content_received = True
+                        elif hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                            content_received = True
+                    yield chunk
+                
+                logger.info(f"Streaming completed: {chunk_count} chunks, content_received: {content_received}")
+                if not content_received:
+                    logger.warning(f"No content received from model {model_name} in {chunk_count} chunks")
+            
+            return log_streaming_response(response)
+        else:
+            # 对于非流式响应，直接检查内容
+            if hasattr(response, 'choices') and response.choices:
+                content = response.choices[0].message.content if response.choices[0].message else ""
+                logger.info(f"LLM API returned non-streaming response. Content length: {len(content) if content else 0}")
+                if not content:
+                    logger.warning(f"Empty content received from model: {model_name}")
+            else:
+                logger.warning(f"No choices in response from model: {model_name}")
+            
+            return response
 
     except Exception as e:
         logger.error(f"Error calling LLM API: {str(e)}", exc_info=True)

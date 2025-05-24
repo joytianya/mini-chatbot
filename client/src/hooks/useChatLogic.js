@@ -52,8 +52,7 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                     setApiSettings(newSettings);
                     // 保存到本地存储
                     storageService.saveApiSettings(newSettings);
-                } else {
-                }
+                } else {}
 
                 setIsConfigLoaded(true);
             } catch (error) {
@@ -219,16 +218,26 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
                 title: conversation.title || messageContent.substring(0, 30) + (messageContent.length > 30 ? '...' : '')
             };
 
-            // 直接保存更新后的对话
-            storageService.saveConversation(targetConversationId, updatedConversation);
+            // 直接保存更新后的对话（使用立即保存模式）
+            const saveResult = storageService.saveConversation(targetConversationId, updatedConversation, true);
 
-            // 确认保存结果
-            const savedConversation = storageService.getConversation(targetConversationId);
-            if (savedConversation && savedConversation.messages && savedConversation.messages.length === updatedMessages.length) {
-            } else {
-                console.warn(`useChatLogic: 对话 ${targetConversationId} 保存可能不完整，预期消息数 ${updatedMessages.length}，实际消息数:`,
-                    savedConversation ? savedConversation.messages ? savedConversation.messages.length : 0 : 0);
+            if (!saveResult) {
+                console.error(`useChatLogic: 保存对话 ${targetConversationId} 失败`);
             }
+
+            // 确认保存结果（添加短暂延迟确保保存完成）
+            setTimeout(() => {
+                const savedConversation = storageService.getConversation(targetConversationId);
+                if (savedConversation && savedConversation.messages && savedConversation.messages.length === updatedMessages.length) {
+                    // 保存成功，无需日志
+                } else {
+                    console.warn(`useChatLogic: 对话 ${targetConversationId} 保存可能不完整，预期消息数 ${updatedMessages.length}，实际消息数: ${savedConversation ? (savedConversation.messages ? savedConversation.messages.length : 0) : 0}`);
+
+                    // 尝试重新保存
+                    console.log(`useChatLogic: 尝试重新保存对话 ${targetConversationId}`);
+                    storageService.saveConversationNow(targetConversationId, updatedConversation);
+                }
+            }, 50);
 
             // 更新本地状态以立即显示用户消息
             setMessages(prevMessages => {
@@ -512,10 +521,10 @@ export const useChatLogic = (conversationId, webSearchEnabled, deepResearchEnabl
 
     // 清除所有对话历史
     const clearAllConversations = useCallback(() => {
-        if (window.confirm('确定要删除所有对话历史吗？此操作不可撤销。')) {
-            storageService.clearAll();
+        if (window.confirm('确定要删除所有对话历史吗？此操作不可撤销。API配置将被保留。')) {
+            storageService.clearConversationsOnly();
             setMessages([]);
-            toast.success('所有对话历史已清除');
+            toast.success('所有对话历史已清除，API配置已保留');
             return true;
         }
         return false;
